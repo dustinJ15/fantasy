@@ -27,43 +27,63 @@ def _lineup_changes(lg: dict) -> list[str]:
     return out
 
 
+def _drop_candidate(lg: dict) -> str | None:
+    """Weakest bench player by ROS value who isn't a K/DST starter or injured stash worth keeping."""
+    starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
+    bench = [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST")]
+    if not bench:
+        return None
+    return min(bench, key=lambda p: p["mu_ros"])["name"]
+
+
 def action_card(packet: dict) -> str:
-    """The short version: what to do today, per league. Meant to be read on a phone."""
+    """Checklist-first: literal things to do today per league, then a one-line why."""
     L = [f"# FF briefing — {packet['generated'][:10]}", ""]
     sh = packet["shared"]
     for lg in packet["leagues"]:
         me = lg["odds"].get(str(lg["my_team_id"])) or {}
         opp = lg["opponent"]; lw = lg["lineup_win"]
-        L.append(f"## {lg['league_name']} — Week {lg['week']} · {lg['my_record']} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%")
-        pw = f" · P(win) {lw['p_win']:.0%}" if lw.get("p_win") is not None else ""
-        L.append(f"vs **{opp.get('name')}** ({lw['mu']:.0f} vs {opp.get('mu') or 0:.0f} proj){pw}")
+        pw = f"{lw['p_win']:.0%}" if lw.get("p_win") is not None else "?"
+        L.append(f"## {lg['league_name']}")
+        L.append(f"_{lg['my_record']} · vs {opp.get('name')} · win {pw} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%_")
+        todo = []
+        # Waiver: anyone who should START this week, or a clear ROS upgrade
+        starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5]
+        ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts]
+        drop = _drop_candidate(lg)
+        for w in starts[:1]:
+            todo.append(f"**Waiver:** add {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)" + (f"; drop {drop}" if drop else ""))
+        for w in ups[:1]:
+            todo.append(f"**Waiver (upgrade):** add {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}" + (f"; drop {drop}" if drop else ""))
+        st = [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]
+        for w in st:
+            todo.append(f"**Stream:** swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)")
         ch = _lineup_changes(lg)
-        L.append("**Lineup:** " + ("; ".join(ch) if ch else "no changes needed"))
-        starters = {n for names in lw["slots"].values() for n in names}
-        flagged = [p for p in lg["roster"] if p["name"] in starters and (p["p_zero"] >= 0.15 or p["bye"])]
-        if flagged:
-            L.append("**Starter risk:** " + "; ".join(f"{p['name']} (p_sit {p['p_zero']:.0%}{', ' + p['sources']['sleeper_notes'] if p['sources'].get('sleeper_notes') else ''})" for p in flagged))
-        ws = [w for w in lg["waivers"] if not w["streamer"]][:2]
-        if ws:
-            def _tag(w):
-                if w.get("delta_week", 0) >= 1.5:
-                    return f", START +{w['delta_week']:.1f} this week at {w['week_slot']}"
-                return f", +{w['delta_over_starter']:.1f} at {w['slot']} ROS" if w['delta_over_starter'] > 0 else ", depth"
-            L.append("**Pickups:** " + "; ".join(f"{w['name']} ({w['pos']}, {w['mu_ros']:.1f}/g{_tag(w)})" for w in ws))
-        st = [w for w in lg["waivers"] if w["streamer"]][:1]
-        if st:
-            L.append(f"**Stream:** {st[0]['name']} ({st[0]['pos']}, +{st[0]['delta_over_starter']:.1f} this week)")
+        if ch:
+            todo.append("**Lineup:** " + "; ".join(ch))
+        else:
+            todo.append("**Lineup:** leave as is")
         if lg["trades"]:
             t = lg["trades"][0]
-            td = f", title odds {t['my_title_delta']:+.1f} me / {t['their_title_delta']:+.1f} them" if "my_title_delta" in t else ""
-            L.append(f"**Trade to pitch:** give {', '.join(t['give'])} for {', '.join(t['get'])} ({t['rival']}; {t['my_delta_ppw']:+.1f} ppw me, {t['their_delta_ppw']:+.1f} them{td})")
+            tag = "worth sending" if t["their_delta_ppw"] >= -0.3 else "a reach, send only if bored"
+            todo.append(f"**Trade ({tag}):** offer {t['rival']} your {', '.join(t['give'])} for {', '.join(t['get'])} (+{t['my_delta_ppw']:.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them)")
+        for x in todo:
+            L.append(f"- {x}")
+        starters = {n for names in lw["slots"].values() for n in names}
+        flagged = [p for p in lg["roster"] if p["name"] in starters and (p["p_zero"] >= 0.15 or p["bye"])]
+        why = []
+        if flagged:
+            why.append("; ".join(f"{p['name']} {p['p_zero']:.0%} to sit" for p in flagged))
+        if lw.get("p_win") is not None:
+            why.append("underdog, favor upside" if lw["p_win"] < 0.42 else ("favorite, play it safe" if lw["p_win"] > 0.58 else "coin flip"))
+        if why:
+            L.append("_Why: " + " · ".join(why) + "_")
         L.append("")
     if sh["injury_watchlist"]:
         L.append("**Watch:** " + "; ".join(f"{w['name']} {w['status'].title()} ({w['league']})" for w in sh["injury_watchlist"]))
     if sh["exposure"]:
         L.append("**Exposure:** " + ", ".join(f"{k} ({len(v)}x)" for k, v in sh["exposure"].items()))
-    # two trailing spaces = markdown hard line break, so the card renders line-by-line in HTML too
-    return "\n".join(line if (not line or line.startswith("#")) else line + "  " for line in L)
+    return "\n".join(line if (not line or line.startswith("#") or line.startswith("- ")) else line + "  " for line in L)
 
 
 def render(packet: dict, detail: bool = True) -> str:
@@ -102,27 +122,26 @@ def render_detail(packet: dict) -> str:
             L.append(f"\n## Matchup vs {opp['name']} (their proj {opp['mu']} ± {opp['sd']})")
         lw, le = lg["lineup_win"], lg["lineup_ev"]
         L.append(f"Recommended lineup (max P(win){' = ' + str(lw['p_win']) if lw.get('p_win') is not None else ''}), proj {lw['mu']} ± {lw['sd']}; current ESPN lineup proj {lg['current_lineup_mu']}")
+        L.append("")
         for slot, names in lw["slots"].items():
             L.append(f"- {slot}: {', '.join(names)}")
         if lg["lineup_diff"]:
             L.append(f"Differs from the pure-points lineup ({le['mu']}): " + "; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"]))
+        L.append("")
         L.append(f"Bench: {', '.join(lw['bench'])}")
 
-        L.append("\n## My roster")
-        L.append("| player | pos | slot | wk μ | sd | p0 | ROS/g | flags | usage | mkt |")
-        L.append("|---|---|---|---|---|---|---|---|---|---|")
+        L.append("\n## My roster (this week μ · ROS/g · flags)")
+        L.append("| player | pos | wk μ | ROS/g | flags |")
+        L.append("|---|---|---|---|---|")
         for p in lg["roster"]:
-            u = p.get("usage") or {}
-            uf = "; ".join(u.get("flags", [])) if u else ""
-            m = p.get("market") or {}
-            L.append(f"| {p['name']} | {p['pos']} | {p['slot']} | {p['mu']} | {p['sd']} | {p['p_zero']} | {p['mu_ros']} | {_flags(p)} | {uf} | {m.get('redraft_value','')} |")
+            L.append(f"| {p['name']} | {p['pos']} | {p['mu']} | {p['mu_ros']} | {_flags(p)} |")
 
         L.append("\n## Waivers")
         if lg["waivers"]:
             faab = lg.get("faab_remaining") is not None
             L.append("| target | pos | wk μ | ROS/g | vs my starter | " + ("bid | " if faab else "") + "why |")
             L.append("|---|---|---|---|---|" + ("---|" if faab else "") + "---|")
-            for w in lg["waivers"]:
+            for w in lg["waivers"][:6]:
                 d = (f"+{w['delta_over_starter']:.1f} at {w['slot']}" if w['delta_over_starter'] > 0 else f"depth ({w['delta_over_starter']:.1f} vs {w['slot']})") if w['slot'] else "depth"
                 L.append(f"| {w['name']} | {w['pos']} | {w['mu_week']} | {w['mu_ros']} | {d} | " + (f"${w['bid']} | " if faab else "") + f"{'; '.join(w['why'][:4])} |")
         else:
@@ -132,7 +151,7 @@ def render_detail(packet: dict) -> str:
 
         L.append("\n## Trade candidates")
         if lg["trades"]:
-            for t in lg["trades"][:6]:
+            for t in lg["trades"][:3]:
                 td = f" · title odds me {t.get('my_title_delta', '?'):+} / them {t.get('their_title_delta', '?'):+}" if "my_title_delta" in t else ""
                 L.append(f"- **Give {', '.join(t['give'])} → get {', '.join(t['get'])}** from {t['rival']}: me {t['my_delta_ppw']:+.1f} ppw, them {t['their_delta_ppw']:+.1f} ppw{td}. {'; '.join(t['why'])}")
         else:

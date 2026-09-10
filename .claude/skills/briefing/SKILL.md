@@ -22,11 +22,12 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
    If nothing changed, write `{}`.
 5. `uv run ff briefing --overrides overrides.json --sims 2000 --out briefing.md` (also 3-5 minutes; timeout 600000). Read briefing.md.
-6. Compose the email body. briefing.md already opens with a short action card per league and puts full tables under a
-   "Full detail below" divider. Keep that structure. Insert one "Claude's read" line (1-3 sentences, plain words: the single
-   most important thing to do today and why, plus the trade pitch text if one is worth sending) directly under each league's
-   heading in the action card. Do not add anything else above the divider. Dustin reads this on a phone: the top of the
-   email must fit on one screen per league.
+6. Compose the email body. briefing.md opens with a checklist per league (Waiver / Lineup / Trade bullets, then a "Why"
+   line) and puts full tables under a "Full detail below" divider. Keep that structure. Directly under each league's "Why"
+   line add one line: `**Claude's read:** ...` (1-2 sentences, plain words: confirm or adjust the checklist based on your
+   research, and if a trade is worth sending, the exact message Dustin can paste to the rival). If your research changes
+   a checklist item (e.g. a player was ruled out), edit the bullet itself. Do not add anything else above the divider.
+   Dustin reads this on a phone: each league must fit on one screen.
 7. Send it to Dustin with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
    Formatting: after editing briefing.md, run `uv run ff to-html briefing.md briefing.html` (compact, ~35 KB). The Gmail
    send tool accepts an `htmlBody` parameter: pass the full contents of briefing.html as `htmlBody` and the markdown text

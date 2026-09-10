@@ -2,6 +2,7 @@
 # Bootstrap inside a fresh cloud clone (Claude Code routine). Idempotent.
 set -euo pipefail
 export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-300}"
+export NFLREADPY_TIMEOUT="${NFLREADPY_TIMEOUT:-120}"
 cd "$(dirname "$0")/.."
 if ! command -v uv >/dev/null 2>&1; then
   pip install --quiet --user uv 2>/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
