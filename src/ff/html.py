@@ -13,17 +13,21 @@ CSS = {
     "p": "margin:6px 0",
     "table": "border-collapse:collapse;font-size:13px;margin:8px 0;width:100%",
     "th": "text-align:left;padding:4px 6px;border-bottom:2px solid #ccc;background:#f4f4f4",
-    "td": "padding:3px 6px;border-bottom:1px solid #eee;vertical-align:top",
+
     "hr": "border:0;border-top:2px dashed #bbb;margin:24px 0",
-    "li": "margin:2px 0",
+
     "blockquote": "margin:8px 0;padding:6px 10px;background:#fff8e1;border-left:4px solid #f5c542",
 }
 
 
 def to_html(markdown_text: str) -> str:
+    """Compact: styles only on block tags, table cells use cellpadding (Gmail honors it). Keeps the file small enough
+    to paste as a tool argument."""
     body = md.markdown(markdown_text, extensions=["tables", "sane_lists"])
     for tag, style in CSS.items():
         if tag == "body":
             continue
         body = re.sub(rf"<{tag}(\s|>)", f'<{tag} style="{style}"\\1', body)
+    body = body.replace("<table ", "<table cellpadding=\"4\" border=\"0\" ")
+    body = re.sub(r"\n\s*<", "<", body)  # drop pretty-print whitespace
     return f'<div style="{CSS["body"]}">{body}</div>'
