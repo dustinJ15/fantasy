@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Bootstrap inside a fresh cloud clone (Claude Code routine). Idempotent.
 set -euo pipefail
+export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-300}"
 cd "$(dirname "$0")/.."
 if ! command -v uv >/dev/null 2>&1; then
   pip install --quiet --user uv 2>/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$PATH"
 fi
 uv python install 3.13 >/dev/null 2>&1 || true
-uv sync --quiet
+uv sync --quiet || uv sync --quiet   # one retry for flaky downloads
 # Cookies arrive as environment variables in the cloud; write them to .env so the CLI finds them.
 if [ ! -f .env ] && [ -n "${ESPN_S2:-}" ]; then
   printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
