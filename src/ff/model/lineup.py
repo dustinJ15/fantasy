@@ -27,7 +27,7 @@ class Lineup:
 
     def to_dict(self) -> dict:
         return {
-            "slots": {s: [p.name for p in ps] for s, ps in self.assignment.items()},
+            "slots": {s: ([p.name for p in ps] or ["(EMPTY — no eligible player)"]) for s, ps in self.assignment.items()},
             "mu": round(self.mu, 2), "sd": round(self.var**0.5, 2),
             "p_win": round(self.p_win, 3) if self.p_win is not None else None,
             "bench": [p.name for p in self.bench],
@@ -61,20 +61,24 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
         flex = "/" in s or s == "OP"
         k = (counts[s] + (3 if flex else 1)) if not use_win else (counts[s] + (5 if flex else 3))
         el = sorted([p for p in avail if s in p.eligible], key=lambda p: -p.ev)[:k]
+        if not el:
+            # Nobody projectable for this slot (e.g. only TE is out). Try anyone eligible, else leave it empty
+            # rather than failing the whole lineup; the report shows it as a hole.
+            el = sorted([p for p in players if s in p.eligible], key=lambda p: -p.ev)[:k] or [None]
         cands.append(el)
 
     best = None
     seen = set()
     for combo in itertools.product(*cands):
-        ids = [p.espn_id for p in combo]
+        ids = [p.espn_id for p in combo if p is not None]
         if len(set(ids)) != len(ids):
             continue
         key = tuple(sorted(ids))
         if key in seen:
             continue
         seen.add(key)
-        mu = sum(p.ev for p in combo)
-        var = sum(p.var for p in combo)
+        mu = sum(p.ev for p in combo if p is not None)
+        var = sum(p.var for p in combo if p is not None)
         score = win_prob(mu, var, opp_mu, opp_var or 0.0) if use_win else mu
         if best is None or score > best[0] + 1e-12 or (abs(score - best[0]) < 1e-12 and mu > best[1]):
             best = (score, mu, var, combo)
@@ -83,8 +87,10 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     score, mu, var, combo = best
     assignment: dict[str, list[PlayerProj]] = {}
     for s, p in zip(slots, combo):
-        assignment.setdefault(s, []).append(p)
-    chosen = {p.espn_id for p in combo}
+        assignment.setdefault(s, [])
+        if p is not None:
+            assignment[s].append(p)
+    chosen = {p.espn_id for p in combo if p is not None}
     bench = [p for p in players if p.espn_id not in chosen]
     pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
     return Lineup(assignment, mu, var, pw, bench)

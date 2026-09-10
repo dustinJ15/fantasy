@@ -28,3 +28,11 @@ def test_compare_lists_differences(roster, slots):
     b = optimize(roster, slots, opp_mu=140, opp_var=200)
     diff = compare(a, b)
     assert isinstance(diff, list)
+
+
+def test_empty_slot_does_not_break_lineup(roster, slots):
+    from tests.conftest import P
+    r = [p for p in roster if p.pos != "TE"] + [P(8, "TEout", "TE", 0.0, 0.0, p0=1.0)]
+    L = optimize(r, slots, opp_mu=110, opp_var=300)
+    assert L.mu > 90 and L.p_win is not None
+    assert L.to_dict()["slots"]["TE"] == ["(EMPTY — no eligible player)"] or L.to_dict()["slots"]["TE"] == ["TEout"]
