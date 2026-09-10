@@ -1,0 +1,17 @@
+# One entry per league. espn_id from the league URL; team_id is my team in that league.
+# No secrets here; cookies live in .env.
+
+[[league]]
+name = "L1"
+espn_id = 1708144565
+team_id = 3
+
+[[league]]
+name = "L2"
+espn_id = 656016554
+team_id = 16
+
+[[league]]
+name = "L3"
+espn_id = 264154198
+team_id = 7
