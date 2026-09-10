@@ -26,6 +26,8 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    the one trade pitch worth sending written so Dustin can paste it to the rival), followed by that league's section
    from briefing.md verbatim. Put the shared injury watchlist and exposure block first.
 7. Send it to Dustin with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
+   The `body` argument must be the literal markdown text of the composed briefing (read the file and paste its contents);
+   there is no file-attachment or FILE: syntax. Send exactly one email.
    If Gmail is unavailable, fall back to `uv run ff email briefing.md` (needs GMAIL_USER/GMAIL_APP_PASSWORD), and if that
    also fails, print the full briefing so it's in the run log.
 8. Do not commit or push anything. Do not touch ESPN beyond reads.
