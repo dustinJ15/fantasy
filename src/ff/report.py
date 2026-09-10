@@ -58,7 +58,8 @@ def action_card(packet: dict) -> str:
         L.append("**Watch:** " + "; ".join(f"{w['name']} {w['status'].title()} ({w['league']})" for w in sh["injury_watchlist"]))
     if sh["exposure"]:
         L.append("**Exposure:** " + ", ".join(f"{k} ({len(v)}x)" for k, v in sh["exposure"].items()))
-    return "\n".join(L)
+    # two trailing spaces = markdown hard line break, so the card renders line-by-line in HTML too
+    return "\n".join(line if (not line or line.startswith("#")) else line + "  " for line in L)
 
 
 def render(packet: dict, detail: bool = True) -> str:
