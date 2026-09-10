@@ -43,3 +43,25 @@ def injury_table(force: bool = False) -> dict[str, dict]:
             "gsis_id": p.get("gsis_id"),
         }
     return out
+
+
+def projections(season: int, week: int, force: bool = False) -> dict[str, dict]:
+    """Sleeper (Rotowire) weekly projections keyed by sleeper_id (and DEF:<team> for defenses)."""
+    def fetch():
+        r = requests.get(f"{BASE.replace('/v1','')}/projections/nfl/{season}/{week}",
+                         params={"season_type": "regular", "position[]": ["QB", "RB", "WR", "TE", "K", "DEF"]},
+                         headers=UA, timeout=60)
+        r.raise_for_status()
+        return r.json()
+    rows = cached_json(f"sleeper_proj_{season}_{week}", 6 * HOUR, fetch, force)
+    pl = players()
+    out = {}
+    for row in rows:
+        st = row.get("stats") or {}
+        if not st.get("pts_ppr") and not st.get("pts_std"):
+            continue
+        p = pl.get(row["player_id"]) or {}
+        key = f"DEF:{row.get('team')}" if p.get("position") == "DEF" or row["player_id"] == row.get("team") else str(row["player_id"])
+        out[key] = {"pts_ppr": st.get("pts_ppr"), "pts_half_ppr": st.get("pts_half_ppr"), "pts_std": st.get("pts_std"),
+                    "opp": row.get("opponent"), "team": row.get("team")}
+    return out

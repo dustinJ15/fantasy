@@ -76,10 +76,11 @@ def packet_cmd(league: str | None = LeagueOpt, overrides: str | None = typer.Opt
 
 
 @app.command()
-def briefing(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), out: str | None = typer.Option(None), sims: int = 3000):
-    """Render the full markdown briefing (no LLM needed)."""
+def briefing(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), out: str | None = typer.Option(None), sims: int = 3000,
+             short: bool = typer.Option(False, "--short", help="Action card only, no detail tables")):
+    """Render the markdown briefing: action card first, full detail below (no LLM needed)."""
     p = _packet(league, overrides, sims)
-    md = report.render(p)
+    md = report.render(p, detail=not short)
     path = out or str(PACKET_DIR / f"briefing-{date.today().isoformat()}.md")
     open(path, "w").write(md)
     print(md)
@@ -146,6 +147,29 @@ def email(file: str = typer.Argument(..., help="markdown file to send"), subject
     subj = subject or f"FF briefing — {date.today().isoformat()}"
     mail.send(subj, body, to)
     rprint(f"[green]sent '{subj}' to {to or 'self'}[/]")
+
+
+@app.command("log-projections")
+def log_projections(league: str | None = LeagueOpt):
+    """Append today's per-source projections to data/projlog/ (for accuracy tracking)."""
+    from . import projlog
+    p = _packet(league, None, sims=200)
+    rprint(projlog.write(p))
+
+
+@app.command()
+def accuracy():
+    """MAE / bias by source × position over logged weeks (needs >=1 completed week)."""
+    from . import projlog
+    from .sources import sleeper
+    wk = sleeper.state().get("week", 1)
+    df = projlog.accuracy(env().season, wk)
+    if df.is_empty():
+        rprint("no completed weeks logged yet"); return
+    t = Table("pos", "source", "n", "MAE", "bias")
+    for r in df.iter_rows(named=True):
+        t.add_row(r["pos"], r["source"], str(r["n"]), str(r["mae"]), str(r["bias"]))
+    rprint(t)
 
 
 @app.command()

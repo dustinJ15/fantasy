@@ -29,25 +29,38 @@ def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
     return cached_json(f"espn_{ref.name}", HOUR / 4, fetch, force)
 
 
-def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining: int, overrides: dict | None) -> tuple[list[PlayerProj], list[PlayerProj]]:
+def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining: int, overrides: dict | None,
+           sl_proj: dict | None = None, lines: dict | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
+    ppr = snap["settings"].get("ppr", 1.0)
+    key = "pts_ppr" if ppr >= 0.75 else ("pts_half_ppr" if ppr > 0 else "pts_std")
+    sl_proj, lines = sl_proj or {}, lines or {}
+
     def mk(rows):
         out = []
         for r in rows:
             fp = xw.fp_row(fp_index, r["espn_id"], r["name"], r["pos"])
-            out.append(blend(r, fp, inj.get(str(r["espn_id"])), weeks_remaining, overrides))
+            if r["pos"] == "D/ST":
+                sp = sl_proj.get(f"DEF:{r['team']}")
+            else:
+                sid = xw.sleeper_id(r["espn_id"], r["name"], r["pos"])
+                sp = sl_proj.get(sid) if sid else None
+            spts = float(sp[key]) if sp and sp.get(key) is not None else None
+            ln = lines.get(r["team"]) or {}
+            out.append(blend(r, fp, inj.get(str(r["espn_id"])), weeks_remaining, overrides,
+                             sleeper_pts=spts, implied_total=ln.get("implied")))
         return out
     return mk(snap["roster"]), mk(snap["free_agents"])
 
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
-                   overrides: dict | None = None, sims: int = 3000) -> dict:
+                   overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None) -> dict:
     s = snap["settings"]
     week = snap["week"]
     slots = s["lineup_slots"]
     total_weeks = len(s["matchup_periods"])
     weeks_remaining = max(total_weeks - week + 1, 1)
     my_id = snap["my_team_id"]
-    rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides)
+    rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines)
     pool = rostered + fas
     repl = replacement_levels(pool, slots, s["team_count"])
     by_team: dict[int, list[PlayerProj]] = defaultdict(list)
@@ -147,7 +160,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "replacement": repl,
         "waivers": waivers, "handcuffs": cuffs, "trades": trades,
         "odds": {str(tid): {**o, "name": teams[tid]["name"], "record": f"{teams[tid]['wins']}-{teams[tid]['losses']}", "is_me": tid == my_id} for tid, o in odds.items()},
-        "rival_needs": {str(tid): {pos: ("hole" if v["hole"] else "surplus" if v["surplus"] else "") for pos, v in n.items()} for tid, n in rival_needs.items()},
+        "rival_needs": {str(tid): {pos: ("hole" if v["hole"] else "surplus" if v["surplus"] else "") for pos, v in n.items() if pos not in ("K", "D/ST")} for tid, n in rival_needs.items()},
         "standings": sorted([{"name": t["name"], "record": f"{t['wins']}-{t['losses']}", "pf": round(t["points_for"], 1), "faab_left": (s["faab_budget"] - t["faab_spent"]) if s["faab"] else None, "waiver_rank": t["waiver_rank"], "is_me": tid == my_id}
                              for tid, t in teams.items()], key=lambda x: -x["pf"]),
     }
@@ -174,11 +187,15 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     else:
         usage_err = None
     lines = vegas.implied_totals()
+    try:
+        sl_proj = sleeper.projections(e.season, sleeper.state().get("week", 1))
+    except Exception:
+        sl_proj = {}
 
     league_blocks, watch, exposure = [], [], defaultdict(list)
     for ref in leagues(only):
         snap = league_snapshot(ref, force)
-        blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims)
+        blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines)
         for p in blk["roster"]:
             exposure[p["name"]].append(ref.name)
             st = (p["sources"].get("espn_status") or p["sources"].get("sleeper_status") or "").upper()

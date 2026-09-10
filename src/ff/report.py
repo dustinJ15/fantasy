@@ -10,10 +10,69 @@ def _flags(p: dict) -> str:
     return ", ".join(f)
 
 
-def render(packet: dict) -> str:
+NON_STARTER = {"BE", "IR", "", "FA"}
+
+
+def _lineup_changes(lg: dict) -> list[str]:
+    """Players to move, comparing the current ESPN slots with the recommended lineup."""
+    cur = {p["name"]: p["slot"] for p in lg["roster"]}
+    rec = {n: s for s, names in lg["lineup_win"]["slots"].items() for n in names if not n.startswith("(")}
+    ins = [f"{n} → {s}" for n, s in rec.items() if cur.get(n) in NON_STARTER]
+    outs = [n for n, s in cur.items() if s not in NON_STARTER and n not in rec]
+    empties = [s for s, names in lg["lineup_win"]["slots"].items() if any(n.startswith("(") for n in names)]
+    out = []
+    if ins: out.append("Start: " + ", ".join(ins))
+    if outs: out.append("Bench: " + ", ".join(outs))
+    if empties: out.append("EMPTY SLOT: " + ", ".join(empties) + " (no healthy player; pick one up)")
+    return out
+
+
+def action_card(packet: dict) -> str:
+    """The short version: what to do today, per league. Meant to be read on a phone."""
+    L = [f"# FF briefing — {packet['generated'][:10]}", ""]
+    sh = packet["shared"]
+    for lg in packet["leagues"]:
+        me = lg["odds"].get(str(lg["my_team_id"])) or {}
+        opp = lg["opponent"]; lw = lg["lineup_win"]
+        L.append(f"## {lg['league_name']} — Week {lg['week']} · {lg['my_record']} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%")
+        pw = f" · P(win) {lw['p_win']:.0%}" if lw.get("p_win") is not None else ""
+        L.append(f"vs **{opp.get('name')}** ({lw['mu']:.0f} vs {opp.get('mu') or 0:.0f} proj){pw}")
+        ch = _lineup_changes(lg)
+        L.append("**Lineup:** " + ("; ".join(ch) if ch else "no changes needed"))
+        starters = {n for names in lw["slots"].values() for n in names}
+        flagged = [p for p in lg["roster"] if p["name"] in starters and (p["p_zero"] >= 0.15 or p["bye"])]
+        if flagged:
+            L.append("**Starter risk:** " + "; ".join(f"{p['name']} (p_sit {p['p_zero']:.0%}{', ' + p['sources']['sleeper_notes'] if p['sources'].get('sleeper_notes') else ''})" for p in flagged))
+        ws = [w for w in lg["waivers"] if not w["streamer"]][:2]
+        if ws:
+            L.append("**Pickups:** " + "; ".join(f"{w['name']} ({w['pos']}, {w['mu_ros']:.1f}/g" + (f", +{w['delta_over_starter']:.1f} at {w['slot']}" if w['delta_over_starter'] > 0 else ", depth") + ")" for w in ws))
+        st = [w for w in lg["waivers"] if w["streamer"]][:1]
+        if st:
+            L.append(f"**Stream:** {st[0]['name']} ({st[0]['pos']}, +{st[0]['delta_over_starter']:.1f} this week)")
+        if lg["trades"]:
+            t = lg["trades"][0]
+            td = f", title odds {t['my_title_delta']:+.1f} me / {t['their_title_delta']:+.1f} them" if "my_title_delta" in t else ""
+            L.append(f"**Trade to pitch:** give {', '.join(t['give'])} for {', '.join(t['get'])} ({t['rival']}; {t['my_delta_ppw']:+.1f} ppw me, {t['their_delta_ppw']:+.1f} them{td})")
+        L.append("")
+    if sh["injury_watchlist"]:
+        L.append("**Watch:** " + "; ".join(f"{w['name']} {w['status'].title()} ({w['league']})" for w in sh["injury_watchlist"]))
+    if sh["exposure"]:
+        L.append("**Exposure:** " + ", ".join(f"{k} ({len(v)}x)" for k, v in sh["exposure"].items()))
+    return "\n".join(L)
+
+
+def render(packet: dict, detail: bool = True) -> str:
+    """Action card first; full tables after a divider (omit with detail=False)."""
+    head = action_card(packet)
+    if not detail:
+        return head
+    return head + "\n\n---\n\n_Full detail below._\n\n" + render_detail(packet)
+
+
+def render_detail(packet: dict) -> str:
     L = []
     sh = packet["shared"]
-    L.append(f"# FF briefing — {packet['generated'][:10]}\n")
+    L.append(f"# Detail — {packet['generated'][:10]}\n")
     if sh["injury_watchlist"]:
         L.append("## Injury watchlist (ambiguous designations on my rosters)")
         for w in sh["injury_watchlist"]:
@@ -59,7 +118,7 @@ def render(packet: dict) -> str:
             L.append("| target | pos | wk μ | ROS/g | vs my starter | " + ("bid | " if faab else "") + "why |")
             L.append("|---|---|---|---|---|" + ("---|" if faab else "") + "---|")
             for w in lg["waivers"]:
-                d = f"{w['delta_over_starter']:+.1f} {w['slot']}" if w['slot'] else "bench only"
+                d = (f"+{w['delta_over_starter']:.1f} at {w['slot']}" if w['delta_over_starter'] > 0 else f"depth ({w['delta_over_starter']:.1f} vs {w['slot']})") if w['slot'] else "depth"
                 L.append(f"| {w['name']} | {w['pos']} | {w['mu_week']} | {w['mu_ros']} | {d} | " + (f"${w['bid']} | " if faab else "") + f"{'; '.join(w['why'][:4])} |")
         else:
             L.append("Nothing worth a claim.")

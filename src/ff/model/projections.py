@@ -68,20 +68,37 @@ def _sigma(pos: str, mu: float, fp_sd: float | None) -> float:
     return float(s)
 
 
-def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None) -> PlayerProj:
-    """row: PlayerRow dict from sources.espn. fp: matched fp_latest_weekly row. sleeper: injury_table row."""
+VEGAS_K = {"QB": 0.35, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}
+LEAGUE_AVG_IMPLIED = 23.0
+
+
+def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None,
+          sleeper_pts: float | None = None, implied_total: float | None = None) -> PlayerProj:
+    """
+    row: PlayerRow dict from sources.espn. fp: matched fp_latest_weekly row. sleeper: injury_table row.
+    sleeper_pts: Sleeper/Rotowire stat projection in this league's scoring. implied_total: Vegas implied team total.
+
+    Blend rule (per FFA's 12-season finding that equal-weight averaging beats accuracy-weighting):
+    equal-weight mean of the stat-based sources available (ESPN/Clay, Sleeper/Rotowire). FantasyPros rank-to-points
+    (r2p_pts) is a rank lookup, not a stat projection, so it is a fallback only. Vegas implied total is applied as a
+    small multiplicative adjuster, never averaged in (every expert already looks at the line).
+    """
     pos = row["pos"]
     espn_pts = float(row.get("proj_week") or 0)
     fp_pts = float(fp["r2p_pts"]) if fp and fp.get("r2p_pts") is not None else None
     fp_sd = float(fp["sd"]) if fp and fp.get("sd") is not None else None
 
-    srcs = [x for x in (fp_pts, espn_pts) if x is not None and x > 0]
-    if fp_pts and espn_pts:
-        mu = 0.6 * fp_pts + 0.4 * espn_pts     # consensus of 130+ experts beats one house model
-    elif srcs:
-        mu = srcs[0]
+    stat_srcs = [x for x in (espn_pts, sleeper_pts) if x is not None and x > 0]
+    if stat_srcs:
+        mu = sum(stat_srcs) / len(stat_srcs)
+        if fp_pts and len(stat_srcs) == 1:
+            mu = 0.7 * mu + 0.3 * fp_pts   # one stat source: let consensus rank temper it
+    elif fp_pts:
+        mu = fp_pts
     else:
         mu = 0.0
+    if implied_total and mu and VEGAS_K.get(pos, 0):
+        mu *= 1 + VEGAS_K[pos] * (implied_total / LEAGUE_AVG_IMPLIED - 1)
 
     status = (row.get("injury_status") or "").upper() or None
     sl_status = ((sleeper or {}).get("status") or "").upper() or None
@@ -115,7 +132,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         fantasy_team_id=row.get("fantasy_team_id"), slot=row.get("slot", ""),
         mu=round(mu, 2), sigma=round(_sigma(pos, mu, fp_sd), 2), p_zero=round(p0, 3), mu_ros=round(mu_ros, 2),
         bye=bool(row.get("bye")),
-        sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
+        sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "sleeper_pts": sleeper_pts, "implied_total": implied_total,
+                 "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
                  "grade": fp.get("start_sit_grade") if fp else None, "espn_status": status, "sleeper_status": sl_status,
                  "sleeper_notes": (sleeper or {}).get("notes"), "percent_owned": row.get("percent_owned")},
         flags=flags,

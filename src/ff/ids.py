@@ -46,6 +46,11 @@ class Crosswalk:
                                           "position": p.get("position"), "team": p.get("team")}
         self.unmatched: list[str] = []
 
+    def sleeper_id(self, espn_id: int | str, name: str = "", pos: str = "") -> str | None:
+        r = self.lookup(espn_id, name, pos)
+        sid = r.get("sleeper_id") if r else None
+        return str(_int(sid)) if sid not in (None, "NA", "") else None
+
     def lookup(self, espn_id: int | str, name: str = "", pos: str = "") -> dict | None:
         r = self.by_espn.get(str(espn_id))
         if r:

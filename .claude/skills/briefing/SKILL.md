@@ -22,16 +22,21 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
    If nothing changed, write `{}`.
 5. `uv run ff briefing --overrides overrides.json --sims 2000 --out briefing.md` (also 3-5 minutes; timeout 600000). Read briefing.md.
-6. Compose the email body: for each league, a "Claude's read" paragraph (3-6 sentences: what to do today, biggest risk,
-   the one trade pitch worth sending written so Dustin can paste it to the rival), followed by that league's section
-   from briefing.md verbatim. Put the shared injury watchlist and exposure block first.
+6. Compose the email body. briefing.md already opens with a short action card per league and puts full tables under a
+   "Full detail below" divider. Keep that structure. Insert one "Claude's read" line (1-3 sentences, plain words: the single
+   most important thing to do today and why, plus the trade pitch text if one is worth sending) directly under each league's
+   heading in the action card. Do not add anything else above the divider. Dustin reads this on a phone: the top of the
+   email must fit on one screen per league.
 7. Send it to Dustin with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
    The `body` argument must be the literal markdown text of the composed briefing (read the file and paste its contents);
    there is no file-attachment or FILE: syntax. Send exactly one email.
    If Gmail is unavailable, fall back to `uv run ff email briefing.md` (needs GMAIL_USER/GMAIL_APP_PASSWORD), and if that
    also fails, print the full briefing so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
-9. Do not commit or push anything. Do not touch ESPN beyond reads.
+9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory:
+   `git add data/projlog && git commit -m "projlog: week <N> <date>" && git push`. If push fails, say so and move on.
+   This is the single exception to the no-commit rule. Never commit anything else.
+10. Do not touch ESPN beyond reads.
 
 ## If anything fails
 If any step errors and cannot be recovered with one retry (dead cookies, a source down, a crash in `ff`), STOP the normal

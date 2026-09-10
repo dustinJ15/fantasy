@@ -54,7 +54,7 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
         # positions (QB/K/DST) are near-worthless.
         near = d_start > -4 or vorp > 2
         bench_val = 0.5 * max(d_bench, 0) if (near and p.pos not in ("QB", "K", "D/ST")) else 0.0
-        trend = min(trending.get(str(p.espn_id), 0) / 20000, 3)
+        trend = min(trending.get(str(p.espn_id), 0) / 40000, 1.5)
         score = max(d_start, 0) * 3 + bench_val + max(vorp, 0) + trend
         if streamer:
             score = d_start  # only worth listing if clearly better than my current K/DST this week

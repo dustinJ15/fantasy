@@ -2,6 +2,7 @@
 .venv/
 data/cache/
 data/packets/
+!data/projlog/
 __pycache__/
 *.pyc
 .pytest_cache/

@@ -11,6 +11,8 @@ class FakeXW:
         return {"r2p_pts": None, "sd": 2.0, "ecr": 10, "start_sit_grade": "B"}
     def lookup(self, espn_id, name="", pos=""):
         return {"gsis_id": f"g{espn_id}"}
+    def sleeper_id(self, espn_id, name="", pos=""):
+        return None
 
 
 def make_snapshot(teams=8):
@@ -71,7 +73,7 @@ def test_end_to_end_synthetic(monkeypatch):
               "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": []},
               "leagues": [blk]}
     md = report.render(packet)
-    assert "Synthetic League" in md and "## Waivers" in md and "## League odds" in md
+    assert "Synthetic League" in md and "## Waivers" in md and "## League odds" in md and "Lineup:" in md
     # overrides flow through
     pid = str(blk["roster"][0]["espn_id"])
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)

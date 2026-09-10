@@ -78,9 +78,9 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 continue
             why = []
             for p in get:
-                if my_needs.get(p.pos, {}).get("hole"): why.append(f"fills my {p.pos} hole")
+                if my_needs.get(p.pos, {}).get("hole") and f"fills my {p.pos} hole" not in why: why.append(f"fills my {p.pos} hole")
             for p in give:
-                if their_needs.get(p.pos, {}).get("hole"): why.append(f"fills their {p.pos} hole")
+                if their_needs.get(p.pos, {}).get("hole") and f"fills their {p.pos} hole" not in why: why.append(f"fills their {p.pos} hole")
             meta = team_meta.get(rid, {})
             if meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
             rival_cands.append({
