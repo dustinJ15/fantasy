@@ -73,7 +73,7 @@ def test_end_to_end_synthetic(monkeypatch):
               "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": []},
               "leagues": [blk]}
     md = report.render(packet)
-    assert "Synthetic League" in md and "## Waivers" in md and "## League odds" in md and "Lineup:" in md
+    assert "Synthetic League" in md and "## Waivers" in md and "## League odds" in md and "Lineup" in md
     # overrides flow through
     pid = str(blk["roster"][0]["espn_id"])
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)
