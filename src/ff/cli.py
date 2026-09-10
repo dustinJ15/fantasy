@@ -148,5 +148,19 @@ def email(file: str = typer.Argument(..., help="markdown file to send"), subject
     rprint(f"[green]sent '{subj}' to {to or 'self'}[/]")
 
 
+@app.command()
+def heartbeat(fail: bool = typer.Option(False, "--fail", help="Report failure instead of success")):
+    """Ping HEALTHCHECK_URL (healthchecks.io dead-man's switch). No-op if unset."""
+    import os, requests
+    url = os.getenv("HEALTHCHECK_URL")
+    if not url:
+        rprint("[dim]HEALTHCHECK_URL not set; skipping heartbeat[/]"); return
+    try:
+        requests.get(url.rstrip("/") + ("/fail" if fail else ""), timeout=15)
+        rprint(f"[green]heartbeat {'FAIL' if fail else 'ok'} sent[/]")
+    except Exception as exc:
+        rprint(f"[yellow]heartbeat failed: {exc}[/]")
+
+
 if __name__ == "__main__":
     app()

@@ -30,4 +30,12 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    there is no file-attachment or FILE: syntax. Send exactly one email.
    If Gmail is unavailable, fall back to `uv run ff email briefing.md` (needs GMAIL_USER/GMAIL_APP_PASSWORD), and if that
    also fails, print the full briefing so it's in the run log.
-8. Do not commit or push anything. Do not touch ESPN beyond reads.
+8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
+9. Do not commit or push anything. Do not touch ESPN beyond reads.
+
+## If anything fails
+If any step errors and cannot be recovered with one retry (dead cookies, a source down, a crash in `ff`), STOP the normal
+flow and instead email Dustin (same Gmail path) with subject `FF briefing FAILED — <YYYY-MM-DD>` containing:
+which step failed, the exact error text, what you tried, and the one action Dustin should take (e.g. refresh cookies per
+scripts/setup_cookies.md, or "no action, source was down"). If a partial briefing exists (some leagues succeeded), include it
+below the failure report. Then run `uv run ff heartbeat --fail`. Never end a run silently.
