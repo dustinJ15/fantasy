@@ -28,11 +28,10 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    heading in the action card. Do not add anything else above the divider. Dustin reads this on a phone: the top of the
    email must fit on one screen per league.
 7. Send it to Dustin with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
-   Formatting: after editing briefing.md, run `uv run ff to-html briefing.md briefing.html`. Inspect the Gmail send tool's
-   schema: if it accepts an HTML body (a parameter or flag such as `html`, `htmlBody`, `contentType`/`mimeType`
-   = text/html, or `body_type`), send the contents of briefing.html that way. If it only accepts plain text, send the
-   markdown text of briefing.md. Either way the body must be the literal file contents pasted in; there is no attachment
-   or FILE: syntax. Send exactly one email.
+   Formatting: after editing briefing.md, run `uv run ff to-html briefing.md briefing.html` (compact, ~35 KB). The Gmail
+   send tool accepts an `htmlBody` parameter: pass the full contents of briefing.html as `htmlBody` and the markdown text
+   of briefing.md as `body` (plain-text fallback). Read briefing.html with the Read tool in two halves if needed, then
+   paste it verbatim; there is no attachment or FILE: syntax. Send exactly one email.
    If Gmail is unavailable, fall back to `uv run ff email briefing.md` (needs GMAIL_USER/GMAIL_APP_PASSWORD), and if that
    also fails, print the full briefing so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
