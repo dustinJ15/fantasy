@@ -77,14 +77,26 @@ def packet_cmd(league: str | None = LeagueOpt, overrides: str | None = typer.Opt
 
 @app.command()
 def briefing(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), out: str | None = typer.Option(None), sims: int = 3000,
-             short: bool = typer.Option(False, "--short", help="Action card only, no detail tables")):
+             short: bool = typer.Option(False, "--short", help="Action card only, no detail tables"),
+             html: str | None = typer.Option(None, "--html", help="Also write an email-ready HTML file here")):
     """Render the markdown briefing: action card first, full detail below (no LLM needed)."""
     p = _packet(league, overrides, sims)
     md = report.render(p, detail=not short)
     path = out or str(PACKET_DIR / f"briefing-{date.today().isoformat()}.md")
     open(path, "w").write(md)
+    if html:
+        from .html import to_html
+        open(html, "w").write(to_html(md))
     print(md)
-    rprint(f"\n[dim]written to {path}[/]")
+    rprint(f"\n[dim]written to {path}{' and ' + html if html else ''}[/]")
+
+
+@app.command("to-html")
+def to_html_cmd(file: str = typer.Argument(...), out: str = typer.Argument(...)):
+    """Convert a (Claude-edited) markdown briefing to email HTML."""
+    from .html import to_html
+    open(out, "w").write(to_html(open(file).read()))
+    rprint(f"[green]wrote {out}[/]")
 
 
 def _section(league, key, sims=1500):
