@@ -35,10 +35,15 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    If Gmail is unavailable, fall back to `uv run ff email briefing.md` (needs GMAIL_USER/GMAIL_APP_PASSWORD), and if that
    also fails, print the full briefing so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
-9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory:
-   `git add data/projlog && git commit -m "projlog: week <N> <date>" && git push`. If push fails, say so and move on.
-   This is the single exception to the no-commit rule. Never commit anything else.
-10. Do not touch ESPN beyond reads.
+9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory with
+   exactly this sequence (the clone may be on a detached HEAD; this handles it):
+   `git add data/projlog && git -c user.name=ff-routine -c user.email=routine@ff.local commit -m "projlog: week <N> <date>" ; git fetch origin main && git rebase FETCH_HEAD && git push origin HEAD:main`
+   If there is nothing to commit, or the push fails, say so in one line and move on. This is the single exception to the
+   no-commit rule. Never commit anything else; delete generated files (briefing.html) rather than committing them.
+10. Scope: do not audit Gmail history, git history, or other routines. Earlier emails with the same subject are expected
+    (tests, re-runs); commits already on origin are not your concern. Send at most one push notification, and only for a
+    same-day action item (e.g. a starter ruled out) or a failure.
+11. Do not touch ESPN beyond reads.
 
 ## If anything fails
 If any step errors and cannot be recovered with one retry (dead cookies, a source down, a crash in `ff`), STOP the normal
