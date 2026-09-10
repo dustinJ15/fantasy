@@ -38,7 +38,10 @@ def faab_bid(delta_over_starter: float, weeks_remaining: int, budget_remaining: 
 
 def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj]], my_bench: list[PlayerProj],
                      repl: dict[str, float], weeks_remaining: int, budget_remaining: int, trending: dict[str, int],
-                     league_max_remaining: int | None = None, top: int = 15) -> list[dict]:
+                     league_max_remaining: int | None = None, top: int = 15,
+                     week_lineup: dict[str, list[PlayerProj]] | None = None) -> list[dict]:
+    """my_lineup: rest-of-season optimal starters (drives long-run value). week_lineup: this week's recommended
+    starters with injury-adjusted EV, so a pickup that beats an OUT starter *this week* is flagged as an immediate start."""
     worst_bench = min((p.mu_ros for p in my_bench), default=0.0)
     out = []
     for p in fas:
@@ -47,6 +50,16 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
         if p.mu_ros < 0.4 * repl.get(p.pos, 0.0):
             continue  # not a real fantasy asset, however much he's trending
         d_start, slot = own_starter_value(p, my_lineup)
+        d_week, week_slot = (0.0, "")
+        if week_lineup:
+            for ws, starters in week_lineup.items():
+                if ws in p.eligible:
+                    weakest = min((s.ev for s in starters), default=None)
+                    if weakest is None:
+                        continue
+                    d = p.ev - weakest
+                    if d > d_week:
+                        d_week, week_slot = round(d, 2), ws
         d_bench = p.mu_ros - worst_bench
         vorp = p.mu_ros - repl.get(p.pos, 0.0)
         streamer = p.pos in ("K", "D/ST")
@@ -55,7 +68,7 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
         near = d_start > -4 or vorp > 2
         bench_val = 0.5 * max(d_bench, 0) if (near and p.pos not in ("QB", "K", "D/ST")) else 0.0
         trend = min(trending.get(str(p.espn_id), 0) / 40000, 1.5)
-        score = max(d_start, 0) * 3 + bench_val + max(vorp, 0) + trend
+        score = max(d_start, 0) * 3 + bench_val + max(vorp, 0) + trend + max(d_week, 0) * 2
         if streamer:
             score = d_start  # only worth listing if clearly better than my current K/DST this week
             if score < 1.0:
@@ -64,13 +77,15 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
             continue
         bid = faab_bid(d_start if not streamer else p.mu, weeks_remaining, budget_remaining, streamer, league_max_remaining) if budget_remaining > 0 else 0
         why = []
+        if d_week >= 1.5: why.append(f"START NOW: +{d_week:.1f} this week at {week_slot}")
         if d_start > 0: why.append(f"+{d_start:.1f}/wk over your {slot}")
         elif d_bench > 0: why.append(f"+{d_bench:.1f}/wk over worst bench")
         if vorp > 0: why.append(f"VORP {vorp:.1f}")
         if trending.get(str(p.espn_id)): why.append(f"trending +{trending[str(p.espn_id)]:,} adds/24h")
         why += p.flags
         out.append({"espn_id": p.espn_id, "name": p.name, "pos": p.pos, "team": p.team, "mu_week": p.mu, "mu_ros": p.mu_ros,
-                    "delta_over_starter": d_start, "slot": slot, "vorp": round(vorp, 2), "bid": bid, "score": round(score, 2),
+                    "delta_over_starter": d_start, "slot": slot, "delta_week": d_week, "week_slot": week_slot,
+                    "vorp": round(vorp, 2), "bid": bid, "score": round(score, 2),
                     "streamer": streamer, "why": why, "percent_owned": p.sources.get("percent_owned")})
     out.sort(key=lambda x: -x["score"])
     skill = [o for o in out if not o["streamer"]][:top]

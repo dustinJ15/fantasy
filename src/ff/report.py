@@ -45,7 +45,11 @@ def action_card(packet: dict) -> str:
             L.append("**Starter risk:** " + "; ".join(f"{p['name']} (p_sit {p['p_zero']:.0%}{', ' + p['sources']['sleeper_notes'] if p['sources'].get('sleeper_notes') else ''})" for p in flagged))
         ws = [w for w in lg["waivers"] if not w["streamer"]][:2]
         if ws:
-            L.append("**Pickups:** " + "; ".join(f"{w['name']} ({w['pos']}, {w['mu_ros']:.1f}/g" + (f", +{w['delta_over_starter']:.1f} at {w['slot']}" if w['delta_over_starter'] > 0 else ", depth") + ")" for w in ws))
+            def _tag(w):
+                if w.get("delta_week", 0) >= 1.5:
+                    return f", START +{w['delta_week']:.1f} this week at {w['week_slot']}"
+                return f", +{w['delta_over_starter']:.1f} at {w['slot']} ROS" if w['delta_over_starter'] > 0 else ", depth"
+            L.append("**Pickups:** " + "; ".join(f"{w['name']} ({w['pos']}, {w['mu_ros']:.1f}/g{_tag(w)})" for w in ws))
         st = [w for w in lg["waivers"] if w["streamer"]][:1]
         if st:
             L.append(f"**Stream:** {st[0]['name']} ({st[0]['pos']}, +{st[0]['delta_over_starter']:.1f} this week)")

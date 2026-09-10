@@ -114,7 +114,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         rival_max = max((s["faab_budget"] - t["faab_spent"] for tid, t in teams.items() if tid != my_id), default=None)
     else:
         budget, rival_max = 0, None
-    waivers = rank_free_agents(fas, my_lineup, my_bench, repl, weeks_remaining, budget, trending, rival_max)
+    waivers = rank_free_agents(fas, my_lineup, my_bench, repl, weeks_remaining, budget, trending, rival_max,
+                               week_lineup=win_lu.assignment)
     my_rbs = [p for p in my_lineup.get("RB", [])]
     cuffs = handcuffs(my_rbs, pool)
 
