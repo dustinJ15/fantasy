@@ -14,17 +14,27 @@ NON_STARTER = {"BE", "IR", "", "FA"}
 
 
 def _lineup_changes(lg: dict) -> list[str]:
-    """Players to move, comparing the current ESPN slots with the recommended lineup."""
+    """Explicit moves to get from the current ESPN slots to the recommended lineup, as an ordered chain:
+    'X: bench -> FLEX' or 'Y: WR -> FLEX', with slots freed in an order that works in the app."""
     cur = {p["name"]: p["slot"] for p in lg["roster"]}
     rec = {n: s for s, names in lg["lineup_win"]["slots"].items() for n in names if not n.startswith("(")}
-    ins = [f"{n} → {s}" for n, s in rec.items() if cur.get(n) in NON_STARTER]
-    outs = [n for n, s in cur.items() if s not in NON_STARTER and n not in rec]
+    moves = []
+    # starters who are dropped entirely
+    for n, s in cur.items():
+        if s not in NON_STARTER and n not in rec:
+            moves.append(f"{n}: {s} → bench")
+    # starters changing slot
+    for n, s in rec.items():
+        if cur.get(n) not in NON_STARTER and cur.get(n) != s:
+            moves.append(f"{n}: {cur[n]} → {s}")
+    # bench players coming in
+    for n, s in rec.items():
+        if cur.get(n) in NON_STARTER:
+            moves.append(f"{n}: bench → {s}")
     empties = [s for s, names in lg["lineup_win"]["slots"].items() if any(n.startswith("(") for n in names)]
-    out = []
-    if ins: out.append("Start: " + ", ".join(ins))
-    if outs: out.append("Bench: " + ", ".join(outs))
-    if empties: out.append("EMPTY SLOT: " + ", ".join(empties) + " (no healthy player; pick one up)")
-    return out
+    if empties:
+        moves.append("EMPTY SLOT: " + ", ".join(empties) + " (no healthy player; pick one up)")
+    return moves
 
 
 def _drop_candidate(lg: dict) -> str | None:
@@ -60,7 +70,7 @@ def action_card(packet: dict) -> str:
             todo.append(f"**Stream:** swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)")
         ch = _lineup_changes(lg)
         if ch:
-            todo.append("**Lineup:** " + "; ".join(ch))
+            todo.append("**Lineup (in order):** " + " · ".join(ch))
         else:
             todo.append("**Lineup:** leave as is")
         if lg["trades"]:
