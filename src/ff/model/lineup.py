@@ -52,10 +52,15 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     use_win = objective == "win" or (objective == "auto" and opp_mu is not None)
     slots = _expand_slots(lineup_slots)
     avail = [p for p in players if p.ev > 0 or p.mu > 0]
-    K = 4
+    # Candidate pool per slot: exact search over the top few eligible players. For the E[points]
+    # objective the answer is nearly greedy, so a small pool is enough; the win-prob objective
+    # needs a wider pool because a lower-EV / higher-variance player can be optimal.
+    counts = {s: slots.count(s) for s in set(slots)}
     cands: list[list[PlayerProj]] = []
     for s in slots:
-        el = sorted([p for p in avail if s in p.eligible], key=lambda p: -p.ev)[: K + 2]
+        flex = "/" in s or s == "OP"
+        k = (counts[s] + (3 if flex else 1)) if not use_win else (counts[s] + (5 if flex else 3))
+        el = sorted([p for p in avail if s in p.eligible], key=lambda p: -p.ev)[:k]
         cands.append(el)
 
     best = None
