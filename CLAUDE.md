@@ -14,18 +14,21 @@ Claude returns *parameters and prose*, never *decisions or state*. Every number 
    WebSearch each one (beat writers, practice reports). Also skim for narrative shifts on my players and top waiver targets
    (committee → bellcow, QB change, coach comments).
 4. Write `overrides.json`: `{"<espn_id>": {"p_zero": 0.15, "mu_mult": 1.1, "note": "..."}}` only where news changes the picture.
-5. `uv run ff briefing --overrides overrides.json` → markdown. Add a short "Claude's read" paragraph per league at the top of each section:
-   what you'd actually do and why, in plain words. Keep the numbers from the packet.
+   The `note` is shown next to the player in the email.
+5. `uv run ff briefing --overrides overrides.json` → markdown + packet path. Then write `reads.json`
+   (`{"L1": {"read": "...", "paste": "...", "paste_to": "..."}}`: 1-2 plain sentences per league, what you'd actually do and why)
+   and `uv run ff render-email --packet <path> --reads reads.json --out briefing.html --md briefing.md`. Never hand-edit the HTML;
+   `src/ff/email_html.py` owns the layout.
 6. Email it to Dustin via the Gmail connector (subject: `FF briefing — Week N — <date>`).
 
 Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday morning = final lineup + inactives check.
 
 ## Commands
-`ff setup-check | doctor | sync | roster | lineup | waivers | trades | odds | packet | briefing` (all accept `--league <name>`).
+`ff setup-check | doctor | sync | roster | lineup | waivers | trades | odds | packet | briefing | render-email` (all accept `--league <name>`).
 
 ## Layout
 `src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math, `packet.py` builds the DecisionPacket,
-`report.py` renders markdown. Tests: `uv run pytest`.
+`report.py` renders markdown (plain-text body), `email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
 
 ## Data gotchas
 - nflreadpy installed from git (PyPI lags). No 2026 snap counts yet.
@@ -39,7 +42,7 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 - Debug a run: `RemoteTrigger list_runs` (trigger_id above) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
 - Code changes take effect on the next cloud run only after `git push` to main (the VM clones fresh each time).
-- Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, data/cache, data/packets.
+- Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, reads.json, data/cache, data/packets.
 
 ## Known failure modes
 | symptom | cause | fix |

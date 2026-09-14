@@ -135,6 +135,7 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "sleeper_pts": sleeper_pts, "implied_total": implied_total,
                  "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
                  "grade": fp.get("start_sit_grade") if fp else None, "espn_status": status, "sleeper_status": sl_status,
-                 "sleeper_notes": (sleeper or {}).get("notes"), "percent_owned": row.get("percent_owned")},
+                 "sleeper_notes": (sleeper or {}).get("notes"), "percent_owned": row.get("percent_owned"),
+                 "override_note": ov.get("note")},
         flags=flags,
     )

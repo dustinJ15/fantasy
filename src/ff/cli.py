@@ -75,25 +75,46 @@ def packet_cmd(league: str | None = LeagueOpt, overrides: str | None = typer.Opt
     rprint(p["_path"])
 
 
+def _load_json(path: str | None) -> dict | None:
+    return json.load(open(path)) if path else None
+
+
 @app.command()
 def briefing(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), out: str | None = typer.Option(None), sims: int = 3000,
              short: bool = typer.Option(False, "--short", help="Action card only, no detail tables"),
-             html: str | None = typer.Option(None, "--html", help="Also write an email-ready HTML file here")):
+             html: str | None = typer.Option(None, "--html", help="Also write an email-ready HTML file here"),
+             reads: str | None = typer.Option(None, "--reads", help="reads.json with Claude's per-league read")):
     """Render the markdown briefing: action card first, full detail below (no LLM needed)."""
     p = _packet(league, overrides, sims)
-    md = report.render(p, detail=not short)
+    r = _load_json(reads)
+    md = report.render(p, detail=not short, reads=r)
     path = out or str(PACKET_DIR / f"briefing-{date.today().isoformat()}.md")
     open(path, "w").write(md)
     if html:
-        from .html import to_html
-        open(html, "w").write(to_html(md))
+        from .email_html import render_email
+        open(html, "w").write(render_email(p, r))
     print(md)
-    rprint(f"\n[dim]written to {path}{' and ' + html if html else ''}[/]")
+    rprint(f"\n[dim]written to {path}{' and ' + html if html else ''}; packet {p['_path']}[/]")
+
+
+@app.command("render-email")
+def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JSON written by `ff packet` / `ff briefing`"),
+                     out: str = typer.Option("briefing.html", "--out"),
+                     reads: str | None = typer.Option(None, "--reads", help="reads.json with Claude's per-league read"),
+                     md: str | None = typer.Option(None, "--md", help="Also rewrite the markdown (plain-text body) with the reads")):
+    """Render the HTML email from an existing packet (seconds, no sims)."""
+    from .email_html import render_email
+    p = json.load(open(packet))
+    r = _load_json(reads)
+    open(out, "w").write(render_email(p, r))
+    if md:
+        open(md, "w").write(report.render(p, reads=r))
+    rprint(f"[green]wrote {out}{' and ' + md if md else ''}[/]")
 
 
 @app.command("to-html")
 def to_html_cmd(file: str = typer.Argument(...), out: str = typer.Argument(...)):
-    """Convert a (Claude-edited) markdown briefing to email HTML."""
+    """Convert a generic markdown file to email HTML (legacy; the briefing uses render-email)."""
     from .html import to_html
     open(out, "w").write(to_html(open(file).read()))
     rprint(f"[green]wrote {out}[/]")
@@ -152,12 +173,13 @@ def odds(league: str | None = LeagueOpt):
 
 
 @app.command()
-def email(file: str = typer.Argument(..., help="markdown file to send"), subject: str | None = typer.Option(None), to: str | None = typer.Option(None)):
-    """Email a briefing markdown file via Gmail SMTP (needs GMAIL_USER / GMAIL_APP_PASSWORD in .env)."""
+def email(file: str = typer.Argument(..., help="markdown file to send"), subject: str | None = typer.Option(None), to: str | None = typer.Option(None),
+          html: str | None = typer.Option(None, "--html", help="HTML file from `ff render-email` to use as the rich body")):
+    """Email a briefing via Gmail SMTP (needs GMAIL_USER / GMAIL_APP_PASSWORD in .env)."""
     from . import mail
     body = open(file).read()
     subj = subject or f"FF briefing — {date.today().isoformat()}"
-    mail.send(subj, body, to)
+    mail.send(subj, body, to, html=open(html).read() if html else None)
     rprint(f"[green]sent '{subj}' to {to or 'self'}[/]")
 
 

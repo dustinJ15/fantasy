@@ -21,26 +21,28 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    `{"<espn_id>": {"p_zero": <0-1>, "mu_mult": <0.5-1.5>, "note": "<source + one-line reason>"}}`
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
    If nothing changed, write `{}`.
-5. `uv run ff briefing --overrides overrides.json --sims 2000 --out briefing.md` (also 3-5 minutes; timeout 600000). Read briefing.md.
-6. Compose the email body. briefing.md opens with a checklist per league (Waiver / Lineup / Trade bullets, then a "Why"
-   line) and puts full tables under a "Full detail below" divider. Keep that structure. Directly under each league's "Why"
-   line add one line: `**Claude's read:** ...` (1-2 sentences, plain words: confirm or adjust the checklist based on your
-   research, and if a trade is worth sending, the exact message Dustin can paste to the rival). If your research changes
-   a checklist item (e.g. a player was ruled out), edit the bullet itself. Do not add anything else above the divider.
-   Dustin reads this on a phone: each league must fit on one screen.
-7. Send it to Dustin with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
-   Formatting: after editing briefing.md, run `uv run ff to-html briefing.md briefing.html` (compact, ~35 KB). The Gmail
-   send tool accepts an `htmlBody` parameter: pass the full contents of briefing.html as `htmlBody` and the markdown text
-   of briefing.md as `body` (plain-text fallback). Read briefing.html with the Read tool in two halves if needed, then
-   paste it verbatim; there is no attachment or FILE: syntax. Send exactly one email.
-   If Gmail is unavailable, fall back to `uv run ff email briefing.md` (needs GMAIL_USER/GMAIL_APP_PASSWORD), and if that
-   also fails, print the full briefing so it's in the run log.
+5. `uv run ff briefing --overrides overrides.json --sims 2000 --out briefing.md` (also 3-5 minutes; timeout 600000).
+   Read briefing.md and note the packet path printed on the last line (`packet data/packets/<date>.json`).
+6. Write `reads.json` at repo root — your judgment, as parameters. One entry per league keyed by its `name` from
+   leagues.toml (L1/L2/L3); omit a league if you have nothing to add:
+   `{"L1": {"read": "<1-2 plain sentences: confirm or adjust the checklist based on your research>",
+            "paste": "<exact message Dustin can paste to the rival, only if a trade is worth sending>", "paste_to": "<rival team name>"}}`
+   Do NOT edit briefing.md or the HTML by hand. If research changes a checklist item (a player ruled out, a role change),
+   that belongs in overrides.json (re-run step 5); the override `note` shows up next to the player in the email.
+   Dustin reads this on a phone: keep each read short.
+7. `uv run ff render-email --packet <packet path from step 5> --reads reads.json --out briefing.html --md briefing.md`
+   (seconds, no sims). Then send with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
+   Pass the full contents of briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). Read
+   briefing.html with the Read tool in halves if needed, then paste it verbatim; there is no attachment or FILE: syntax.
+   Send exactly one email.
+   If Gmail is unavailable, fall back to `uv run ff email briefing.md --html briefing.html` (needs GMAIL_USER/GMAIL_APP_PASSWORD),
+   and if that also fails, print the full briefing.md so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
 9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory with
    exactly this sequence (the clone may be on a detached HEAD; this handles it):
    `git add data/projlog && git -c user.name=ff-routine -c user.email=routine@ff.local commit -m "projlog: week <N> <date>" ; git fetch origin main && git rebase FETCH_HEAD && git push origin HEAD:main`
    If there is nothing to commit, or the push fails, say so in one line and move on. This is the single exception to the
-   no-commit rule. Never commit anything else; delete generated files (briefing.html) rather than committing them.
+   no-commit rule. Never commit anything else; delete generated files (briefing.html, reads.json) rather than committing them.
 10. Scope: do not audit Gmail history, git history, or other routines. Earlier emails with the same subject are expected
     (tests, re-runs); commits already on origin are not your concern. Send at most one push notification, and only for a
     same-day action item (e.g. a starter ruled out) or a failure.

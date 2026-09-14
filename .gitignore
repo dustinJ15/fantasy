@@ -9,3 +9,5 @@ __pycache__/
 *.egg-info/
 overrides.json
 briefing.md
+briefing.html
+reads.json
