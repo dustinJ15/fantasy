@@ -30,6 +30,14 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    Do NOT edit briefing.md or the HTML by hand. If research changes a checklist item (a player ruled out, a role change),
    that belongs in overrides.json (re-run step 5); the override `note` shows up next to the player in the email.
    Dustin reads this on a phone: keep each read short.
+   Voice (both `read` and `paste`): write like a guy texting a coworker about football, not like an assistant.
+   - The `paste` message goes to a real person in Dustin's league. One or two casual sentences, first person, lowercase is fine,
+     say what you want and why it helps *them*, end with a question. Example: "hey, any interest in Rice + Montgomery for Henry?
+     you're thin at WR and I could use the RB. no worries if not". Never mention projections, models, points per week, or Claude.
+   - Avoid the known AI tells: no em dashes (use a comma or a period), no "not X, but Y" reframes, no lists of three, no
+     "label: explanation" openers, no "worth noting"/"that said"/"ultimately", no hedging stacks. Vary sentence length. Contractions.
+     If a sentence sounds like a press release or a LinkedIn post, rewrite it. `ff render-email` prints a warning for
+     the patterns it can detect; fix reads.json and re-run before sending.
 7. `uv run ff render-email --packet <packet path from step 5> --reads reads.json --out briefing.html --md briefing.md`
    (seconds, no sims). Then send with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
    Pass the full contents of briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). Read

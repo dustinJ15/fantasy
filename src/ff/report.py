@@ -100,6 +100,32 @@ def watch_line(w: dict) -> str:
     return s + (f" — {w['override_note']}" if w.get("override_note") else "")
 
 
+AI_TELLS = [
+    ("—", "em dash; use a comma or a period"),
+    (r"\bnot (?:just |only |merely )?\w[\w' ]{0,30}, but\b", "'not X, but Y' reframe"),
+    (r"\b(worth noting|that said|ultimately|it's important to|in today's|game-changer|leverage|robust|seamless|delve)\b", "stock AI phrase"),
+    (r"\b(projection|projected|model|points per week|ppw|Claude)\b", "paste message mentions the model or numbers"),
+]
+
+
+def voice_lint(reads: dict) -> list[str]:
+    """Flag the well-known AI-writing tells in Claude's prose so the routine can rewrite before sending.
+    The last pattern only applies to the paste message (a real person receives it)."""
+    import re
+    out = []
+    for lg, r in reads.items():
+        for field in ("read", "paste"):
+            txt = (r or {}).get(field) or ""
+            if not txt:
+                continue
+            for pat, why in AI_TELLS[:3] + (AI_TELLS[3:] if field == "paste" else []):
+                if re.search(pat, txt, flags=re.I):
+                    out.append(f"{lg}.{field}: {why}")
+            if field == "paste" and len(txt) > 280:
+                out.append(f"{lg}.paste: too long for a chat message ({len(txt)} chars)")
+    return out
+
+
 def action_card(packet: dict, reads: dict | None = None) -> str:
     """Checklist-first: literal things to do today per league, then a one-line why and Claude's read."""
     L = [f"# FF briefing — {packet['generated'][:10]}", ""]

@@ -47,3 +47,13 @@ def test_markdown_lists_render(monkeypatch):
     assert lines[first - 1] == ""  # blank line so markdown makes a real list
     assert "**Claude's read:** hold" in head
     assert "p_zero=" not in md
+
+
+def test_voice_lint_flags_ai_tells():
+    reads = {"L1": {"read": "It's not the lineup — it's the matchup. Not a bad spot, but a risky one.", "paste": "Per my model you gain 2.1 ppw. Worth noting this is robust."},
+             "L2": {"read": "Coin flip, leave it.", "paste": "hey, any interest in Rice + Montgomery for Henry? you're thin at WR. no worries if not"}}
+    warns = report.voice_lint(reads)
+    assert any(w.startswith("L1.read") and "em dash" in w for w in warns)
+    assert any("not X, but Y" in w for w in warns)
+    assert any(w.startswith("L1.paste") and "model" in w for w in warns)
+    assert not any(w.startswith("L2") for w in warns)

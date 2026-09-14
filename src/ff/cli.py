@@ -106,6 +106,8 @@ def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JS
     from .email_html import render_email
     p = json.load(open(packet))
     r = _load_json(reads)
+    for warn in report.voice_lint(r or {}):
+        rprint(f"[yellow]voice: {warn}[/]")
     open(out, "w").write(render_email(p, r))
     if md:
         open(md, "w").write(report.render(p, reads=r))
