@@ -11,14 +11,14 @@ POS_ORDER = ("QB", "RB", "WR", "TE", "K", "D/ST")
 
 def lineup_strength(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[float, float]:
     """(mu, var) of the E[points]-optimal lineup using rest-of-season per-game expectations."""
-    ros = [PlayerProj(**{**p.__dict__, "mu": p.mu_ros, "p_zero": min(p.p_zero, 0.15) if not p.bye else 0.05, "bye": False}) for p in roster]
+    ros = [p.ros(min(p.p_zero, 0.15) if not (p.bye or p.locked) else 0.05) for p in roster]
     L = optimize(ros, slots, objective="ev")
     return L.mu, L.var
 
 
 def needs(roster: list[PlayerProj], slots: dict[str, int], repl: dict[str, float]) -> dict:
     """Per-position surplus/hole: starters' avg value over replacement, and count of startable depth."""
-    ros = [PlayerProj(**{**p.__dict__, "mu": p.mu_ros, "p_zero": 0.05, "bye": False}) for p in roster]
+    ros = [p.ros() for p in roster]
     L = optimize(ros, slots, objective="ev")
     starters = {p.espn_id for ps in L.assignment.values() for p in ps}
     out = {}

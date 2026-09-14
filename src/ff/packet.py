@@ -13,6 +13,7 @@ from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
 from .model.trades import lineup_strength, needs, scan
+from .model.clock import apply_clock, week_state
 from .model.vbd import replacement_levels, own_starter_value
 from .model.waivers import handcuffs, rank_free_agents
 from .sources import espn, fantasycalc, sleeper, vegas, weather
@@ -53,7 +54,8 @@ def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining
 
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
-                   overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None) -> dict:
+                   overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None,
+                   now=None) -> dict:
     s = snap["settings"]
     week = snap["week"]
     slots = s["lineup_slots"]
@@ -61,6 +63,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     weeks_remaining = max(total_weeks - week + 1, 1)
     my_id = snap["my_team_id"]
     rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines)
+    apply_clock(rostered, snap["roster"], lines or {}, now)
+    apply_clock(fas, snap["free_agents"], lines or {}, now, free_agents=True)
     pool = rostered + fas
     repl = replacement_levels(pool, slots, s["team_count"])
     by_team: dict[int, list[PlayerProj]] = defaultdict(list)
@@ -87,6 +91,11 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         current.setdefault(p.slot, []).append(p)
     current_starters = [p for p in mine if p.slot not in espn.NON_STARTER]
     cur_mu = sum(p.ev for p in current_starters)
+    wstate = week_state(mine, by_team.get(opp_id, []), espn.NON_STARTER)
+    for m in snap["matchups"]:
+        if my_id in (m["home"], m["away"]) and (m.get("home_score") or m.get("away_score")):
+            wstate["espn_my_score"] = m["home_score"] if m["home"] == my_id else m["away_score"]
+            wstate["espn_opp_score"] = m["away_score"] if m["home"] == my_id else m["home_score"]
 
     # season sim
     ids = list(by_team.keys())
@@ -106,7 +115,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     odds = simulate(ids, records, strength, remaining, s["playoff_team_count"], n_rounds, n=sims)
 
     # waivers
-    my_lineup_ros = optimize([PlayerProj(**{**p.__dict__, "mu": p.mu_ros, "p_zero": 0.05, "bye": False}) for p in mine], slots, objective="ev")
+    my_lineup_ros = optimize([p.ros() for p in mine], slots, objective="ev")
     my_lineup = my_lineup_ros.assignment
     my_bench = my_lineup_ros.bench
     if s["faab"]:
@@ -151,6 +160,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "name": snap["ref"]["name"], "league_name": s["name"], "week": week, "weeks_remaining": weeks_remaining,
         "settings": {k: s[k] for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr")},
         "my_team_id": my_id, "my_record": f"{teams[my_id]['wins']}-{teams[my_id]['losses']}" if my_id in teams else None,
+        "week_state": wstate,
         "faab_remaining": budget if s["faab"] else None,
         "waiver_rank": teams[my_id]["waiver_rank"] if my_id in teams else None,
         "opponent": {"team_id": opp_id, "name": teams[opp_id]["name"] if opp_id in teams else None, "mu": round(opp_mu, 1) if opp_mu else None,

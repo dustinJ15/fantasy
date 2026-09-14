@@ -16,7 +16,9 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    - every entry in `shared.injury_watchlist` (latest practice report / beat-writer status),
    - each starter in any league's `lineup_win.slots` whose flags include QUESTIONABLE/DOUBTFUL/OUT or `sleeper:`,
    - the top 3 waiver targets per league (is the role change real?).
-   Note the day: Tue/Wed = waivers matter most; Fri/Sat/Sun = final designations and weather; Thu = TNF players.
+   Note the day: Tue/Wed = waivers matter most; Fri/Sat/Sun = final designations and weather; Thu = TNF players;
+   Mon = only Monday-night players can still move (each league's `week_state` in the packet says the phase, the score so
+   far, and who is left to play); do not research or suggest lineup changes for players marked `locked`.
 4. Write `overrides.json` at repo root containing only players where news moves the picture:
    `{"<espn_id>": {"p_zero": <0-1>, "mu_mult": <0.5-1.5>, "note": "<source + one-line reason>"}}`
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.

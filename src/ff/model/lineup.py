@@ -51,6 +51,25 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     """
     use_win = objective == "win" or (objective == "auto" and opp_mu is not None)
     slots = _expand_slots(lineup_slots)
+    # Locked players (game started) can't move: pin locked starters to their current slot and drop locked bench.
+    pinned: dict[str, list[PlayerProj]] = {}
+    free_players = []
+    for p in players:
+        if p.locked and p.slot in slots and slots.count(p.slot) > sum(len(v) for k, v in pinned.items() if k == p.slot):
+            pinned.setdefault(p.slot, []).append(p)
+        elif not p.locked:
+            free_players.append(p)
+    for s_, ps in pinned.items():
+        for _ in ps:
+            slots.remove(s_)
+    pin_list = [p for ps in pinned.values() for p in ps]
+    pin_mu, pin_var = sum(p.ev for p in pin_list), sum(p.var for p in pin_list)
+    players_all = players
+    players = free_players
+    if not slots:
+        pw = win_prob(pin_mu, pin_var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
+        return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, pw,
+                      [p for p in players_all if p not in pin_list])
     avail = [p for p in players if p.ev > 0 or p.mu > 0]
     # Candidate pool per slot: exact search over the top few eligible players. For the E[points]
     # objective the answer is nearly greedy, so a small pool is enough; the win-prob objective
@@ -77,21 +96,21 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
         if key in seen:
             continue
         seen.add(key)
-        mu = sum(p.ev for p in combo if p is not None)
-        var = sum(p.var for p in combo if p is not None)
+        mu = pin_mu + sum(p.ev for p in combo if p is not None)
+        var = pin_var + sum(p.var for p in combo if p is not None)
         score = win_prob(mu, var, opp_mu, opp_var or 0.0) if use_win else mu
         if best is None or score > best[0] + 1e-12 or (abs(score - best[0]) < 1e-12 and mu > best[1]):
             best = (score, mu, var, combo)
     if best is None:
-        return Lineup({}, 0.0, 0.0, None, list(players))
+        return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, None, [p for p in players_all if p not in pin_list])
     score, mu, var, combo = best
-    assignment: dict[str, list[PlayerProj]] = {}
+    assignment: dict[str, list[PlayerProj]] = {s_: list(ps) for s_, ps in pinned.items()}
     for s, p in zip(slots, combo):
         assignment.setdefault(s, [])
         if p is not None:
             assignment[s].append(p)
-    chosen = {p.espn_id for p in combo if p is not None}
-    bench = [p for p in players if p.espn_id not in chosen]
+    chosen = {p.espn_id for p in combo if p is not None} | {p.espn_id for p in pin_list}
+    bench = [p for p in players_all if p.espn_id not in chosen]
     pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
     return Lineup(assignment, mu, var, pw, bench)
 

@@ -40,6 +40,14 @@ class PlayerProj:
     bye: bool = False
     sources: dict = field(default_factory=dict)
     flags: list[str] = field(default_factory=list)
+    locked: bool = False          # game started/finished: ESPN won't let this player change slots
+    actual: float | None = None   # points scored so far this week (None if not started)
+    sigma_ros: float | None = None  # pre-lock sigma, kept so rest-of-season copies aren't deterministic
+
+    def ros(self, p_zero: float = 0.05) -> "PlayerProj":
+        """Rest-of-season view: per-game expectation, no lock, no bye, normal variance."""
+        return PlayerProj(**{**self.__dict__, "mu": self.mu_ros, "p_zero": p_zero, "bye": False,
+                             "locked": False, "actual": None, "sigma": self.sigma_ros or self.sigma})
 
     @property
     def ev(self) -> float:

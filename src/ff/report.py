@@ -46,6 +46,22 @@ def _drop_candidate(lg: dict) -> str | None:
     return min(bench, key=lambda p: p["mu_ros"])["name"]
 
 
+def phase_line(lg: dict) -> str | None:
+    """One plain sentence about where the week stands, or None before kickoff."""
+    ws = lg.get("week_state") or {}
+    ph = ws.get("phase", "pre")
+    if ph == "pre":
+        return None
+    me, op = ws.get("espn_my_score", ws.get("my_points")), ws.get("espn_opp_score", ws.get("opp_points"))
+    if ph == "final":
+        res = "W" if (me or 0) > (op or 0) else ("L" if (me or 0) < (op or 0) else "T")
+        return f"Week {lg['week']} final: {res} {me}–{op}"
+    left = ws.get("my_left") or []
+    ol = ws.get("opp_left") or []
+    return (f"Week {lg['week']} in progress: you {me}, them {op} · you have {len(left)} left ({', '.join(left) or 'none'}), "
+            f"they have {len(ol)} left")
+
+
 def trade_tag(t: dict) -> str:
     return "worth sending" if t["their_delta_ppw"] >= 0 else "a reach, send only if bored"
 
@@ -65,11 +81,15 @@ def todos(lg: dict) -> list[dict]:
                     "text": f"add {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}" + (f"; drop {drop}" if drop else "")})
     for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]:
         out.append({"kind": "stream", "label": "Stream", "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
-    ch = _lineup_changes(lg)
-    if ch:
-        out.append({"kind": "lineup", "label": "Lineup (in order)", "text": " · ".join(ch), "moves": ch})
+    ph = (lg.get("week_state") or {}).get("phase", "pre")
+    ch = _lineup_changes(lg) if ph != "final" else []
+    if ph == "final":
+        out.append({"kind": "lineup", "label": "Lineup", "moves": [],
+                    "text": f"week {lg['week']} is over; set next week's lineup once ESPN rolls to week {lg['week'] + 1} (Tuesday)"})
+    elif ch:
+        out.append({"kind": "lineup", "label": "Lineup (in order)" if ph == "pre" else "Lineup (only unplayed slots)", "text": " · ".join(ch), "moves": ch})
     else:
-        out.append({"kind": "lineup", "label": "Lineup", "text": "leave as is", "moves": []})
+        out.append({"kind": "lineup", "label": "Lineup", "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []})
     if lg["trades"]:
         t = lg["trades"][0]
         out.append({"kind": "trade", "label": f"Trade ({trade_tag(t)})", "worth": t["their_delta_ppw"] >= 0,
@@ -81,12 +101,13 @@ def why_parts(lg: dict) -> list[str]:
     """Short reasons behind the checklist: risky starters and the game script."""
     lw = lg["lineup_win"]
     starters = {n for names in lw["slots"].values() for n in names}
-    flagged = [p for p in lg["roster"] if p["name"] in starters and (p["p_zero"] >= 0.15 or p["bye"])]
+    flagged = [p for p in lg["roster"] if p["name"] in starters and not p.get("locked") and (p["p_zero"] >= 0.15 or p["bye"])]
     why = []
     if flagged:
         why.append("; ".join(f"{p['name']} {p['p_zero']:.0%} to sit" for p in flagged))
-    if lw.get("p_win") is not None:
-        why.append(game_script(lw["p_win"]))
+    ph = (lg.get("week_state") or {}).get("phase", "pre")
+    if lw.get("p_win") is not None and ph != "final":
+        why.append(game_script(lw["p_win"]) + (f" ({lw['p_win']:.0%} with what's left)" if ph == "in_progress" else ""))
     return why
 
 
@@ -134,8 +155,12 @@ def action_card(packet: dict, reads: dict | None = None) -> str:
         me = lg["odds"].get(str(lg["my_team_id"])) or {}
         opp = lg["opponent"]; lw = lg["lineup_win"]
         pw = f"{lw['p_win']:.0%}" if lw.get("p_win") is not None else "?"
+        final = (lg.get("week_state") or {}).get("phase") == "final"
         L.append(f"## {lg['league_name']}")
-        L.append(f"_{lg['my_record']} · vs {opp.get('name')} · win {pw} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%_")
+        L.append(f"_{lg['my_record']} · vs {opp.get('name')}{'' if final else ' · win ' + pw} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%_")
+        pl = phase_line(lg)
+        if pl:
+            L.append(f"**{pl}**")
         L.append("")
         for x in todos(lg):
             L.append(f"- **{x['label']}:** {x['text']}")

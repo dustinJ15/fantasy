@@ -151,7 +151,8 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
     matchups = []
     for m in league.scoreboard(week):
         matchups.append({"home": m.home_team.team_id, "away": getattr(m.away_team, "team_id", None),
-                         "home_proj": getattr(m, "home_projected", None), "away_proj": getattr(m, "away_projected", None)})
+                         "home_proj": getattr(m, "home_projected", None), "away_proj": getattr(m, "away_projected", None),
+                         "home_score": getattr(m, "home_score", None), "away_score": getattr(m, "away_score", None)})
     # FAAB history: all bids incl. losing ones
     bids = []
     try:

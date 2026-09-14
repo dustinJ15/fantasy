@@ -97,7 +97,9 @@ SHORT = {"QUESTIONABLE": "Q", "DOUBTFUL": "D"}
 def _status_cell(p: dict) -> str:
     bits = []
     st = _status(p)
-    if st:
+    if p.get("locked"):
+        bits.append(_badge("PLAYED", "grey"))
+    elif st:
         bits.append(_badge(SHORT.get(st[0], st[0]), st[1]))
     g = p["sources"].get("grade")
     if g:
@@ -132,10 +134,11 @@ def _stat_row(lg: dict) -> str:
     lw = lg["lineup_win"]; opp = lg["opponent"]
     pw = lw.get("p_win")
     tone = "grey" if pw is None else ("good" if pw > 0.58 else ("warn" if pw < 0.42 else "grey"))
+    final = (lg.get("week_state") or {}).get("phase") == "final"
     cells = [
         f"<b>{_e(lg['my_record'])}</b>",
         f"vs {_e(opp.get('name') or 'TBD')}",
-        f"Win {_badge(_pct(pw * 100 if pw is not None else None), tone)}",
+        *([] if final else [f"Win {_badge(_pct(pw * 100 if pw is not None else None), tone)}"]),
         f"Playoffs <b>{_pct(me.get('playoff_pct'))}</b>",
         f"Title <b>{_pct(me.get('title_pct'))}</b>",
     ]
@@ -159,8 +162,17 @@ def _todo_rows(lg: dict) -> str:
     return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>'
 
 
+def _phase(lg: dict) -> str:
+    pl = report.phase_line(lg)
+    if not pl:
+        return ""
+    ph = lg["week_state"]["phase"]
+    tone = "grey" if ph == "final" else "warn"
+    return f'<div style="margin-top:6px">{_badge("FINAL" if ph == "final" else "IN PROGRESS", tone)} <span style="font-size:13px">{_e(pl.split(": ", 1)[1])}</span></div>'
+
+
 def _league_action(lg: dict, r: dict) -> str:
-    body = _todo_rows(lg)
+    body = _phase(lg) + _todo_rows(lg)
     why = report.why_parts(lg)
     if why:
         body += _muted("Why: " + _e(" · ".join(why)))
@@ -202,6 +214,9 @@ def _lineup_table(lg: dict) -> str:
                 continue
             p = by_name.get(n)
             st = _status(p) if p else None
+            if p and p.get("locked"):
+                cells.append(_e(n) + f" <span style='color:{MUTED}'>{p.get('actual') or 0:.1f} pts</span> {_badge('PLAYED', 'grey')}")
+                continue
             cells.append(_e(n) + (f" {_badge(SHORT.get(st[0], st[0]), st[1])}" if st else "") + (f" <span style='color:{MUTED}'>{p['mu']:.1f}</span>" if p else ""))
         rows.append([f"<b>{_e(slot)}</b>", ", ".join(cells)])
     return _table(["Slot", "Start"], rows, "ll")
