@@ -47,7 +47,7 @@ def _drop_candidate(lg: dict) -> str | None:
 
 
 def trade_tag(t: dict) -> str:
-    return "worth sending" if t["their_delta_ppw"] >= -0.3 else "a reach, send only if bored"
+    return "worth sending" if t["their_delta_ppw"] >= 0 else "a reach, send only if bored"
 
 
 def todos(lg: dict) -> list[dict]:
@@ -72,7 +72,7 @@ def todos(lg: dict) -> list[dict]:
         out.append({"kind": "lineup", "label": "Lineup", "text": "leave as is", "moves": []})
     if lg["trades"]:
         t = lg["trades"][0]
-        out.append({"kind": "trade", "label": f"Trade ({trade_tag(t)})", "worth": t["their_delta_ppw"] >= -0.3,
+        out.append({"kind": "trade", "label": f"Trade ({trade_tag(t)})", "worth": t["their_delta_ppw"] >= 0,
                     "text": f"offer {t['rival']} your {', '.join(t['give'])} for {', '.join(t['get'])} (+{t['my_delta_ppw']:.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them)"})
     return out
 

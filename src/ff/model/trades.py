@@ -44,7 +44,11 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
          team_meta: dict[int, dict], values: dict[str, dict], max_per_rival: int = 3, top: int = 10) -> list[dict]:
     """
     For each rival: try 1-for-1 and 2-for-1 packages where my surplus meets their hole.
-    Score = my lineup gain; fairness = their lineup gain (must be > -1.5 so it's plausible they'd accept).
+
+    Ranking is acceptance-first: a trade only has value if the rival says yes, and rivals (a) overvalue what they
+    own, (b) infer that an offer favors the offerer, and (c) remember lowballs in a repeated game with coworkers.
+    So among trades that help me by >= 0.75 ppw, sort by the rival's gain, cap the market-value ask at ~1.2x, and
+    only favor 2-for-1s when the one player they get is the best piece in the deal (consolidation, which people accept).
     """
     mine = rosters[my_id]
     my_mu0, _ = lineup_strength(mine, slots)
@@ -65,7 +69,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             # crude pre-filter on market value to avoid absurd asks
             gv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in give)
             rv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in get)
-            if gv and rv and (rv > gv * 1.6 or gv > rv * 2.2):
+            if gv and rv and (rv > gv * 1.2 or gv > rv * 2.2):
                 continue
             new_mine = _swap(mine, {p.espn_id for p in give}, get)
             new_theirs = _swap(theirs, {p.espn_id for p in get}, give)
@@ -82,12 +86,19 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             for p in give:
                 if their_needs.get(p.pos, {}).get("hole") and f"fills their {p.pos} hole" not in why: why.append(f"fills their {p.pos} hole")
             meta = team_meta.get(rid, {})
-            if meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
+            games = meta.get("wins", 0) + meta.get("losses", 0)
+            if games >= 4 and meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
+            # 2-for-1: consolidation (they get the single best player) is accepted; two mid pieces for a star is a lowball
+            consol = 0.0
+            if len(give) > len(get):
+                best_give = max((values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0) for p in give)
+                consol = 0.5 if rv >= best_give else -0.75
+                if rv >= best_give and "consolidates value for them" not in why: why.append("consolidates value for them")
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
                 "market_give": gv, "market_get": rv, "why": why,
-                "score": round(d_me + 0.75 * min(d_them, 3) + (0.5 if len(give) > len(get) else 0), 2),
+                "score": round(d_them + 0.5 * min(d_me, 3) + consol, 2),
             })
         rival_cands.sort(key=lambda c: -c["score"])
         seen_get, kept = set(), []

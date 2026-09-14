@@ -246,7 +246,7 @@ def _league_detail(lg: dict) -> str:
     if lg["trades"]:
         rows = []
         for t in lg["trades"][:3]:
-            worth = t["their_delta_ppw"] >= -0.3
+            worth = t["their_delta_ppw"] >= 0
             td = f" · title odds you {t['my_title_delta']:+.1f} / them {t['their_title_delta']:+.1f}" if "my_title_delta" in t else ""
             rows.append([_badge("SEND" if worth else "REACH", "good" if worth else "grey"),
                          f"Give <b>{_e(', '.join(t['give']))}</b> → get <b>{_e(', '.join(t['get']))}</b> from {_e(t['rival'])}"

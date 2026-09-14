@@ -37,7 +37,7 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 
 ## Operations (for a fresh session responding to a morning email)
 - Routine "FF daily briefing": trigger `trig_012oA6amKwYBZFg51w1hEqgb`, cron `0 12 * * *` UTC (6 AM Denver during DST),
-  cloud env `fantasy` (`env_01Fh955ffyDEwuNxskeXjN3q`, network Full, env vars ESPN_S2/SWID/SEASON/HEALTHCHECK_URL).
+  cloud env `fantasy` (`env_01Fh955ffyDEwuNxskeXjN3q`, network Full, env vars ESPN_S2/SWID/SEASON/HEALTHCHECK_URL), model `claude-opus-5` (changed from Sonnet 5 on 2026-09-14 via `RemoteTrigger update`).
   Page: https://claude.ai/code/routines/trig_012oA6amKwYBZFg51w1hEqgb
 - Debug a run: `RemoteTrigger list_runs` (trigger_id above) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
