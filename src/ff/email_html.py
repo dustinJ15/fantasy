@@ -31,8 +31,7 @@ LABELS = {"waiver": ("WAIVER", "info"), "waiver_up": ("WAIVER", "info"), "stream
 
 def _badge(text: str, tone: str = "grey") -> str:
     bg, fg = TONES[tone]
-    return (f'<span style="display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;'
-            f'background:{bg};color:{fg};white-space:nowrap">{_e(text)}</span>')
+    return f'<span style="padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;background:{bg};color:{fg}">{_e(text)}</span>'
 
 
 def _muted(text: str, size: int = 13) -> str:
@@ -98,7 +97,7 @@ def _status_cell(p: dict) -> str:
     bits = []
     st = _status(p)
     if p.get("locked"):
-        bits.append(_badge("PLAYED", "grey"))
+        bits.append(f'<span style="color:{MUTED};font-size:11px">played</span>')
     elif st:
         bits.append(_badge(SHORT.get(st[0], st[0]), st[1]))
     g = p["sources"].get("grade")
@@ -215,7 +214,7 @@ def _lineup_table(lg: dict) -> str:
             p = by_name.get(n)
             st = _status(p) if p else None
             if p and p.get("locked"):
-                cells.append(_e(n) + f" <span style='color:{MUTED}'>{p.get('actual') or 0:.1f} pts</span> {_badge('PLAYED', 'grey')}")
+                cells.append(_e(n) + f" <span style='color:{MUTED}'>{p.get('actual') or 0:.1f} pts, played</span>")
                 continue
             cells.append(_e(n) + (f" {_badge(SHORT.get(st[0], st[0]), st[1])}" if st else "") + (f" <span style='color:{MUTED}'>{p['mu']:.1f}</span>" if p else ""))
         rows.append([f"<b>{_e(slot)}</b>", ", ".join(cells)])

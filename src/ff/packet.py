@@ -213,7 +213,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
             if st in AMBIGUOUS:
                 watch.append({"name": p["name"], "pos": p["pos"], "team": p["team"], "league": ref.name, "status": st,
                               "notes": p["sources"].get("sleeper_notes"), "espn_id": p["espn_id"], "p_zero": p["p_zero"],
-                              "override_note": p["sources"].get("override_note")})
+                              "override_note": p["sources"].get("override_note"), "locked": p.get("locked", False)})
             ln = lines.get(p["team"])
             if ln:
                 p["odds_line"] = {"opp": ln["opp"], "implied": ln["implied"], "spread": ln["spread"], "total": ln["total"], "kickoff": ln["kickoff"]}

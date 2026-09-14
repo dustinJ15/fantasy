@@ -196,7 +196,8 @@ def render_detail(packet: dict) -> str:
     if sh["injury_watchlist"]:
         L.append("## Injury watchlist (ambiguous designations on my rosters)")
         for w in sh["injury_watchlist"]:
-            L.append(f"- **{w['name']}** ({w['pos']}, {w['team']}) — {w['status']} in *{w['league']}*; {w['p_zero']:.0%} chance to sit" + (f"; {w['notes']}" if w.get("notes") else ""))
+            risk = "already played this week" if w.get("locked") else f"{w['p_zero']:.0%} chance to sit"
+            L.append(f"- **{w['name']}** ({w['pos']}, {w['team']}) — {w['status']} in *{w['league']}*; {risk}" + (f"; {w['notes']}" if w.get("notes") else "") + (f"; {w['override_note']}" if w.get("override_note") else ""))
         L.append("")
     if sh["exposure"]:
         L.append("## Exposure (held in 2+ leagues)")
