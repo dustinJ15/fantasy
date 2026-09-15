@@ -197,7 +197,9 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
         usage_err = str(exc)
     else:
         usage_err = None
-    lines = vegas.implied_totals()
+    # ESPN's un-parameterised scoreboard stays on last week until Tuesday night (fantasy leagues roll Tuesday morning),
+    # so always ask for the league's week; otherwise the clock locks every player as already played.
+    lines_by_week: dict[int, dict] = {}
     try:
         sl_proj = sleeper.projections(e.season, sleeper.state().get("week", 1))
     except Exception:
@@ -206,6 +208,10 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     league_blocks, watch, exposure = [], [], defaultdict(list)
     for ref in leagues(only):
         snap = league_snapshot(ref, force)
+        wk = int(snap.get("week") or 0)
+        if wk not in lines_by_week:
+            lines_by_week[wk] = vegas.implied_totals(wk or None)
+        lines = lines_by_week[wk]
         blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines)
         for p in blk["roster"]:
             exposure[p["name"]].append(ref.name)
