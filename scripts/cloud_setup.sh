@@ -14,9 +14,13 @@ uv sync --quiet || uv sync --quiet   # one retry for flaky downloads
 if [ ! -f .env ] && [ -n "${ESPN_S2:-}" ]; then
   printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
 fi
-# League ids arrive the same way (LEAGUES_TOML holds the file's contents); leagues.toml is untracked.
+# League ids arrive the same way; leagues.toml is untracked. LEAGUES_TOML is either the raw file contents or, because
+# the cloud env box is one KEY=VALUE per line, its base64 (`base64 -w0 leagues.toml`).
 if [ ! -f leagues.toml ] && [ -n "${LEAGUES_TOML:-}" ]; then
-  printf '%s\n' "$LEAGUES_TOML" > leagues.toml
+  case "$LEAGUES_TOML" in
+    *"[[league]]"*) printf '%s\n' "$LEAGUES_TOML" > leagues.toml ;;
+    *) printf '%s' "$LEAGUES_TOML" | base64 -d > leagues.toml ;;
+  esac
 fi
 if [ ! -f leagues.toml ]; then
   echo "leagues.toml missing: set the LEAGUES_TOML environment variable (contents of the file) or copy leagues.example.toml" >&2

@@ -27,7 +27,7 @@ jobs:
       - name: Write .env and leagues.toml from secrets/variables
         run: |
           printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
-          printf '%s\n' "$LEAGUES_TOML" > leagues.toml
+          case "$LEAGUES_TOML" in *"[[league]]"*) printf '%s\n' "$LEAGUES_TOML" > leagues.toml ;; *) printf '%s' "$LEAGUES_TOML" | base64 -d > leagues.toml ;; esac
         env:
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
