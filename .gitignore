@@ -2,7 +2,7 @@
 .venv/
 data/cache/
 data/packets/
-!data/projlog/
+data/projlog/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -11,3 +11,5 @@ overrides.json
 briefing.md
 briefing.html
 reads.json
+ops.local.md
+leagues.toml

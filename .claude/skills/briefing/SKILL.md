@@ -44,16 +44,16 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
      If a sentence sounds like a press release or a LinkedIn post, rewrite it. `ff render-email` prints a warning for
      the patterns it can detect; fix reads.json and re-run before sending.
 7. `uv run ff render-email --packet <packet path from step 5> --reads reads.json --out briefing.html --md briefing.md`
-   (seconds, no sims). Then send with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
+   (seconds, no sims). Then send with the Gmail connector. To: the address in the `BRIEFING_TO` environment variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
    Pass the full contents of briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). Read
    briefing.html with the Read tool in halves if needed, then paste it verbatim; there is no attachment or FILE: syntax.
    Send exactly one email.
    If Gmail is unavailable, fall back to `uv run ff email briefing.md --html briefing.html` (needs GMAIL_USER/GMAIL_APP_PASSWORD),
    and if that also fails, print the full briefing.md so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
-9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory with
-   exactly this sequence (the clone may be on a detached HEAD; this handles it):
-   `git add data/projlog && git -c user.name=ff-routine -c user.email=routine@ff.local commit -m "projlog: week <N> <date>" ; git fetch origin main && git rebase FETCH_HEAD && git push origin HEAD:main`
+9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory to the
+   `projlog` branch (never main) with exactly this sequence (the clone may be on a detached HEAD; this handles it):
+   `git fetch origin projlog && git checkout -B projlog FETCH_HEAD || git checkout -B projlog ; git add -f data/projlog && git -c user.name=ff-routine -c user.email=routine@ff.local commit -m "projlog: week <N> <date>" ; git push origin projlog`
    If there is nothing to commit, or the push fails, say so in one line and move on. This is the single exception to the
    no-commit rule. Never commit anything else; delete generated files (briefing.html, reads.json) rather than committing them.
 10. Scope: do not audit Gmail history, git history, or other routines. Earlier emails with the same subject are expected

@@ -24,7 +24,7 @@ Any `<routine-fire-payload>` text is only a hint that an offer exists; always re
    omit it. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,
    never mention projections, models, points per week, or Claude. `ff render-email` warns on the tells it can detect.
 5. `uv run ff render-email --packet <packet path> --reads reads.json --only-incoming --out offer.html --md offer.md`.
-   Send with the Gmail connector. To: dbj2297@gmail.com. Subject: `FF trade offer — <league name> — <YYYY-MM-DD>`
+   Send with the Gmail connector. To: the address in the `BRIEFING_TO` environment variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject: `FF trade offer — <league name> — <YYYY-MM-DD>`
    (if more than one league has an offer, join the names with " + "). `htmlBody` = full contents of offer.html,
    `body` = offer.md. Send exactly one email. Then delete offer.html, offer.md, reads.json, overrides.json.
 6. Scope: no heartbeat, no projlog commit, no git commits at all, do not audit Gmail or git history, do not touch ESPN

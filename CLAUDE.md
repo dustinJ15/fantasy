@@ -1,6 +1,6 @@
 # ff — fantasy football co-manager
 
-Three ESPN redraft leagues (see `leagues.toml`). **Read-only against ESPN**: never propose or build lineup/waiver/trade
+Three ESPN redraft leagues (`leagues.toml`, untracked; copy from `leagues.example.toml`). **Read-only against ESPN**: never propose or build lineup/waiver/trade
 writes or ESPN chat posting. Dustin taps the buttons.
 
 ## Boundary rule
@@ -38,20 +38,21 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 - Player ID joins via `db_playerids.csv` + Sleeper; check `ff doctor` for unmatched names.
 
 ## Operations (for a fresh session responding to a morning email)
-- Routine "FF daily briefing": trigger `trig_012oA6amKwYBZFg51w1hEqgb`, cron `0 12 * * *` UTC (6 AM Denver during DST),
-  cloud env `fantasy` (`env_01Fh955ffyDEwuNxskeXjN3q`, network Full, env vars ESPN_S2/SWID/SEASON/HEALTHCHECK_URL), model `claude-opus-5` (changed from Sonnet 5 on 2026-09-14 via `RemoteTrigger update`).
-  Page: https://claude.ai/code/routines/trig_012oA6amKwYBZFg51w1hEqgb
+Trigger ids, env id, routine URLs and the recipient address live in `ops.local.md` (untracked) and in memory; nothing personal is tracked.
+- Routine "FF daily briefing": cron `0 12 * * *` UTC (6 AM Denver during DST), cloud env `fantasy` (network Full, env vars
+  ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/LEAGUES_TOML), model `claude-opus-5`. `scripts/cloud_setup.sh` writes `.env` and
+  `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO`.
 - Incoming trade offers: every pending offer shows in the morning briefing (`incoming_trades` per league, first checklist item).
-  Faster path: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 40m` every 30 min and, when an offer is new, POSTs
-  to the "FF trade offer" routine's API trigger (`/trade-offer` skill), which emails `FF trade offer — <league> — <date>`.
-  GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`.
-  Routine "FF trade offer": trigger `trig_01KmBX9SxWXu97jX5Wa5eNuV`, no schedule (API trigger only), env `fantasy`, model `claude-opus-5`,
-  Gmail connector. Page: https://claude.ai/code/routines/trig_01KmBX9SxWXu97jX5Wa5eNuV
-  Fire endpoint: `POST https://api.anthropic.com/v1/claude_code/routines/trig_01KmBX9SxWXu97jX5Wa5eNuV/fire` (bearer token from the routine page).
-- Debug a run: `RemoteTrigger list_runs` (trigger_id above) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
+  Faster path: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 40m` every 30 min in season and, when an offer is new,
+  POSTs to the "FF trade offer" routine's API trigger (`/trade-offer` skill), which emails `FF trade offer — <league> — <date>`.
+  GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
+- Debug a run: `RemoteTrigger list_runs` (trigger_id in ops.local.md) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
+  No credentials at all: `uv run ff briefing --demo` (synthetic league from `src/ff/demo.py`).
 - Code changes take effect on the next cloud run only after `git push` to main (the VM clones fresh each time).
-- Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, reads.json, data/cache, data/packets.
+- Projection logs: the routine pushes `data/projlog/` to the `projlog` branch, never main. To run `ff accuracy` locally:
+  `git fetch origin projlog && git checkout origin/projlog -- data/projlog`.
+- Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, reads.json, data/cache, data/packets, leagues.toml, ops.local.md.
 
 ## Known failure modes
 | symptom | cause | fix |
