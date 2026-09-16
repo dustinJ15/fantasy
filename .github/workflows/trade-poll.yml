@@ -5,7 +5,8 @@ name: trade-poll
 on:
   schedule:
     # every 30 min, in season only (Sep-Jan), 12:00-23:59 UTC, Tue-Sun; offers also surface in the morning briefing
-    - cron: '*/30 12-23 * 9-12,1 2-7'
+    - cron: '*/30 12-23 * 9-12 2-7'
+    - cron: '*/30 12-23 * 1 2-7'
   workflow_dispatch:
     inputs:
       window:
