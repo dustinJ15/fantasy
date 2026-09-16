@@ -1,6 +1,7 @@
 # Roadmap — making the analysis genuinely sharp
 
-Honest status of the model and what would move the needle, in priority order.
+Honest status of the model and what would move the needle, in priority order. Current standing in all three leagues: not yet
+dominant, which the model attributes to variance.
 
 ## Where the edge is today
 - **Trade scanner**: evaluates every 1-for-1 and 2-for-1 against every rival by both sides' lineup delta and re-simulated title odds. Nobody in a 12-team league does this by hand. This is the biggest structural advantage.

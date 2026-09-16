@@ -1,0 +1,1593 @@
+{
+ "version": 4,
+ "generated": "2026-09-16T16:45:09",
+ "season": 2026,
+ "demo": true,
+ "shared": {
+  "injury_watchlist": [],
+  "exposure": {},
+  "trending_adds": [],
+  "usage_error": null,
+  "unmatched_ids": [],
+  "pending_trades_error": null,
+  "incoming_trade_count": 1
+ },
+ "leagues": [
+  {
+   "name": "demo",
+   "league_name": "Demo League",
+   "week": 2,
+   "weeks_remaining": 15,
+   "settings": {
+    "team_count": 8,
+    "lineup_slots": {
+     "QB": 1,
+     "RB": 2,
+     "WR": 2,
+     "TE": 1,
+     "RB/WR/TE": 1,
+     "K": 1,
+     "D/ST": 1
+    },
+    "faab": true,
+    "faab_budget": 100,
+    "playoff_team_count": 4,
+    "playoff_weeks": [
+     15,
+     16
+    ],
+    "ppr": 1.0
+   },
+   "my_team_id": 1,
+   "my_record": "1-2",
+   "week_state": {
+    "phase": "pre",
+    "my_points": 0,
+    "opp_points": 0,
+    "my_left": [
+     "QB1_0",
+     "RB1_0",
+     "RB1_1",
+     "WR1_0",
+     "WR1_1",
+     "TE1_0",
+     "K1_0",
+     "D/ST1_0"
+    ],
+    "opp_left": [
+     "QB8_0",
+     "RB8_0",
+     "RB8_1",
+     "WR8_0",
+     "WR8_1",
+     "TE8_0",
+     "K8_0",
+     "D/ST8_0"
+    ]
+   },
+   "faab_remaining": 78,
+   "waiver_rank": 1,
+   "opponent": {
+    "team_id": 8,
+    "name": "Team 8",
+    "mu": 90.3,
+    "sd": 18.0
+   },
+   "roster": [
+    {
+     "espn_id": 101,
+     "name": "QB1_1",
+     "pos": "QB",
+     "team": "GB",
+     "eligible": [
+      "QB"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 20.8,
+     "sigma": 6.24,
+     "p_zero": 0.02,
+     "mu_ros": 21.49,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 20.8,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "ACTIVE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 20.38,
+     "sd": 6.83,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 112,
+     "name": "K1_0",
+     "pos": "K",
+     "team": "KC",
+     "eligible": [
+      "K"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "K",
+     "mu": 12.7,
+     "sigma": 5.71,
+     "p_zero": 0.02,
+     "mu_ros": 13.13,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 12.7,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": null,
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 12.45,
+     "sd": 5.93,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 102,
+     "name": "RB1_0",
+     "pos": "RB",
+     "team": "KC",
+     "eligible": [
+      "RB",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "RB",
+     "mu": 12.3,
+     "sigma": 5.54,
+     "p_zero": 0.02,
+     "mu_ros": 12.72,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 12.3,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": null,
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 12.05,
+     "sd": 5.75,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 100,
+     "name": "QB1_0",
+     "pos": "QB",
+     "team": "GB",
+     "eligible": [
+      "QB"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "QB",
+     "mu": 23.2,
+     "sigma": 6.96,
+     "p_zero": 0.5,
+     "mu_ros": 23.95,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 23.2,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "ACTIVE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": "Q, DNP Friday; beat writer says game-time decision (demo)"
+     },
+     "flags": [
+      "fp:B",
+      "llm:p_zero"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 11.6,
+     "sd": 12.6,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 107,
+     "name": "WR1_1",
+     "pos": "WR",
+     "team": "GB",
+     "eligible": [
+      "WR",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "WR",
+     "mu": 10.2,
+     "sigma": 5.1,
+     "p_zero": 0.02,
+     "mu_ros": 10.51,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 10.2,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "ACTIVE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 10.0,
+     "sd": 5.25,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 104,
+     "name": "RB1_2",
+     "pos": "RB",
+     "team": "KC",
+     "eligible": [
+      "RB",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 13.5,
+     "sigma": 6.08,
+     "p_zero": 0.3,
+     "mu_ros": 13.94,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 13.5,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "QUESTIONABLE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "espn:QUESTIONABLE",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 9.45,
+     "sd": 8.01,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 111,
+     "name": "TE1_1",
+     "pos": "TE",
+     "team": "GB",
+     "eligible": [
+      "TE",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 8.1,
+     "sigma": 4.46,
+     "p_zero": 0.02,
+     "mu_ros": 8.37,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 8.1,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "ACTIVE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 7.94,
+     "sd": 4.56,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 108,
+     "name": "WR1_2",
+     "pos": "WR",
+     "team": "DAL",
+     "eligible": [
+      "WR",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 6.79,
+     "sigma": 3.9,
+     "p_zero": 0.02,
+     "mu_ros": 6.09,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 5.9,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": null,
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": "named the starter after the trade; expect a full workload (demo)"
+     },
+     "flags": [
+      "fp:B",
+      "llm:mu"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 6.65,
+     "sd": 3.98,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 110,
+     "name": "TE1_0",
+     "pos": "TE",
+     "team": "GB",
+     "eligible": [
+      "TE",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "TE",
+     "mu": 7.9,
+     "sigma": 4.35,
+     "p_zero": 0.3,
+     "mu_ros": 8.15,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 7.9,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "QUESTIONABLE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "espn:QUESTIONABLE",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 5.53,
+     "sd": 5.13,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 113,
+     "name": "D/ST1_0",
+     "pos": "D/ST",
+     "team": "DAL",
+     "eligible": [
+      "D/ST"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "D/ST",
+     "mu": 5.1,
+     "sigma": 3.3,
+     "p_zero": 0.02,
+     "mu_ros": 5.27,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 5.1,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": null,
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 5.0,
+     "sd": 3.34,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 103,
+     "name": "RB1_1",
+     "pos": "RB",
+     "team": "GB",
+     "eligible": [
+      "RB",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "RB",
+     "mu": 4.5,
+     "sigma": 3.9,
+     "p_zero": 0.02,
+     "mu_ros": 4.64,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 4.5,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "ACTIVE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 4.41,
+     "sd": 3.91,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 106,
+     "name": "WR1_0",
+     "pos": "WR",
+     "team": "GB",
+     "eligible": [
+      "WR",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "WR",
+     "mu": 5.0,
+     "sigma": 3.9,
+     "p_zero": 0.3,
+     "mu_ros": 5.15,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 5.0,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "QUESTIONABLE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "espn:QUESTIONABLE",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 3.5,
+     "sd": 3.99,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 105,
+     "name": "RB1_3",
+     "pos": "RB",
+     "team": "GB",
+     "eligible": [
+      "RB",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 4.3,
+     "sigma": 3.9,
+     "p_zero": 0.3,
+     "mu_ros": 4.47,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 4.3,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "QUESTIONABLE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "espn:QUESTIONABLE",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 3.01,
+     "sd": 3.81,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 109,
+     "name": "WR1_3",
+     "pos": "WR",
+     "team": "KC",
+     "eligible": [
+      "WR",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 2.2,
+     "sigma": 3.9,
+     "p_zero": 0.3,
+     "mu_ros": 2.26,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 2.2,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "QUESTIONABLE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "espn:QUESTIONABLE",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 1.54,
+     "sd": 3.42,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    }
+   ],
+   "current_lineup_mu": 64.5,
+   "lineup_ev": {
+    "slots": {
+     "K": [
+      "K1_0"
+     ],
+     "QB": [
+      "QB1_1"
+     ],
+     "RB": [
+      "RB1_0",
+      "RB1_2"
+     ],
+     "TE": [
+      "TE1_0"
+     ],
+     "WR": [
+      "WR1_1",
+      "WR1_2"
+     ],
+     "D/ST": [
+      "D/ST1_0"
+     ],
+     "RB/WR/TE": [
+      "TE1_1"
+     ]
+    },
+    "mu": 89.45,
+    "sd": 16.75,
+    "p_win": null,
+    "bench": [
+     "QB1_0",
+     "RB1_1",
+     "RB1_3",
+     "WR1_0",
+     "WR1_3"
+    ]
+   },
+   "lineup_win": {
+    "slots": {
+     "K": [
+      "K1_0"
+     ],
+     "QB": [
+      "QB1_1"
+     ],
+     "RB": [
+      "RB1_0",
+      "RB1_2"
+     ],
+     "TE": [
+      "TE1_1"
+     ],
+     "WR": [
+      "WR1_1",
+      "WR1_2"
+     ],
+     "D/ST": [
+      "D/ST1_0"
+     ],
+     "RB/WR/TE": [
+      "TE1_0"
+     ]
+    },
+    "mu": 89.45,
+    "sd": 16.75,
+    "p_win": 0.486,
+    "bench": [
+     "QB1_0",
+     "RB1_1",
+     "RB1_3",
+     "WR1_0",
+     "WR1_3"
+    ]
+   },
+   "lineup_diff": [],
+   "replacement": {
+    "QB": 14.96,
+    "RB": 8.55,
+    "WR": 5.15,
+    "TE": 7.05,
+    "K": 8.04,
+    "D/ST": 4.63
+   },
+   "waivers": [
+    {
+     "espn_id": 239,
+     "name": "FA_TE_27",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 11.3,
+     "mu_ros": 11.68,
+     "delta_over_starter": 3.53,
+     "slot": "TE",
+     "delta_week": 5.54,
+     "week_slot": "RB/WR/TE",
+     "vorp": 4.63,
+     "bid": 27,
+     "score": 31.01,
+     "streamer": false,
+     "why": [
+      "START NOW: +5.5 this week at RB/WR/TE",
+      "+3.5/wk over your TE",
+      "VORP 4.6",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 233,
+     "name": "FA_RB_21",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 10.3,
+     "mu_ros": 10.63,
+     "delta_over_starter": 2.26,
+     "slot": "RB/WR/TE",
+     "delta_week": 4.56,
+     "week_slot": "RB/WR/TE",
+     "vorp": 2.08,
+     "bid": 25,
+     "score": 22.16,
+     "streamer": false,
+     "why": [
+      "START NOW: +4.6 this week at RB/WR/TE",
+      "+2.3/wk over your RB/WR/TE",
+      "VORP 2.1",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 231,
+     "name": "FA_WR_19",
+     "pos": "WR",
+     "team": "GB",
+     "mu_week": 7.9,
+     "mu_ros": 8.15,
+     "delta_over_starter": 2.06,
+     "slot": "WR",
+     "delta_week": 2.21,
+     "week_slot": "RB/WR/TE",
+     "vorp": 3.0,
+     "bid": 23,
+     "score": 16.55,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.2 this week at RB/WR/TE",
+      "+2.1/wk over your WR",
+      "VORP 3.0",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 243,
+     "name": "FA_WR_31",
+     "pos": "WR",
+     "team": "GB",
+     "mu_week": 7.2,
+     "mu_ros": 7.42,
+     "delta_over_starter": 1.33,
+     "slot": "WR",
+     "delta_week": 1.53,
+     "week_slot": "RB/WR/TE",
+     "vorp": 2.27,
+     "bid": 15,
+     "score": 11.9,
+     "streamer": false,
+     "why": [
+      "START NOW: +1.5 this week at RB/WR/TE",
+      "+1.3/wk over your WR",
+      "VORP 2.3",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 219,
+     "name": "FA_RB_7",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 8.5,
+     "mu_ros": 8.8,
+     "delta_over_starter": 0.43,
+     "slot": "RB/WR/TE",
+     "delta_week": 2.8,
+     "week_slot": "RB/WR/TE",
+     "vorp": 0.25,
+     "bid": 7,
+     "score": 10.41,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.8 this week at RB/WR/TE",
+      "+0.4/wk over your RB/WR/TE",
+      "VORP 0.2",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 235,
+     "name": "FA_TE_23",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 8.1,
+     "mu_ros": 8.38,
+     "delta_over_starter": 0.23,
+     "slot": "TE",
+     "delta_week": 2.41,
+     "week_slot": "RB/WR/TE",
+     "vorp": 1.33,
+     "bid": 5,
+     "score": 9.9,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.4 this week at RB/WR/TE",
+      "+0.2/wk over your TE",
+      "VORP 1.3",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 224,
+     "name": "FA_RB_12",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 8.4,
+     "mu_ros": 8.69,
+     "delta_over_starter": 0.32,
+     "slot": "RB/WR/TE",
+     "delta_week": 2.7,
+     "week_slot": "RB/WR/TE",
+     "vorp": 0.14,
+     "bid": 5,
+     "score": 9.71,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.7 this week at RB/WR/TE",
+      "+0.3/wk over your RB/WR/TE",
+      "VORP 0.1",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 247,
+     "name": "FA_TE_35",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 7.9,
+     "mu_ros": 8.18,
+     "delta_over_starter": 0.03,
+     "slot": "TE",
+     "delta_week": 2.21,
+     "week_slot": "RB/WR/TE",
+     "vorp": 1.13,
+     "bid": 3,
+     "score": 8.6,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.2 this week at RB/WR/TE",
+      "+0.0/wk over your TE",
+      "VORP 1.1",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 237,
+     "name": "FA_TE_25",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 7.6,
+     "mu_ros": 7.87,
+     "delta_over_starter": -0.28,
+     "slot": "TE",
+     "delta_week": 1.92,
+     "week_slot": "RB/WR/TE",
+     "vorp": 0.82,
+     "bid": 3,
+     "score": 7.46,
+     "streamer": false,
+     "why": [
+      "START NOW: +1.9 this week at RB/WR/TE",
+      "+5.6/wk over worst bench",
+      "VORP 0.8",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 245,
+     "name": "FA_RB_33",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 7.7,
+     "mu_ros": 7.94,
+     "delta_over_starter": -0.43,
+     "slot": "RB/WR/TE",
+     "delta_week": 2.02,
+     "week_slot": "RB/WR/TE",
+     "vorp": -0.61,
+     "bid": 3,
+     "score": 6.88,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.0 this week at RB/WR/TE",
+      "+5.7/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 220,
+     "name": "FA_RB_8",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 7.6,
+     "mu_ros": 7.84,
+     "delta_over_starter": -0.53,
+     "slot": "RB/WR/TE",
+     "delta_week": 1.92,
+     "week_slot": "RB/WR/TE",
+     "vorp": -0.71,
+     "bid": 3,
+     "score": 6.63,
+     "streamer": false,
+     "why": [
+      "START NOW: +1.9 this week at RB/WR/TE",
+      "+5.6/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 249,
+     "name": "FA_WR_37",
+     "pos": "WR",
+     "team": "GB",
+     "mu_week": 6.3,
+     "mu_ros": 6.48,
+     "delta_over_starter": 0.39,
+     "slot": "WR",
+     "delta_week": 0.64,
+     "week_slot": "RB/WR/TE",
+     "vorp": 1.33,
+     "bid": 5,
+     "score": 5.89,
+     "streamer": false,
+     "why": [
+      "+0.4/wk over your WR",
+      "VORP 1.3",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 230,
+     "name": "FA_TE_18",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 6.8,
+     "mu_ros": 7.04,
+     "delta_over_starter": -1.11,
+     "slot": "TE",
+     "delta_week": 1.13,
+     "week_slot": "RB/WR/TE",
+     "vorp": -0.01,
+     "bid": 3,
+     "score": 4.65,
+     "streamer": false,
+     "why": [
+      "+4.8/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 218,
+     "name": "FA_RB_6",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 6.7,
+     "mu_ros": 6.92,
+     "delta_over_starter": -1.45,
+     "slot": "RB/WR/TE",
+     "delta_week": 1.04,
+     "week_slot": "RB/WR/TE",
+     "vorp": -1.63,
+     "bid": 3,
+     "score": 4.41,
+     "streamer": false,
+     "why": [
+      "+4.7/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 251,
+     "name": "FA_RB_39",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 6.0,
+     "mu_ros": 6.17,
+     "delta_over_starter": -2.2,
+     "slot": "RB/WR/TE",
+     "delta_week": 0.35,
+     "week_slot": "RB/WR/TE",
+     "vorp": -2.38,
+     "bid": 3,
+     "score": 2.66,
+     "streamer": false,
+     "why": [
+      "+3.9/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 246,
+     "name": "FA_D/ST_34",
+     "pos": "D/ST",
+     "team": "GB",
+     "mu_week": 9.8,
+     "mu_ros": 10.12,
+     "delta_over_starter": 4.85,
+     "slot": "D/ST",
+     "delta_week": 4.61,
+     "week_slot": "D/ST",
+     "vorp": 5.49,
+     "bid": 3,
+     "score": 4.85,
+     "streamer": true,
+     "why": [
+      "START NOW: +4.6 this week at D/ST",
+      "+4.8/wk over your D/ST",
+      "VORP 5.5",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 213,
+     "name": "FA_D/ST_1",
+     "pos": "D/ST",
+     "team": "GB",
+     "mu_week": 7.9,
+     "mu_ros": 8.18,
+     "delta_over_starter": 2.91,
+     "slot": "D/ST",
+     "delta_week": 2.74,
+     "week_slot": "D/ST",
+     "vorp": 3.55,
+     "bid": 3,
+     "score": 2.91,
+     "streamer": true,
+     "why": [
+      "START NOW: +2.7 this week at D/ST",
+      "+2.9/wk over your D/ST",
+      "VORP 3.5",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    }
+   ],
+   "handcuffs": [
+    {
+     "starter": "RB1_2",
+     "handcuff": "RB8_1",
+     "owner_team_id": 8,
+     "est_value": 0.0
+    },
+    {
+     "starter": "RB1_0",
+     "handcuff": "RB8_1",
+     "owner_team_id": 8,
+     "est_value": 0.0
+    }
+   ],
+   "trades": [
+    {
+     "rival_team_id": 8,
+     "rival": "Team 8",
+     "give": [
+      "QB1_0",
+      "WR1_1"
+     ],
+     "get": [
+      "WR8_0"
+     ],
+     "my_delta_ppw": 1.13,
+     "their_delta_ppw": 7.09,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills my WR hole",
+      "fills their QB hole",
+      "consolidates value for them"
+     ],
+     "score": 8.15,
+     "my_title_delta": -3.9,
+     "their_title_delta": 11.5
+    },
+    {
+     "rival_team_id": 8,
+     "rival": "Team 8",
+     "give": [
+      "QB1_1",
+      "TE1_1"
+     ],
+     "get": [
+      "TE8_0"
+     ],
+     "my_delta_ppw": 4.18,
+     "their_delta_ppw": 4.04,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their QB hole",
+      "fills their TE hole",
+      "consolidates value for them"
+     ],
+     "score": 6.04,
+     "my_title_delta": 4.5,
+     "their_title_delta": 3.8
+    },
+    {
+     "rival_team_id": 8,
+     "rival": "Team 8",
+     "give": [
+      "QB1_1",
+      "RB1_0"
+     ],
+     "get": [
+      "RB8_1"
+     ],
+     "my_delta_ppw": 4.46,
+     "their_delta_ppw": 3.75,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their QB hole",
+      "fills their RB hole",
+      "consolidates value for them"
+     ],
+     "score": 5.75,
+     "my_title_delta": 5.5,
+     "their_title_delta": 3.2
+    },
+    {
+     "rival_team_id": 3,
+     "rival": "Team 3",
+     "give": [
+      "QB1_0",
+      "TE1_0"
+     ],
+     "get": [
+      "RB3_1"
+     ],
+     "my_delta_ppw": 1.05,
+     "their_delta_ppw": 4.38,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their TE hole",
+      "consolidates value for them"
+     ],
+     "score": 5.4
+    },
+    {
+     "rival_team_id": 7,
+     "rival": "Team 7",
+     "give": [
+      "QB1_0",
+      "RB1_0"
+     ],
+     "get": [
+      "RB7_0"
+     ],
+     "my_delta_ppw": 0.79,
+     "their_delta_ppw": 4.37,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their QB hole",
+      "fills their RB hole",
+      "consolidates value for them"
+     ],
+     "score": 5.27
+    },
+    {
+     "rival_team_id": 7,
+     "rival": "Team 7",
+     "give": [
+      "QB1_0",
+      "TE1_0"
+     ],
+     "get": [
+      "RB7_3"
+     ],
+     "my_delta_ppw": 0.82,
+     "their_delta_ppw": 4.35,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their QB hole",
+      "fills their TE hole",
+      "consolidates value for them"
+     ],
+     "score": 5.26
+    },
+    {
+     "rival_team_id": 3,
+     "rival": "Team 3",
+     "give": [
+      "QB1_1",
+      "TE1_1"
+     ],
+     "get": [
+      "RB3_0"
+     ],
+     "my_delta_ppw": 2.25,
+     "their_delta_ppw": 3.18,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their TE hole",
+      "consolidates value for them"
+     ],
+     "score": 4.8
+    },
+    {
+     "rival_team_id": 7,
+     "rival": "Team 7",
+     "give": [
+      "QB1_1",
+      "TE1_1"
+     ],
+     "get": [
+      "RB7_1"
+     ],
+     "my_delta_ppw": 3.65,
+     "their_delta_ppw": 1.52,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their QB hole",
+      "fills their TE hole",
+      "consolidates value for them"
+     ],
+     "score": 3.52
+    },
+    {
+     "rival_team_id": 4,
+     "rival": "Team 4",
+     "give": [
+      "QB1_0",
+      "RB1_2"
+     ],
+     "get": [
+      "WR4_2"
+     ],
+     "my_delta_ppw": 1.31,
+     "their_delta_ppw": 1.95,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills my WR hole",
+      "fills their RB hole",
+      "consolidates value for them"
+     ],
+     "score": 3.11
+    },
+    {
+     "rival_team_id": 3,
+     "rival": "Team 3",
+     "give": [
+      "QB1_1",
+      "WR1_1"
+     ],
+     "get": [
+      "WR3_0"
+     ],
+     "my_delta_ppw": 4.64,
+     "their_delta_ppw": 0.79,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills my WR hole",
+      "consolidates value for them"
+     ],
+     "score": 2.79
+    }
+   ],
+   "incoming_trades": [
+    {
+     "id": "in-1",
+     "rival_team_id": 2,
+     "rival": "Team 2",
+     "proposed_iso": "2026-09-15T13:20",
+     "expires_iso": "2026-09-17T13:20",
+     "hours_left": 20.6,
+     "proposed_ts": 1789500000000,
+     "unmatched_ids": [],
+     "give": [
+      "RB1_1",
+      "WR1_1"
+     ],
+     "get": [
+      "RB2_0"
+     ],
+     "my_delta_ppw": 3.94,
+     "their_delta_ppw": -6.49,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their RB hole",
+      "2-for-1: I consolidate, they get depth"
+     ],
+     "verdict": "accept",
+     "my_title_delta": 12.7,
+     "their_title_delta": -19.4
+    }
+   ],
+   "outgoing_trades": [
+    {
+     "id": "out-1",
+     "rival_team_id": 3,
+     "rival": "Team 3",
+     "proposed_iso": "2026-09-15T13:20",
+     "expires_iso": "2026-09-17T13:20",
+     "hours_left": 20.6,
+     "proposed_ts": 1789500000000,
+     "unmatched_ids": [],
+     "give": [
+      "TE1_1"
+     ],
+     "get": [
+      "TE3_0"
+     ]
+    }
+   ],
+   "pending_trades_error": null,
+   "odds": {
+    "1": {
+     "playoff_pct": 85.9,
+     "title_pct": 23.2,
+     "exp_wins": 8.61,
+     "name": "Team 1",
+     "record": "1-2",
+     "is_me": true
+    },
+    "2": {
+     "playoff_pct": 96.2,
+     "title_pct": 34.0,
+     "exp_wins": 9.87,
+     "name": "Team 2",
+     "record": "1-0",
+     "is_me": false
+    },
+    "3": {
+     "playoff_pct": 2.6,
+     "title_pct": 0.0,
+     "exp_wins": 3.7,
+     "name": "Team 3",
+     "record": "0-0",
+     "is_me": false
+    },
+    "4": {
+     "playoff_pct": 46.2,
+     "title_pct": 8.2,
+     "exp_wins": 6.56,
+     "name": "Team 4",
+     "record": "0-0",
+     "is_me": false
+    },
+    "5": {
+     "playoff_pct": 2.1,
+     "title_pct": 0.0,
+     "exp_wins": 3.7,
+     "name": "Team 5",
+     "record": "0-0",
+     "is_me": false
+    },
+    "6": {
+     "playoff_pct": 38.1,
+     "title_pct": 4.7,
+     "exp_wins": 6.28,
+     "name": "Team 6",
+     "record": "0-0",
+     "is_me": false
+    },
+    "7": {
+     "playoff_pct": 42.2,
+     "title_pct": 5.5,
+     "exp_wins": 6.68,
+     "name": "Team 7",
+     "record": "0-0",
+     "is_me": false
+    },
+    "8": {
+     "playoff_pct": 86.7,
+     "title_pct": 24.3,
+     "exp_wins": 8.6,
+     "name": "Team 8",
+     "record": "0-0",
+     "is_me": false
+    }
+   },
+   "rival_needs": {
+    "2": {
+     "QB": "",
+     "RB": "hole",
+     "WR": "",
+     "TE": "hole"
+    },
+    "3": {
+     "QB": "",
+     "RB": "hole",
+     "WR": "",
+     "TE": "hole"
+    },
+    "4": {
+     "QB": "",
+     "RB": "hole",
+     "WR": "",
+     "TE": "hole"
+    },
+    "5": {
+     "QB": "",
+     "RB": "hole",
+     "WR": "",
+     "TE": "hole"
+    },
+    "6": {
+     "QB": "",
+     "RB": "",
+     "WR": "",
+     "TE": "hole"
+    },
+    "7": {
+     "QB": "hole",
+     "RB": "hole",
+     "WR": "",
+     "TE": "hole"
+    },
+    "8": {
+     "QB": "hole",
+     "RB": "hole",
+     "WR": "",
+     "TE": "hole"
+    }
+   },
+   "standings": [
+    {
+     "name": "Team 8",
+     "record": "0-0",
+     "pf": 128.6,
+     "faab_left": 88,
+     "waiver_rank": 8,
+     "is_me": false
+    },
+    {
+     "name": "Team 6",
+     "record": "0-0",
+     "pf": 128.0,
+     "faab_left": 96,
+     "waiver_rank": 6,
+     "is_me": false
+    },
+    {
+     "name": "Team 4",
+     "record": "0-0",
+     "pf": 120.4,
+     "faab_left": 80,
+     "waiver_rank": 4,
+     "is_me": false
+    },
+    {
+     "name": "Team 1",
+     "record": "1-2",
+     "pf": 114.1,
+     "faab_left": 78,
+     "waiver_rank": 1,
+     "is_me": true
+    },
+    {
+     "name": "Team 3",
+     "record": "0-0",
+     "pf": 107.2,
+     "faab_left": 99,
+     "waiver_rank": 3,
+     "is_me": false
+    },
+    {
+     "name": "Team 7",
+     "record": "0-0",
+     "pf": 102.3,
+     "faab_left": 71,
+     "waiver_rank": 7,
+     "is_me": false
+    },
+    {
+     "name": "Team 2",
+     "record": "1-0",
+     "pf": 99.2,
+     "faab_left": 73,
+     "waiver_rank": 2,
+     "is_me": false
+    },
+    {
+     "name": "Team 5",
+     "record": "0-0",
+     "pf": 93.4,
+     "faab_left": 71,
+     "waiver_rank": 5,
+     "is_me": false
+    }
+   ]
+  }
+ ]
+}
