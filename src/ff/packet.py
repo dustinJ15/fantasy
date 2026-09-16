@@ -3,18 +3,18 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
-from .cache import cached_json, HOUR
-from .config import LeagueRef, PACKET_DIR, env, leagues
+from .cache import HOUR, cached_json
+from .config import PACKET_DIR, LeagueRef, env, leagues
 from .ids import Crosswalk
 from .model import usage as usage_mod
+from .model.clock import apply_clock, week_state
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
 from .model.trades import evaluate, lineup_strength, needs, scan
-from .model.clock import apply_clock, week_state
-from .model.vbd import replacement_levels, own_starter_value
+from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
 from .sources import espn, fantasycalc, sleeper, vegas, weather
 
@@ -61,8 +61,8 @@ def _hours_left(ms, now=None) -> float | None:
     if not ms:
         return None
     if now is None or now.tzinfo is None:
-        now = datetime.now(timezone.utc)
-    return round((datetime.fromtimestamp(ms / 1000, tz=timezone.utc) - now).total_seconds() / 3600, 1)
+        now = datetime.now(UTC)
+    return round((datetime.fromtimestamp(ms / 1000, tz=UTC) - now).total_seconds() / 3600, 1)
 
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,

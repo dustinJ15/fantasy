@@ -1,11 +1,11 @@
 """Game clock: locked players stay put, banked points feed the matchup, phase is reported."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ff.model.clock import apply_clock, game_phase, week_state
 from ff.model.lineup import optimize
 from tests.conftest import P
 
-NOW = datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc)  # Monday morning
+NOW = datetime(2026, 9, 14, 12, 0, tzinfo=UTC)  # Monday morning
 LINES = {"SUN": {"kickoff": "2026-09-13T17:00Z", "state": "post"}, "MON": {"kickoff": "2026-09-15T00:15Z", "state": "pre"},
          "LIVE": {"kickoff": "2026-09-14T11:00Z", "state": "in"}}
 

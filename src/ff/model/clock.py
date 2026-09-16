@@ -6,7 +6,7 @@ players who played Sunday. A player is locked when the kickoff (from the ESPN sc
 in/post, or they already have points."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .projections import PlayerProj
 
@@ -38,7 +38,7 @@ def game_phase(line: dict | None, actual: float, now: datetime) -> str:
 def apply_clock(players: list[PlayerProj], rows: list[dict], lines: dict, now: datetime | None = None, free_agents: bool = False) -> None:
     """Mutates projections in place. Rostered locked players: mu = points banked (post) or banked + half projection (in),
     variance shrunk; they can't move slots. Locked free agents: this-week value is unobtainable, so mu = 0 (ROS untouched)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     actual_by_id = {r["espn_id"]: float(r.get("actual_week") or 0.0) for r in rows}
     for p in players:
         if p.bye:

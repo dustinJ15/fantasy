@@ -4,7 +4,7 @@ X ~ (1 - p_zero) * N(mu, sigma^2) + p_zero * delta(0)
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
@@ -44,7 +44,7 @@ class PlayerProj:
     actual: float | None = None   # points scored so far this week (None if not started)
     sigma_ros: float | None = None  # pre-lock sigma, kept so rest-of-season copies aren't deterministic
 
-    def ros(self, p_zero: float = 0.05) -> "PlayerProj":
+    def ros(self, p_zero: float = 0.05) -> PlayerProj:
         """Rest-of-season view: per-game expectation, no lock, no bye, normal variance."""
         return PlayerProj(**{**self.__dict__, "mu": self.mu_ros, "p_zero": p_zero, "bye": False,
                              "locked": False, "actual": None, "sigma": self.sigma_ros or self.sigma})

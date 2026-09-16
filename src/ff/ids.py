@@ -4,9 +4,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
-import polars as pl
-
 from .sources import fantasypros, sleeper
+
 
 def _int(x) -> int:
     return int(float(x))

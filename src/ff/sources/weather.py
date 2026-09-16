@@ -1,7 +1,7 @@
 """Open-Meteo forecast at kickoff for outdoor stadiums."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 
@@ -30,7 +30,7 @@ def forecast(home_team: str, kickoff_iso: str, force: bool = False) -> dict | No
     lat, lon, dome = st
     if dome:
         return {"dome": True}
-    kick = datetime.fromisoformat(kickoff_iso.replace("Z", "+00:00")).astimezone(timezone.utc)
+    kick = datetime.fromisoformat(kickoff_iso.replace("Z", "+00:00")).astimezone(UTC)
     day = kick.date().isoformat()
 
     def fetch():

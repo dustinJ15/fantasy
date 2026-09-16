@@ -158,7 +158,7 @@ def _todo_rows(lg: dict) -> str:
             label = report.VERDICT_WORD[t["verdict"]] + " OFFER"
         if t["kind"] == "lineup" and t.get("moves"):
             body = "<b>In this order:</b><br>" + "<br>".join(
-                _e(m).replace(" → ", ' <span style="color:%s">→</span> ' % MUTED) for m in t["moves"])
+                _e(m).replace(" → ", f' <span style="color:{MUTED}">→</span> ') for m in t["moves"])
         else:
             body = _e(t["text"])
         rows.append(f'<tr><td valign="top" width="1" style="padding:6px 8px 6px 0">{_badge(label, tone)}</td>'

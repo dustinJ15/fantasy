@@ -54,7 +54,6 @@ def settings(ref: LeagueRef, league: League) -> LeagueSettings:
     lineup = {k: v for k, v in slot_counts.items() if k not in NON_STARTER}
     scoring = {item["abbr"]: float(item["points"]) for item in s.scoring_format}
     ppr = scoring.get("REC", 0.0)
-    total = s.reg_season_count + (len(s.matchup_periods) - s.reg_season_count)
     playoff_weeks = [mp for mp in range(s.reg_season_count + 1, len(s.matchup_periods) + 1)]
     return LeagueSettings(
         name=s.name,

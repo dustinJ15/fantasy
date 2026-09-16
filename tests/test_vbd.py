@@ -1,4 +1,4 @@
-from ff.model.vbd import starters_per_pos, replacement_levels, own_starter_value, tiers
+from ff.model.vbd import own_starter_value, replacement_levels, starters_per_pos, tiers
 from tests.conftest import P
 
 

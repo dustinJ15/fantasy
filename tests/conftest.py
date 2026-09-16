@@ -1,4 +1,5 @@
 import pytest
+
 from ff.model.projections import PlayerProj
 
 

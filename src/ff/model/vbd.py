@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from .projections import PlayerProj, FLEX_LABELS
+from .projections import PlayerProj
 
 CORE = ("QB", "RB", "WR", "TE", "K", "D/ST")
 

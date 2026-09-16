@@ -1,0 +1,19 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.13 && uv sync --quiet
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+      - name: Demo briefing runs with no credentials
+        run: uv run ff briefing --demo --sims 200 --out /tmp/demo.md > /dev/null && head -20 /tmp/demo.md

@@ -1,4 +1,4 @@
-from ff.model.lineup import optimize, win_prob, compare
+from ff.model.lineup import compare, optimize, win_prob
 
 
 def test_win_prob_symmetry():

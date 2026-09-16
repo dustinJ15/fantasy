@@ -7,7 +7,8 @@ import typer
 from rich import print as rprint
 from rich.table import Table
 
-from . import cache, packet as packet_mod, report
+from . import cache, report
+from . import packet as packet_mod
 from .config import PACKET_DIR, env, leagues
 from .sources import espn
 
@@ -25,7 +26,7 @@ def setup_check(league: str | None = LeagueOpt):
         try:
             lg = espn.connect(ref)
         except espn.CookieError as exc:
-            rprint(f"[red]{exc}[/]"); raise typer.Exit(1)
+            rprint(f"[red]{exc}[/]"); raise typer.Exit(1) from exc
         me = espn.my_team(lg, ref.team_id)
         rprint(f"[bold]{ref.name}[/] → {lg.settings.name} ({lg.settings.team_count} teams, week {lg.current_week}, FAAB={lg.settings.faab})")
         for t in lg.teams:
@@ -55,7 +56,7 @@ def doctor():
 @app.command()
 def sync(force: bool = typer.Option(False, "--force", help="Ignore cache TTLs")):
     """Refresh all sources."""
-    from .sources import fantasypros, sleeper, vegas, fantasycalc
+    from .sources import fantasycalc, fantasypros, sleeper, vegas
     fantasypros.weekly_ecr(force); fantasypros.player_ids(force); rprint("fantasypros mirror ok")
     sleeper.players(force); sleeper.trending("add", 24, 100, force); rprint("sleeper ok")
     vegas.implied_totals(force=force); rprint("odds ok")
@@ -64,14 +65,20 @@ def sync(force: bool = typer.Option(False, "--force", help="Ignore cache TTLs"))
         packet_mod.league_snapshot(ref, force=True); rprint(f"espn {ref.name} ok")
 
 
-def _packet(league, overrides, sims=3000):
+DemoOpt = typer.Option(False, "--demo", help="Synthetic league, no ESPN account or network needed")
+
+
+def _packet(league, overrides, sims=3000, demo=False):
+    if demo:
+        from . import demo as demo_mod
+        return demo_mod.build_packet(overrides, sims=sims)
     return packet_mod.build(league, overrides, sims=sims)
 
 
 @app.command("packet")
-def packet_cmd(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), sims: int = 3000):
+def packet_cmd(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), sims: int = 3000, demo: bool = DemoOpt):
     """Write the DecisionPacket JSON and print its path."""
-    p = _packet(league, overrides, sims)
+    p = _packet(league, overrides, sims, demo)
     rprint(p["_path"])
 
 
@@ -83,9 +90,10 @@ def _load_json(path: str | None) -> dict | None:
 def briefing(league: str | None = LeagueOpt, overrides: str | None = typer.Option(None), out: str | None = typer.Option(None), sims: int = 3000,
              short: bool = typer.Option(False, "--short", help="Action card only, no detail tables"),
              html: str | None = typer.Option(None, "--html", help="Also write an email-ready HTML file here"),
-             reads: str | None = typer.Option(None, "--reads", help="reads.json with Claude's per-league read")):
+             reads: str | None = typer.Option(None, "--reads", help="reads.json with Claude's per-league read"),
+             demo: bool = DemoOpt):
     """Render the markdown briefing: action card first, full detail below (no LLM needed)."""
-    p = _packet(league, overrides, sims)
+    p = _packet(league, overrides, sims, demo)
     r = _load_json(reads)
     md = report.render(p, detail=not short, reads=r)
     path = out or str(PACKET_DIR / f"briefing-{date.today().isoformat()}.md")
@@ -179,14 +187,15 @@ def _parse_since(txt: str) -> float:
 def incoming(league: str | None = LeagueOpt, sims: int = 1500,
              as_json: bool = typer.Option(False, "--json", help="Print the incoming_trades blocks as JSON"),
              new_since: str | None = typer.Option(None, "--new-since", help="Only offers proposed within this window (e.g. 40m); implies --json, always exits 0"),
-             force: bool = typer.Option(False, "--force", help="Re-read ESPN instead of the 15-minute snapshot cache")):
+             force: bool = typer.Option(False, "--force", help="Re-read ESPN instead of the 15-minute snapshot cache"),
+             demo: bool = DemoOpt):
     """Offers other managers sent me, with an accept / decline / counter verdict. Read-only; you tap the button."""
     import time
     if new_since:
         # poller path: cheap sims, fresh ESPN read, JSON only
         cutoff_ms = (time.time() - _parse_since(new_since)) * 1000
         sims, as_json, force = min(sims, 200), True, True
-    p = packet_mod.build(league, None, force=force, sims=sims)
+    p = _packet(league, None, sims, demo) if demo else packet_mod.build(league, None, force=force, sims=sims)
     found = []
     for lg in p["leagues"]:
         for t in lg["incoming_trades"]:
@@ -211,7 +220,7 @@ def incoming(league: str | None = LeagueOpt, sims: int = 1500,
 def odds(league: str | None = LeagueOpt):
     for lg in _section(league, "odds"):
         t = Table("team", "record", "playoff %", "title %", "exp W")
-        for tid, o in sorted(lg["odds"].items(), key=lambda kv: -kv[1]["title_pct"]):
+        for _tid, o in sorted(lg["odds"].items(), key=lambda kv: -kv[1]["title_pct"]):
             t.add_row(("★ " if o["is_me"] else "") + o["name"], o["record"], str(o["playoff_pct"]), str(o["title_pct"]), str(o["exp_wins"]))
         rprint(t)
 
@@ -253,7 +262,9 @@ def accuracy():
 @app.command()
 def heartbeat(fail: bool = typer.Option(False, "--fail", help="Report failure instead of success")):
     """Ping HEALTHCHECK_URL (healthchecks.io dead-man's switch). No-op if unset."""
-    import os, requests
+    import os
+
+    import requests
     url = os.getenv("HEALTHCHECK_URL")
     if not url:
         rprint("[dim]HEALTHCHECK_URL not set; skipping heartbeat[/]"); return

@@ -310,7 +310,7 @@ def render_detail(packet: dict) -> str:
         L.append("\n## League odds")
         L.append("| team | record | playoff % | title % | exp wins |")
         L.append("|---|---|---|---|---|")
-        for tid, o in sorted(lg["odds"].items(), key=lambda kv: -kv[1]["title_pct"]):
+        for _tid, o in sorted(lg["odds"].items(), key=lambda kv: -kv[1]["title_pct"]):
             L.append(f"| {'**' if o['is_me'] else ''}{o['name']}{'**' if o['is_me'] else ''} | {o['record']} | {o['playoff_pct']} | {o['title_pct']} | {o['exp_wins']} |")
         L.append("\nRival needs: " + "; ".join(f"{lg['odds'].get(tid, {}).get('name', tid)}: " + ", ".join(f"{pos} {v}" for pos, v in n.items() if v) for tid, n in lg["rival_needs"].items()))
     return "\n".join(L)

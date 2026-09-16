@@ -50,7 +50,7 @@ def test_markdown_lists_render(monkeypatch):
     md = report.render(p, reads={"L9": {"read": "hold"}})
     head = md.split("---")[0]
     lines = head.splitlines()
-    first = next(i for i, l in enumerate(lines) if l.startswith("- "))
+    first = next(i for i, ln in enumerate(lines) if ln.startswith("- "))
     assert lines[first - 1] == ""  # blank line so markdown makes a real list
     assert "**Claude's read:** hold" in head
     assert "p_zero=" not in md
