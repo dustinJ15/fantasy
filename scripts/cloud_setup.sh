@@ -14,4 +14,12 @@ uv sync --quiet || uv sync --quiet   # one retry for flaky downloads
 if [ ! -f .env ] && [ -n "${ESPN_S2:-}" ]; then
   printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
 fi
+# League ids arrive the same way (LEAGUES_TOML holds the file's contents); leagues.toml is untracked.
+if [ ! -f leagues.toml ] && [ -n "${LEAGUES_TOML:-}" ]; then
+  printf '%s\n' "$LEAGUES_TOML" > leagues.toml
+fi
+if [ ! -f leagues.toml ]; then
+  echo "leagues.toml missing: set the LEAGUES_TOML environment variable (contents of the file) or copy leagues.example.toml" >&2
+  exit 2
+fi
 uv run ff doctor

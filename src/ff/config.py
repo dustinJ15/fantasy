@@ -46,7 +46,11 @@ def env() -> Env:
 
 
 def leagues(only: str | None = None) -> list[LeagueRef]:
-    with open(ROOT / "leagues.toml", "rb") as f:
+    path = ROOT / "leagues.toml"
+    if not path.exists():
+        raise SystemExit("leagues.toml not found: copy leagues.example.toml to leagues.toml and fill in your league ids "
+                         "(or run `ff briefing --demo` for a synthetic league)")
+    with open(path, "rb") as f:
         raw = tomllib.load(f)
     refs = [LeagueRef(**{k: v for k, v in x.items() if k in LeagueRef.__dataclass_fields__}) for x in raw.get("league", [])]
     refs = [r for r in refs if r.espn_id]
@@ -55,7 +59,7 @@ def leagues(only: str | None = None) -> list[LeagueRef]:
         if not refs:
             raise SystemExit(f"No league named {only!r} in leagues.toml")
     if not refs:
-        raise SystemExit("No leagues with a non-zero espn_id in leagues.toml")
+        raise SystemExit("No leagues with a non-zero espn_id in leagues.toml (see leagues.example.toml)")
     return refs
 
 

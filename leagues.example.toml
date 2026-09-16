@@ -1,0 +1,13 @@
+# Copy to leagues.toml (untracked) and fill in your leagues.
+# espn_id: the leagueId in your ESPN league URL. team_id: your team's id in that league (`ff setup-check` prints all of them).
+# No secrets here; cookies live in .env. Keep team_id blank to let the SWID cookie identify your team.
+
+[[league]]
+name = "L1"
+espn_id = 0
+team_id = 1
+
+[[league]]
+name = "L2"
+espn_id = 0
+team_id = 1

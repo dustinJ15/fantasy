@@ -4,7 +4,8 @@
 name: trade-poll
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # every 30 min, in season only (Sep-Jan), 12:00-23:59 UTC, Tue-Sun; offers also surface in the morning briefing
+    - cron: '*/30 12-23 * 9-12,1 2-7'
   workflow_dispatch:
     inputs:
       window:
@@ -23,12 +24,15 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.13 && uv sync --quiet
-      - name: Write .env from secrets
-        run: printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
+      - name: Write .env and leagues.toml from secrets/variables
+        run: |
+          printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
+          printf '%s\n' "$LEAGUES_TOML" > leagues.toml
         env:
           ESPN_S2: ${{ secrets.ESPN_S2 }}
           SWID: ${{ secrets.SWID }}
           SEASON: ${{ vars.SEASON }}
+          LEAGUES_TOML: ${{ vars.LEAGUES_TOML }}
       - name: Look for new offers
         id: look
         run: |
