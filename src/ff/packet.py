@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from .cache import cached_json, HOUR
 from .config import LeagueRef, PACKET_DIR, env, leagues
@@ -12,13 +12,13 @@ from .model import usage as usage_mod
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
-from .model.trades import lineup_strength, needs, scan
+from .model.trades import evaluate, lineup_strength, needs, scan
 from .model.clock import apply_clock, week_state
 from .model.vbd import replacement_levels, own_starter_value
 from .model.waivers import handcuffs, rank_free_agents
 from .sources import espn, fantasycalc, sleeper, vegas, weather
 
-PACKET_VERSION = 3
+PACKET_VERSION = 4
 AMBIGUOUS = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE"}
 
 
@@ -51,6 +51,18 @@ def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining
                              sleeper_pts=spts, implied_total=ln.get("implied")))
         return out
     return mk(snap["roster"]), mk(snap["free_agents"])
+
+
+def _ms_iso(ms) -> str | None:
+    return datetime.fromtimestamp(ms / 1000).isoformat(timespec="minutes") if ms else None
+
+
+def _hours_left(ms, now=None) -> float | None:
+    if not ms:
+        return None
+    if now is None or now.tzinfo is None:
+        now = datetime.now(timezone.utc)
+    return round((datetime.fromtimestamp(ms / 1000, tz=timezone.utc) - now).total_seconds() / 3600, 1)
 
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
@@ -144,6 +156,31 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         c["my_title_delta"] = round(o2[my_id]["title_pct"] - odds[my_id]["title_pct"], 1)
         c["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
 
+    # offers other managers sent me (and mine still open), from ESPN's pending transactions
+    by_id = {p.espn_id: p for ps in by_team.values() for p in ps}
+    incoming, outgoing = [], []
+    for tx in snap.get("pending_trades") or []:
+        rid = tx.get("rival_team_id")
+        give = [by_id[i] for i in tx["give"] if i in by_id]
+        get = [by_id[i] for i in tx["get"] if i in by_id]
+        unmatched = [i for i in tx["give"] + tx["get"] if i not in by_id]
+        base = {"id": tx["id"], "rival_team_id": rid, "rival": teams.get(rid, {}).get("name"),
+                "proposed_iso": _ms_iso(tx.get("proposed_ts")), "expires_iso": _ms_iso(tx.get("expires_ts")),
+                "hours_left": _hours_left(tx.get("expires_ts"), now), "proposed_ts": tx.get("proposed_ts"),
+                "unmatched_ids": unmatched}
+        if tx.get("direction") != "incoming" or rid is None:
+            outgoing.append({**base, "give": [p.name for p in give], "get": [p.name for p in get]})
+            continue
+        ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values)
+        new_mine = [p for p in mine if p.espn_id not in {g.espn_id for g in give}] + get
+        new_theirs = [p for p in by_team.get(rid, []) if p.espn_id not in {g.espn_id for g in get}] + give
+        st2 = dict(strength); st2[my_id] = lineup_strength(new_mine, slots); st2[rid] = lineup_strength(new_theirs, slots)
+        o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=min(sims, 1500), seed=11)
+        ev["my_title_delta"] = round(o2[my_id]["title_pct"] - odds[my_id]["title_pct"], 1)
+        ev["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
+        incoming.append({**base, **ev})
+    incoming.sort(key=lambda t: t.get("proposed_ts") or 0, reverse=True)
+
     # usage signals + market values on my roster
     def enrich(p: PlayerProj) -> dict:
         d = p.to_dict()
@@ -170,6 +207,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "lineup_ev": ev_lu.to_dict(), "lineup_win": win_lu.to_dict(), "lineup_diff": compare(ev_lu, win_lu),
         "replacement": repl,
         "waivers": waivers, "handcuffs": cuffs, "trades": trades,
+        "incoming_trades": incoming, "outgoing_trades": outgoing,
+        "pending_trades_error": snap.get("pending_trades_error"),
         "odds": {str(tid): {**o, "name": teams[tid]["name"], "record": f"{teams[tid]['wins']}-{teams[tid]['losses']}", "is_me": tid == my_id} for tid, o in odds.items()},
         "rival_needs": {str(tid): {pos: ("hole" if v["hole"] else "surplus" if v["surplus"] else "") for pos, v in n.items() if pos not in ("K", "D/ST")} for tid, n in rival_needs.items()},
         "standings": sorted([{"name": t["name"], "record": f"{t['wins']}-{t['losses']}", "pf": round(t["points_for"], 1), "faab_left": (s["faab_budget"] - t["faab_spent"]) if s["faab"] else None, "waiver_rank": t["waiver_rank"], "is_me": tid == my_id}
@@ -234,6 +273,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
             "exposure": {k: v for k, v in exposure.items() if len(v) > 1},
             "trending_adds": [{"espn_id": k, "count": v} for k, v in sorted(trending.items(), key=lambda kv: -kv[1])[:15]],
             "usage_error": usage_err, "unmatched_ids": xw.unmatched[:50],
+            "pending_trades_error": {b["name"]: b["pending_trades_error"] for b in league_blocks if b.get("pending_trades_error")} or None,
+            "incoming_trade_count": sum(len(b["incoming_trades"]) for b in league_blocks),
         },
         "leagues": league_blocks,
     }

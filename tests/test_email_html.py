@@ -1,4 +1,6 @@
 """HTML email renderer over the synthetic league: structure, reads, no leaked jargon, size."""
+from html import escape
+
 from ff import report
 from ff.email_html import render_email
 from ff.packet import analyze_league
@@ -28,11 +30,16 @@ def test_render_email(monkeypatch):
     assert "limited Friday, expected to play" in html
     for todo in report.todos(p["leagues"][0]):
         if not todo.get("moves"):
-            assert todo["text"][:30] in html
+            assert escape(todo["text"])[:30] in html
     for jargon in ("p_zero", "fp:", "llm:", "espn:", "sleeper:"):
         assert jargon not in html
     assert len(html) < 80_000
     assert "Full detail" in html and "League odds" in html
+    assert "OFFER" in html and "Offers on the table" in html and "SENT" in html
+    # alert-tier email: only the offer, with the reply callout
+    short = render_email(p, {"L9": {"reply": "how about RB2 straight up?", "reply_to": "Team 2"}}, only_incoming=True)
+    assert "FF trade offer" in short and "how about RB2 straight up?" in short and "Waivers" not in short
+    assert len(short) < 20_000
     # no reads -> no callouts
     bare = render_email(p)
     assert "Claude" not in bare.split("Full detail")[0].replace("read from Claude", "")

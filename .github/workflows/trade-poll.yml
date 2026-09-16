@@ -1,0 +1,58 @@
+# Poll ESPN for new incoming trade offers and fire the "FF trade offer" routine when one appears.
+# Dedupe is a time window: an offer proposed within the last 40 min is "new" (poll every 30 min + slack).
+# The morning briefing lists every still-pending offer, so a missed fire only delays the verdict.
+name: trade-poll
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      window:
+        description: 'How far back counts as new (e.g. 40m, 48h)'
+        default: '40m'
+concurrency:
+  group: trade-poll
+  cancel-in-progress: false
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.13 && uv sync --quiet
+      - name: Write .env from secrets
+        run: printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
+        env:
+          ESPN_S2: ${{ secrets.ESPN_S2 }}
+          SWID: ${{ secrets.SWID }}
+          SEASON: ${{ vars.SEASON }}
+      - name: Look for new offers
+        id: look
+        run: |
+          uv run ff incoming --json --new-since "${{ github.event.inputs.window || '40m' }}" > new.json
+          echo "count=$(python3 -c 'import json;print(len(json.load(open("new.json"))))')" >> "$GITHUB_OUTPUT"
+          cat new.json
+        env:
+          NFLREADPY_TIMEOUT: '120'
+      - name: Fire the trade-offer routine
+        if: steps.look.outputs.count != '0'
+        run: |
+          python3 - <<'PY' > payload.json
+          import json
+          offers = json.load(open("new.json"))
+          lines = [f"{o['league']} ({o['league_name']}): {o['rival']} offers {', '.join(o['get'])} for {', '.join(o['give'])}; verdict {o['verdict']}" for o in offers]
+          json.dump({"text": "New incoming ESPN trade offer(s):\n" + "\n".join(lines)}, open("payload.json", "w"))
+          PY
+          curl --fail --silent --show-error -X POST \
+            "https://api.anthropic.com/v1/claude_code/routines/${ROUTINE_ID}/fire" \
+            -H "Authorization: Bearer ${FF_ROUTINE_FIRE_TOKEN}" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "Content-Type: application/json" \
+            --data @payload.json
+        env:
+          ROUTINE_ID: ${{ vars.FF_TRADE_ROUTINE_ID }}
+          FF_ROUTINE_FIRE_TOKEN: ${{ secrets.FF_ROUTINE_FIRE_TOKEN }}

@@ -16,7 +16,8 @@ Claude returns *parameters and prose*, never *decisions or state*. Every number 
 4. Write `overrides.json`: `{"<espn_id>": {"p_zero": 0.15, "mu_mult": 1.1, "note": "..."}}` only where news changes the picture.
    The `note` is shown next to the player in the email.
 5. `uv run ff briefing --overrides overrides.json` → markdown + packet path. Then write `reads.json`
-   (`{"L1": {"read": "...", "paste": "...", "paste_to": "..."}}`: 1-2 plain sentences per league, what you'd actually do and why)
+   (`{"L1": {"read": "...", "paste": "...", "paste_to": "...", "reply": "...", "reply_to": "..."}}`: 1-2 plain sentences per league,
+   what you'd actually do and why; `reply` only when `incoming_trades` has an offer)
    and `uv run ff render-email --packet <path> --reads reads.json --out briefing.html --md briefing.md`. Never hand-edit the HTML;
    `src/ff/email_html.py` owns the layout.
 6. Email it to Dustin via the Gmail connector (subject: `FF briefing — Week N — <date>`).
@@ -24,7 +25,8 @@ Claude returns *parameters and prose*, never *decisions or state*. Every number 
 Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday morning = final lineup + inactives check.
 
 ## Commands
-`ff setup-check | doctor | sync | roster | lineup | waivers | trades | odds | packet | briefing | render-email` (all accept `--league <name>`).
+`ff setup-check | doctor | sync | roster | lineup | waivers | trades | incoming | odds | packet | briefing | render-email` (all accept `--league <name>`).
+`ff incoming` = offers other managers sent me, with an accept/decline/counter verdict (`--json --new-since 40m` is the poller path).
 
 ## Layout
 `src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math, `packet.py` builds the DecisionPacket,
@@ -39,6 +41,13 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 - Routine "FF daily briefing": trigger `trig_012oA6amKwYBZFg51w1hEqgb`, cron `0 12 * * *` UTC (6 AM Denver during DST),
   cloud env `fantasy` (`env_01Fh955ffyDEwuNxskeXjN3q`, network Full, env vars ESPN_S2/SWID/SEASON/HEALTHCHECK_URL), model `claude-opus-5` (changed from Sonnet 5 on 2026-09-14 via `RemoteTrigger update`).
   Page: https://claude.ai/code/routines/trig_012oA6amKwYBZFg51w1hEqgb
+- Incoming trade offers: every pending offer shows in the morning briefing (`incoming_trades` per league, first checklist item).
+  Faster path: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 40m` every 30 min and, when an offer is new, POSTs
+  to the "FF trade offer" routine's API trigger (`/trade-offer` skill), which emails `FF trade offer — <league> — <date>`.
+  GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`.
+  Routine "FF trade offer": trigger `trig_01KmBX9SxWXu97jX5Wa5eNuV`, no schedule (API trigger only), env `fantasy`, model `claude-opus-5`,
+  Gmail connector. Page: https://claude.ai/code/routines/trig_01KmBX9SxWXu97jX5Wa5eNuV
+  Fire endpoint: `POST https://api.anthropic.com/v1/claude_code/routines/trig_01KmBX9SxWXu97jX5Wa5eNuV/fire` (bearer token from the routine page).
 - Debug a run: `RemoteTrigger list_runs` (trigger_id above) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
 - Code changes take effect on the next cloud run only after `git push` to main (the VM clones fresh each time).
@@ -56,3 +65,6 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 | Sleeper projections missing for many players | crosswalk join | `Crosswalk.sleeper_id()`; check `shared.unmatched_ids` in the packet |
 | Agent sent >1 email or investigated git/Gmail history | skill scope drift | SKILL.md step 10 forbids it; tighten wording if it recurs |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
+| Briefing says "could not read pending trades" | ESPN changed `mPendingTransactions` or cookies half-dead | check `pending_trades_error` in the packet; `ff incoming --force` locally |
+| trade-poll workflow red | cookies dead in GitHub secrets, or fire token revoked | update repo secrets; `gh workflow run trade-poll.yml -f window=48h` to test |
+| Trade offer email never arrives but the offer is in ESPN | poller window missed it (offer older than 40 min at first sight) or routine disabled | it still appears in the next morning briefing; `RemoteTrigger get` on the trade routine |

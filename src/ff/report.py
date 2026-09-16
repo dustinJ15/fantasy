@@ -66,10 +66,24 @@ def trade_tag(t: dict) -> str:
     return "worth sending" if t["their_delta_ppw"] >= 0 else "a reach, send only if bored"
 
 
+VERDICT_WORD = {"accept": "ACCEPT", "decline": "DECLINE", "counter": "COUNTER"}
+
+
+def incoming_line(t: dict) -> str:
+    """One sentence on an offer someone sent me: what moves, what it does for each side, when it expires."""
+    td = f", title odds {t['my_title_delta']:+.1f}" if t.get("my_title_delta") is not None else ""
+    left = f"; expires in {t['hours_left']:.0f}h" if t.get("hours_left") is not None else ""
+    return (f"{t['rival']} offers {', '.join(t['get']) or 'nothing'} for your {', '.join(t['give']) or 'nothing'}: "
+            f"{t['my_delta_ppw']:+.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them{td}{left}")
+
+
 def todos(lg: dict) -> list[dict]:
     """The literal things to do today in one league. Each item: {kind, label, text, moves?}.
-    kind ∈ waiver | waiver_up | stream | lineup | trade. Shared by the markdown and HTML renderers."""
+    kind ∈ trade_in | waiver | waiver_up | stream | lineup | trade. Shared by the markdown and HTML renderers."""
     out = []
+    for t in lg.get("incoming_trades") or []:
+        out.append({"kind": "trade_in", "label": f"Incoming offer ({VERDICT_WORD[t['verdict']]})", "verdict": t["verdict"],
+                    "text": incoming_line(t)})
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5]
     ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts]
     drop = _drop_candidate(lg)
@@ -135,15 +149,15 @@ def voice_lint(reads: dict) -> list[str]:
     import re
     out = []
     for lg, r in reads.items():
-        for field in ("read", "paste"):
+        for field in ("read", "paste", "reply"):
             txt = (r or {}).get(field) or ""
             if not txt:
                 continue
-            for pat, why in AI_TELLS[:3] + (AI_TELLS[3:] if field == "paste" else []):
+            for pat, why in AI_TELLS[:3] + (AI_TELLS[3:] if field in ("paste", "reply") else []):
                 if re.search(pat, txt, flags=re.I):
                     out.append(f"{lg}.{field}: {why}")
-            if field == "paste" and len(txt) > 280:
-                out.append(f"{lg}.paste: too long for a chat message ({len(txt)} chars)")
+            if field in ("paste", "reply") and len(txt) > 280:
+                out.append(f"{lg}.{field}: too long for a chat message ({len(txt)} chars)")
     return out
 
 
@@ -173,6 +187,8 @@ def action_card(packet: dict, reads: dict | None = None) -> str:
             L.append(f"**Claude's read:** {r['read']}")
         if r.get("paste"):
             L.append(f"**Paste to {r.get('paste_to') or 'the rival'}:** \"{r['paste']}\"")
+        if r.get("reply"):
+            L.append(f"**Reply to {r.get('reply_to') or 'the offer'}:** \"{r['reply']}\"")
         L.append("")
     if sh["injury_watchlist"]:
         L.append("**Watch:** " + "; ".join(watch_line(w) for w in sh["injury_watchlist"]))
@@ -181,8 +197,33 @@ def action_card(packet: dict, reads: dict | None = None) -> str:
     return "\n".join(line if (not line or line.startswith("#") or line.startswith("- ")) else line + "  " for line in L)
 
 
-def render(packet: dict, detail: bool = True, reads: dict | None = None) -> str:
-    """Action card first; full tables after a divider (omit with detail=False)."""
+def offer_card(packet: dict, reads: dict | None = None) -> str:
+    """Just the incoming offers (for the alert email): verdict line, why, and Claude's reply, per league with an offer."""
+    reads = reads or {}
+    L = [f"# FF trade offer — {packet['generated'][:10]}", ""]
+    for lg in packet["leagues"]:
+        if not lg.get("incoming_trades"):
+            continue
+        L.append(f"## {lg['league_name']}")
+        L.append("")
+        for t in lg["incoming_trades"]:
+            L.append(f"- **{VERDICT_WORD[t['verdict']]}:** {incoming_line(t)}. {'; '.join(t['why']) or 'even swap on paper'}")
+        L.append("")
+        r = reads.get(lg["name"]) or {}
+        if r.get("read"):
+            L.append(f"**Claude's read:** {r['read']}")
+        if r.get("reply"):
+            L.append(f"**Reply to {r.get('reply_to') or 'the offer'}:** \"{r['reply']}\"")
+        L.append("")
+    if len(L) == 2:
+        L.append("No incoming offers pending.")
+    return "\n".join(line if (not line or line.startswith("#") or line.startswith("- ")) else line + "  " for line in L)
+
+
+def render(packet: dict, detail: bool = True, reads: dict | None = None, only_incoming: bool = False) -> str:
+    """Action card first; full tables after a divider (omit with detail=False). only_incoming: just the offer card."""
+    if only_incoming:
+        return offer_card(packet, reads)
     head = action_card(packet, reads)
     if not detail:
         return head
@@ -205,6 +246,8 @@ def render_detail(packet: dict) -> str:
         L.append("")
     if sh.get("usage_error"):
         L.append(f"> usage metrics unavailable: {sh['usage_error']}\n")
+    if sh.get("pending_trades_error"):
+        L.append(f"> could not read pending trades: {sh['pending_trades_error']}\n")
 
     for lg in packet["leagues"]:
         L.append(f"\n---\n# {lg['league_name']} (`{lg['name']}`) — Week {lg['week']}")
@@ -245,6 +288,16 @@ def render_detail(packet: dict) -> str:
         if lg["handcuffs"]:
             L.append("")
             L.append("Handcuffs: " + "; ".join(f"{h['handcuff']} for {h['starter']} ({'FA' if h['owner_team_id'] is None else 'owned'})" for h in lg["handcuffs"]))
+
+        L.append("\n## Incoming offers")
+        if lg.get("incoming_trades"):
+            for t in lg["incoming_trades"]:
+                mk = f" · market {t['market_get']} for {t['market_give']}" if t.get("market_give") and t.get("market_get") else ""
+                L.append(f"- **{VERDICT_WORD[t['verdict']]}** — {incoming_line(t)}{mk}. {'; '.join(t['why']) or 'even swap on paper'}")
+        else:
+            L.append("None pending.")
+        if lg.get("outgoing_trades"):
+            L.append("Your open offers: " + "; ".join(f"{', '.join(t['give'])} for {', '.join(t['get'])} to {t['rival']}" for t in lg["outgoing_trades"]))
 
         L.append("\n## Trade candidates")
         if lg["trades"]:

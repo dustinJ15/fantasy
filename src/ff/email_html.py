@@ -5,7 +5,8 @@ Gmail strips <style>, so everything is inline; table-based layout; cellpadding/b
 styles to keep the document small enough to paste as a tool argument (~≤60 KB); no images or web fonts; colors chosen to
 survive Gmail's dark-mode inversion (no pure-black text, badges are tinted backgrounds with dark text).
 
-Claude's prose comes in via `reads`: {"<league name>": {"read": "...", "paste": "...", "paste_to": "..."}}.
+Claude's prose comes in via `reads`: {"<league name>": {"read": "...", "paste": "...", "paste_to": "...",
+"reply": "...", "reply_to": "..."}} (`reply` answers an incoming offer).
 """
 from __future__ import annotations
 
@@ -26,7 +27,8 @@ TONES = {
 FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 TEXT, MUTED, BORDER, PAGE, CARD, ZEBRA = "#1f2933", "#6b7280", "#e3e6ea", "#eef0f3", "#ffffff", "#f6f7f9"
 LABELS = {"waiver": ("WAIVER", "info"), "waiver_up": ("WAIVER", "info"), "stream": ("STREAM", "info"),
-          "lineup": ("LINEUP", "move"), "trade": ("TRADE", "good")}
+          "lineup": ("LINEUP", "move"), "trade": ("TRADE", "good"), "trade_in": ("OFFER", "warn")}
+VERDICT_TONE = {"accept": "good", "decline": "bad", "counter": "warn"}
 
 
 def _badge(text: str, tone: str = "grey") -> str:
@@ -151,6 +153,9 @@ def _todo_rows(lg: dict) -> str:
         if t["kind"] == "trade":
             tone = "good" if t.get("worth") else "grey"
             label = "TRADE" if t.get("worth") else "TRADE (reach)"
+        if t["kind"] == "trade_in":
+            tone = VERDICT_TONE[t["verdict"]]
+            label = report.VERDICT_WORD[t["verdict"]] + " OFFER"
         if t["kind"] == "lineup" and t.get("moves"):
             body = "<b>In this order:</b><br>" + "<br>".join(
                 _e(m).replace(" → ", ' <span style="color:%s">→</span> ' % MUTED) for m in t["moves"])
@@ -179,6 +184,8 @@ def _league_action(lg: dict, r: dict) -> str:
         body += _callout("Claude's read", r["read"], "info")
     if r.get("paste"):
         body += _callout(f"Paste to {r.get('paste_to') or 'the rival'}", r["paste"], "good", quote=True)
+    if r.get("reply"):
+        body += _callout(f"Reply to {r.get('reply_to') or 'the offer'}", r["reply"], "warn", quote=True)
     pw = lg["lineup_win"].get("p_win")
     accent = TONES["good"][1] if pw is not None and pw > 0.58 else (TONES["warn"][1] if pw is not None and pw < 0.42 else "#94a3b8")
     return _card(lg["league_name"], _stat_row(lg), body, accent)
@@ -221,6 +228,21 @@ def _lineup_table(lg: dict) -> str:
     return _table(["Slot", "Start"], rows, "ll")
 
 
+def _offers_table(lg: dict) -> str:
+    """Incoming offers with a verdict badge, then my own open offers, one row each."""
+    rows = []
+    for t in lg.get("incoming_trades") or []:
+        mk = f" · market {t['market_get']} for {t['market_give']}" if t.get("market_give") and t.get("market_get") else ""
+        td = f" · title odds you {t['my_title_delta']:+.1f} / them {t['their_title_delta']:+.1f}" if t.get("my_title_delta") is not None else ""
+        left = f" · expires in {t['hours_left']:.0f}h" if t.get("hours_left") is not None else ""
+        rows.append([_badge(report.VERDICT_WORD[t["verdict"]], VERDICT_TONE[t["verdict"]]),
+                     f"{_e(t['rival'] or 'Someone')} gives <b>{_e(', '.join(t['get']) or 'nothing')}</b> for your <b>{_e(', '.join(t['give']) or 'nothing')}</b>"
+                     f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{mk}{left} · {_e('; '.join(t['why']) or 'even swap on paper')}</div>"])
+    for t in lg.get("outgoing_trades") or []:
+        rows.append([_badge("SENT", "grey"), f"Your <b>{_e(', '.join(t['give']))}</b> for <b>{_e(', '.join(t['get']))}</b> to {_e(t['rival'] or '?')}, waiting on them"])
+    return _table(["", "Offer"], rows, "ll", 13)
+
+
 def _league_detail(lg: dict) -> str:
     lw, opp = lg["lineup_win"], lg["opponent"]
     me = lg["odds"].get(str(lg["my_team_id"])) or {}
@@ -256,6 +278,9 @@ def _league_detail(lg: dict) -> str:
     if lg["handcuffs"]:
         body += _muted("Handcuffs: " + _e("; ".join(f"{h['handcuff']} for {h['starter']} ({'FA' if h['owner_team_id'] is None else 'owned'})" for h in lg["handcuffs"])), 12)
 
+    if lg.get("incoming_trades") or lg.get("outgoing_trades"):
+        body += _h("Offers on the table") + _offers_table(lg)
+
     body += _h("Trades")
     if lg["trades"]:
         rows = []
@@ -284,8 +309,43 @@ def _league_detail(lg: dict) -> str:
     return _card(lg["league_name"], sub, body, "#94a3b8")
 
 
-def render_email(packet: dict, reads: dict | None = None) -> str:
+def render_offer_email(packet: dict, reads: dict | None = None) -> str:
+    """Short alert email: one card per league with an incoming offer (verdict table + Claude's read + reply)."""
     reads = reads or {}
+    cards = []
+    for lg in packet["leagues"]:
+        if not lg.get("incoming_trades"):
+            continue
+        r = reads.get(lg["name"]) or {}
+        body = _offers_table({**lg, "outgoing_trades": []})
+        if r.get("read"):
+            body += _callout("Claude's read", r["read"], "info")
+        if r.get("reply"):
+            body += _callout(f"Reply to {r.get('reply_to') or 'the offer'}", r["reply"], "warn", quote=True)
+        t0 = lg["incoming_trades"][0]
+        cards.append(_card(lg["league_name"], _muted(f"From {_e(t0['rival'] or '?')} · week {lg['week']}"), body, TONES[VERDICT_TONE[t0["verdict"]]][1]))
+    if not cards:
+        cards.append(_card("No incoming offers", "", _muted("Nothing pending on ESPN right now."), "#94a3b8"))
+    head = (f'<div style="font-size:22px;font-weight:800;margin:4px 0 2px">FF trade offer</div>'
+            f'<div style="color:{MUTED};font-size:13px;margin-bottom:14px">{_e(packet["generated"][:16].replace("T", " "))} · you accept or decline in the ESPN app</div>')
+    return _page(head + "".join(cards))
+
+
+def _page(inner: str) -> str:
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+        '<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head>'
+        f'<body style="margin:0;padding:0;background:{PAGE}">'
+        f'<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAGE}"><tr><td align="center" style="padding:12px 8px">'
+        f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:{FONT};color:{TEXT};line-height:1.45">'
+        f"<tr><td>{inner}</td></tr></table></td></tr></table></body></html>"
+    )
+
+
+def render_email(packet: dict, reads: dict | None = None, only_incoming: bool = False) -> str:
+    reads = reads or {}
+    if only_incoming:
+        return render_offer_email(packet, reads)
     try:
         gen = datetime.fromisoformat(packet["generated"])
         when = gen.strftime("%a %b %-d")
@@ -301,12 +361,7 @@ def render_email(packet: dict, reads: dict | None = None) -> str:
     details = "".join(_league_detail(lg) for lg in packet["leagues"])
     if packet["shared"].get("usage_error"):
         details += _muted("Usage metrics unavailable this run.", 11)
+    if packet["shared"].get("pending_trades_error"):
+        details += _muted("Could not read pending trades from ESPN this run; check the app for offers.", 11)
     foot = _muted(f"Generated {_e(packet['generated'][:16].replace('T', ' '))} · numbers from ff, read from Claude · read-only against ESPN", 11)
-    return (
-        '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
-        '<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head>'
-        f'<body style="margin:0;padding:0;background:{PAGE}">'
-        f'<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAGE}"><tr><td align="center" style="padding:12px 8px">'
-        f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:{FONT};color:{TEXT};line-height:1.45">'
-        f"<tr><td>{head}{actions}{shared}{divider}{details}{foot}</td></tr></table></td></tr></table></body></html>"
-    )
+    return _page(head + actions + shared + divider + details + foot)

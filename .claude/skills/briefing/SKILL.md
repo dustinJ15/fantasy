@@ -15,7 +15,8 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
 3. Research (WebSearch), in this order, spending at most ~10 searches total:
    - every entry in `shared.injury_watchlist` (latest practice report / beat-writer status),
    - each starter in any league's `lineup_win.slots` whose flags include QUESTIONABLE/DOUBTFUL/OUT or `sleeper:`,
-   - the top 3 waiver targets per league (is the role change real?).
+   - the top 3 waiver targets per league (is the role change real?),
+   - every player named in any league's `incoming_trades` (an offer someone sent Dustin; the packet already has a verdict).
    Note the day: Tue/Wed = waivers matter most; Fri/Sat/Sun = final designations and weather; Thu = TNF players;
    Mon = only Monday-night players can still move (each league's `week_state` in the packet says the phase, the score so
    far, and who is left to play); do not research or suggest lineup changes for players marked `locked`.
@@ -28,11 +29,13 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
 6. Write `reads.json` at repo root — your judgment, as parameters. One entry per league keyed by its `name` from
    leagues.toml (L1/L2/L3); omit a league if you have nothing to add:
    `{"L1": {"read": "<1-2 plain sentences: confirm or adjust the checklist based on your research>",
-            "paste": "<exact message Dustin can paste to the rival, only if a trade is worth sending>", "paste_to": "<rival team name>"}}`
+            "paste": "<exact message Dustin can paste to the rival, only if a trade is worth sending>", "paste_to": "<rival team name>",
+            "reply": "<what Dustin sends back on an incoming offer: a polite no for decline, a concrete tweak for counter; omit for accept>", "reply_to": "<rival team name>"}}`
+   Only include `reply` when that league has an entry in `incoming_trades`.
    Do NOT edit briefing.md or the HTML by hand. If research changes a checklist item (a player ruled out, a role change),
    that belongs in overrides.json (re-run step 5); the override `note` shows up next to the player in the email.
    Dustin reads this on a phone: keep each read short.
-   Voice (both `read` and `paste`): write like a guy texting a coworker about football, not like an assistant.
+   Voice (`read`, `paste` and `reply`): write like a guy texting a coworker about football, not like an assistant.
    - The `paste` message goes to a real person in Dustin's league. One or two casual sentences, first person, lowercase is fine,
      say what you want and why it helps *them*, end with a question. Example: "hey, any interest in Rice + Montgomery for Henry?
      you're thin at WR and I could use the RB. no worries if not". Never mention projections, models, points per week, or Claude.

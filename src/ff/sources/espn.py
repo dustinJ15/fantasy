@@ -131,6 +131,40 @@ def free_agent_rows(league: League, week: int, size: int = 300) -> list[PlayerRo
     return rows
 
 
+def pending_trades(league: League, my_team_id: int | None) -> list[dict[str, Any]]:
+    """Trade proposals still open on ESPN that involve my team, parsed from the raw `mPendingTransactions` view.
+
+    espn-api's Transaction wrapper drops the item direction and the proposal id, so this reads the JSON directly.
+    Use this view, not mTransactions2: the history view keeps showing a proposal as PENDING after it was declined.
+    Each entry: {id, proposer_team_id, proposed_ts, expires_ts, status, team_actions, direction, give, get} where
+    `give` are espn player ids leaving my roster and `get` are ids joining it (direction is from my point of view).
+    """
+    if my_team_id is None:
+        return []
+    raw = league.espn_request.league_get(params={"view": "mPendingTransactions"})
+    out = []
+    for tx in raw.get("pendingTransactions") or []:
+        if tx.get("type") != "TRADE_PROPOSAL":
+            continue
+        items = [i for i in tx.get("items", []) if i.get("type") == "TRADE"]
+        give = [i["playerId"] for i in items if i.get("fromTeamId") == my_team_id]
+        get = [i["playerId"] for i in items if i.get("toTeamId") == my_team_id]
+        if not give and not get:
+            continue
+        proposer = tx.get("teamId")
+        other = {i.get("fromTeamId") for i in items} | {i.get("toTeamId") for i in items}
+        other.discard(my_team_id); other.discard(None)
+        out.append({
+            "id": tx.get("id"), "proposer_team_id": proposer,
+            "rival_team_id": next(iter(other), None) if proposer == my_team_id else proposer,
+            "proposed_ts": tx.get("proposedDate"), "expires_ts": tx.get("expirationDate"),
+            "status": tx.get("status"), "team_actions": tx.get("teamActions") or {},
+            "direction": "outgoing" if proposer == my_team_id else "incoming",
+            "give": give, "get": get,
+        })
+    return out
+
+
 def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
     """Everything the model needs from one league, JSON-serializable."""
     me = my_team(league, ref.team_id)
@@ -162,6 +196,12 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
                          "items": [{"type": i.type, "player_id": i.playerId, "player": str(i.player)} for i in tx.items]})
     except Exception:
         pass
+    # Open trade proposals. Keep the error separate from "no offers" so a changed API is visible in the briefing.
+    pending, pending_err = [], None
+    try:
+        pending = pending_trades(league, me.team_id if me else None)
+    except Exception as exc:
+        pending_err = f"{type(exc).__name__}: {exc}"
     return {
         "ref": asdict(ref), "week": week, "settings": asdict(settings(ref, league)),
         "my_team_id": me.team_id if me else None,
@@ -169,4 +209,5 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
         "roster": [asdict(r) for r in roster_rows(league, week)],
         "free_agents": [asdict(r) for r in free_agent_rows(league, week)],
         "faab_bids": bids,
+        "pending_trades": pending, "pending_trades_error": pending_err,
     }

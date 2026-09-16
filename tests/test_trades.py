@@ -1,4 +1,4 @@
-from ff.model.trades import scan
+from ff.model.trades import evaluate, scan
 from tests.conftest import P
 
 
@@ -30,3 +30,39 @@ def test_scan_prefers_rival_gain_and_penalizes_two_for_one_lowball(slots):
     # ranking: candidates are sorted by score, which weights the rival's gain first
     assert out == sorted(out, key=lambda c: -c["score"])
     assert all("motivated" not in w for c in out for w in c["why"])  # 0-2 is too early to call a rival desperate
+
+
+def _rosters():
+    mine = [P(1, "QB", "QB", 20, tid=1), P(2, "RB1", "RB", 16, tid=1), P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1),
+            P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1), P(7, "TE", "TE", 3, tid=1), P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "QB", "QB", 20, tid=2), P(12, "RB1", "RB", 8, tid=2), P(13, "RB2", "RB", 6, tid=2),
+              P(15, "WR1", "WR", 14, tid=2), P(16, "WR2", "WR", 12, tid=2), P(17, "WR3", "WR", 11, tid=2), P(18, "TEgood", "TE", 12, tid=2), P(22, "TE2", "TE", 6, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    return mine, theirs
+
+
+def test_evaluate_accepts_offer_that_fixes_my_hole(slots):
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    by_id = {p.espn_id: p for p in mine + theirs}
+    # they offer their star TE for my third RB: big lineup gain for me, market roughly even
+    out = evaluate(1, 2, [by_id[4]], [by_id[18]], {1: mine, 2: theirs}, slots, repl, values={"4": {"redraft_value": 2000}, "18": {"redraft_value": 2100}})
+    assert out["verdict"] == "accept" and out["my_delta_ppw"] > 0.75 and "fills my TE hole" in out["why"]
+
+
+def test_evaluate_declines_lowball(slots):
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    by_id = {p.espn_id: p for p in mine + theirs}
+    # they want my RB1 for their backup TE: hurts my lineup and the market gap is huge
+    out = evaluate(1, 2, [by_id[2]], [by_id[22]], {1: mine, 2: theirs}, slots, repl, values={"2": {"redraft_value": 5000}, "22": {"redraft_value": 500}})
+    assert out["verdict"] == "decline" and out["my_delta_ppw"] < 0
+    assert any(w.startswith("market says I give more") for w in out["why"])
+
+
+def test_evaluate_counter_on_close_call(slots):
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    by_id = {p.espn_id: p for p in mine + theirs}
+    # WR3 for WR3: nothing moves for either lineup
+    out = evaluate(1, 2, [by_id[21]], [by_id[17]], {1: mine, 2: theirs}, slots, repl, values={})
+    assert out["verdict"] == "counter" and abs(out["my_delta_ppw"]) < 0.75

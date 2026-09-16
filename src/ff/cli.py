@@ -101,16 +101,17 @@ def briefing(league: str | None = LeagueOpt, overrides: str | None = typer.Optio
 def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JSON written by `ff packet` / `ff briefing`"),
                      out: str = typer.Option("briefing.html", "--out"),
                      reads: str | None = typer.Option(None, "--reads", help="reads.json with Claude's per-league read"),
-                     md: str | None = typer.Option(None, "--md", help="Also rewrite the markdown (plain-text body) with the reads")):
+                     md: str | None = typer.Option(None, "--md", help="Also rewrite the markdown (plain-text body) with the reads"),
+                     only_incoming: bool = typer.Option(False, "--only-incoming", help="Short alert email: just the incoming offers and the reply")):
     """Render the HTML email from an existing packet (seconds, no sims)."""
     from .email_html import render_email
     p = json.load(open(packet))
     r = _load_json(reads)
     for warn in report.voice_lint(r or {}):
         rprint(f"[yellow]voice: {warn}[/]")
-    open(out, "w").write(render_email(p, r))
+    open(out, "w").write(render_email(p, r, only_incoming=only_incoming))
     if md:
-        open(md, "w").write(report.render(p, reads=r))
+        open(md, "w").write(report.render(p, reads=r, only_incoming=only_incoming))
     rprint(f"[green]wrote {out}{' and ' + md if md else ''}[/]")
 
 
@@ -163,6 +164,47 @@ def trades(league: str | None = LeagueOpt):
     for lg in _section(league, "trades"):
         for c in lg["trades"]:
             rprint(f"- give {c['give']} → get {c['get']} ({c['rival']}): me {c['my_delta_ppw']:+.1f}, them {c['their_delta_ppw']:+.1f}  {c['why']}")
+
+
+def _parse_since(txt: str) -> float:
+    """'40m' / '6h' / '2d' -> seconds."""
+    unit = txt[-1].lower()
+    mult = {"m": 60, "h": 3600, "d": 86400}.get(unit)
+    if mult is None:
+        raise typer.BadParameter("use a number followed by m, h or d, e.g. 40m")
+    return float(txt[:-1]) * mult
+
+
+@app.command()
+def incoming(league: str | None = LeagueOpt, sims: int = 1500,
+             as_json: bool = typer.Option(False, "--json", help="Print the incoming_trades blocks as JSON"),
+             new_since: str | None = typer.Option(None, "--new-since", help="Only offers proposed within this window (e.g. 40m); implies --json, always exits 0"),
+             force: bool = typer.Option(False, "--force", help="Re-read ESPN instead of the 15-minute snapshot cache")):
+    """Offers other managers sent me, with an accept / decline / counter verdict. Read-only; you tap the button."""
+    import time
+    if new_since:
+        # poller path: cheap sims, fresh ESPN read, JSON only
+        cutoff_ms = (time.time() - _parse_since(new_since)) * 1000
+        sims, as_json, force = min(sims, 200), True, True
+    p = packet_mod.build(league, None, force=force, sims=sims)
+    found = []
+    for lg in p["leagues"]:
+        for t in lg["incoming_trades"]:
+            if new_since and (t.get("proposed_ts") or 0) < cutoff_ms:
+                continue
+            found.append({"league": lg["name"], "league_name": lg["league_name"], "week": lg["week"], **t})
+    if as_json:
+        print(json.dumps(found, indent=1, default=str)); return
+    for lg in p["leagues"]:
+        rprint(f"\n[bold]{lg['league_name']} — week {lg['week']}[/]")
+        if lg.get("pending_trades_error"):
+            rprint(f"[red]could not read pending trades: {lg['pending_trades_error']}[/]")
+        for t in lg["incoming_trades"]:
+            rprint(f"- [bold]{t['verdict'].upper()}[/] {report.incoming_line(t)}  market {t['market_get']} for {t['market_give']}  {'; '.join(t['why'])}")
+        for t in lg["outgoing_trades"]:
+            rprint(f"- [dim]sent: your {', '.join(t['give'])} for {', '.join(t['get'])} to {t['rival']}[/]")
+        if not lg["incoming_trades"] and not lg["outgoing_trades"]:
+            rprint("[dim]no offers pending[/]")
 
 
 @app.command()

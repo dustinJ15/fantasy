@@ -112,3 +112,55 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
         cands += kept
     cands.sort(key=lambda c: -c["score"])
     return cands[:top]
+
+
+def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[PlayerProj], rosters: dict[int, list[PlayerProj]],
+             slots: dict[str, int], repl: dict[str, float], values: dict[str, dict]) -> dict:
+    """
+    Score an offer someone sent me: `give` leaves my roster, `get` joins it. Any size, K/DST allowed.
+
+    Verdict is lineup-delta first (same both-sides math as scan), with FantasyCalc redraft value as a lowball check:
+    accept when it clearly helps my starting lineup and the market side isn't a fleece; decline when it hurts or the
+    market gap is large; everything else is a counter (close enough that the right tweak makes it a yes).
+    """
+    mine, theirs = rosters.get(my_id, []), rosters.get(rival_id, [])
+    my_mu0, _ = lineup_strength(mine, slots)
+    their_mu0, _ = lineup_strength(theirs, slots)
+    new_mine = _swap(mine, {p.espn_id for p in give}, get)
+    new_theirs = _swap(theirs, {p.espn_id for p in get}, give)
+    my_mu1, _ = lineup_strength(new_mine, slots)
+    their_mu1, _ = lineup_strength(new_theirs, slots)
+    d_me, d_them = my_mu1 - my_mu0, their_mu1 - their_mu0
+    gv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in give)
+    rv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in get)
+    market_ratio = (rv / gv) if gv and rv else None
+
+    my_needs, their_needs = needs(mine, slots, repl), needs(theirs, slots, repl)
+    why = []
+    for p in get:
+        if my_needs.get(p.pos, {}).get("hole"): why.append(f"fills my {p.pos} hole")
+    for p in give:
+        if their_needs.get(p.pos, {}).get("hole"): why.append(f"fills their {p.pos} hole")
+    new_needs = needs(new_mine, slots, repl)
+    for pos, n in new_needs.items():
+        if n["hole"] and not my_needs.get(pos, {}).get("hole"): why.append(f"opens a {pos} hole for me")
+    if len(give) > len(get):
+        why.append("2-for-1: I consolidate, they get depth")
+    elif len(get) > len(give):
+        why.append("1-for-2: I take on depth and need a roster spot")
+    if market_ratio is not None:
+        if market_ratio < 0.8: why.append(f"market says I give more ({rv} vs {gv})")
+        elif market_ratio > 1.2: why.append(f"market says I get more ({rv} vs {gv})")
+    why = list(dict.fromkeys(why))
+
+    if d_me <= -0.5 or (market_ratio is not None and market_ratio < 0.65):
+        verdict = "decline"
+    elif d_me >= 0.75 and (market_ratio is None or market_ratio >= 0.8):
+        verdict = "accept"
+    else:
+        verdict = "counter"
+    return {
+        "give": [p.name for p in give], "get": [p.name for p in get],
+        "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
+        "market_give": gv, "market_get": rv, "why": why, "verdict": verdict,
+    }

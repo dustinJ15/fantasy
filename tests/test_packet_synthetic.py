@@ -51,12 +51,23 @@ def make_snapshot(teams=8):
                   "streak": "W1", "seed": t, "espn_playoff_pct": 50, "schedule": sched[t], "scores": [], "outcomes": [], "is_me": t == 1} for t in ids]
     team_rows[0]["losses"] = 2
     matchups = [{"home": 1, "away": sched[1][1], "home_proj": None, "away_proj": None}]
+    by_name = {r["name"]: r["espn_id"] for r in roster}
     return {
         "ref": {"name": "synth", "espn_id": 1}, "week": 2, "my_team_id": 1, "teams": team_rows, "matchups": matchups,
         "settings": {"name": "Synthetic League", "team_count": teams, "scoring": {"REC": 1.0}, "lineup_slots": slots, "bench_slots": 6, "ir_slots": 1,
                      "reg_season_weeks": 14, "playoff_team_count": 4, "playoff_weeks": [15, 16], "matchup_periods": {i: [i] for i in range(1, 17)},
                      "faab": True, "faab_budget": 100, "trade_deadline_ms": 0, "ppr": 1.0},
         "roster": roster, "free_agents": fas, "faab_bids": [],
+        # one incoming 2-for-1 from team 2 (their best RB for my RB2 + WR2), one offer I sent to team 3
+        "pending_trades": [
+            {"id": "in-1", "proposer_team_id": 2, "rival_team_id": 2, "proposed_ts": 1789500000000, "expires_ts": 1789672800000,
+             "status": "PENDING", "team_actions": {"2": "ACCEPTED"}, "direction": "incoming",
+             "give": [by_name["RB1_1"], by_name["WR1_1"]], "get": [by_name["RB2_0"]]},
+            {"id": "out-1", "proposer_team_id": 1, "rival_team_id": 3, "proposed_ts": 1789500000000, "expires_ts": 1789672800000,
+             "status": "PENDING", "team_actions": {"1": "ACCEPTED"}, "direction": "outgoing",
+             "give": [by_name["TE1_1"]], "get": [by_name["TE3_0"]]},
+        ],
+        "pending_trades_error": None,
     }
 
 
@@ -74,6 +85,16 @@ def test_end_to_end_synthetic(monkeypatch):
               "leagues": [blk]}
     md = report.render(packet)
     assert "Synthetic League" in md and "## Waivers" in md and "## League odds" in md and "Lineup" in md
+    # incoming offer: evaluated, first in the checklist, outgoing listed separately
+    inc = blk["incoming_trades"]
+    assert len(inc) == 1 and inc[0]["verdict"] in ("accept", "decline", "counter") and inc[0]["rival"] == "Team 2"
+    assert inc[0]["give"] == ["RB1_1", "WR1_1"] and inc[0]["get"] == ["RB2_0"] and "my_title_delta" in inc[0]
+    assert len(blk["outgoing_trades"]) == 1 and blk["outgoing_trades"][0]["rival"] == "Team 3"
+    first = report.todos(blk)[0]
+    assert first["kind"] == "trade_in" and "Team 2 offers RB2_0 for your RB1_1, WR1_1" in first["text"]
+    assert "## Incoming offers" in md and "Your open offers" in md
+    short = report.render(packet, reads={"synth": {"reply": "thanks but no", "reply_to": "Team 2"}}, only_incoming=True)
+    assert short.startswith("# FF trade offer") and "Reply to Team 2" in short and "## Waivers" not in short
     # overrides flow through
     pid = str(blk["roster"][0]["espn_id"])
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)
