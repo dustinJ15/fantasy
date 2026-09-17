@@ -162,6 +162,9 @@ def _todo_rows(lg: dict) -> str:
                 _e(m).replace(" → ", f' <span style="color:{MUTED}">→</span> ') for m in t["moves"])
         else:
             body = _e(t["text"])
+        if t.get("warn"):
+            warn_fg = TONES["bad"][1]
+            body += f'<div style="color:{warn_fg};font-size:11px;margin-top:2px">{_e("; ".join(t["warn"]))}</div>'
         rows.append(f'<tr><td valign="top" width="1" style="padding:6px 8px 6px 0">{_badge(label, tone)}</td>'
                     f'<td valign="top" style="padding:6px 0;font-size:14px;border-bottom:1px solid {BORDER}">{body}</td></tr>')
     return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>'

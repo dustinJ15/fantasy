@@ -32,6 +32,11 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
             "paste": "<exact message Dustin can paste to the rival, only if a trade is worth sending>", "paste_to": "<rival team name>",
             "reply": "<what Dustin sends back on an incoming offer: a polite no for decline, a concrete tweak for counter; omit for accept>", "reply_to": "<rival team name>"}}`
    Only include `reply` when that league has an entry in `incoming_trades`.
+   If your research says a checklist item is wrong, say so in the first words of the read, in plain words, naming the
+   item: "skip the trade item below, Herbert and Daniels are the same player this year" or "don't make the waiver claim".
+   The card is the model's math and your read is judgment; they are allowed to disagree, but the email has to end with
+   one answer, not a card saying do it and a paragraph saying don't. A card may list up to three trade ideas: if you
+   only disagree with one, name which.
    Do NOT edit briefing.md or the HTML by hand. If research changes a checklist item (a player ruled out, a role change),
    that belongs in overrides.json (re-run step 5); the override `note` shows up next to the player in the email.
    Dustin reads this on a phone: keep each read short.

@@ -74,3 +74,14 @@ def test_voice_lint_flags_ai_tells():
     assert any("not X, but Y" in w for w in warns)
     assert any(w.startswith("L1.paste") and "model" in w for w in warns)
     assert not any(w.startswith("L2") for w in warns)
+
+
+def test_depth_warning_reaches_both_renderers(monkeypatch):
+    """A 'leaves me no backup QB' caveat is useless if it only lands in the detail tables the HTML no longer carries."""
+    p = _packet(monkeypatch)
+    warns = [w for t in report.todos(p["leagues"][0]) for w in (t.get("warn") or [])]
+    assert warns, "the demo league's 2-for-1s ship a QB, so a depth warning is expected"
+    html, md = render_email(p), report.render(p)
+    for w in warns:
+        assert escape(w) in html, f"missing from the card: {w}"
+        assert w in md, f"missing from the plain text: {w}"

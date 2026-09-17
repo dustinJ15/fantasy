@@ -104,9 +104,14 @@ def todos(lg: dict) -> list[dict]:
         out.append({"kind": "lineup", "label": "Lineup (in order)" if ph == "pre" else "Lineup (only unplayed slots)", "text": " · ".join(ch), "moves": ch})
     else:
         out.append({"kind": "lineup", "label": "Lineup", "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []})
-    if lg["trades"]:
-        t = lg["trades"][0]
+    # Every offer that helps both sides is a thing I could actually send today, so list them (capped at 3 so the card
+    # stays a checklist). A "reach" only helps me, so at most one of those, and only when there is nothing better.
+    worth = [t for t in lg["trades"] if t["their_delta_ppw"] >= 0][:3]
+    for t in worth or lg["trades"][:1]:
         out.append({"kind": "trade", "label": f"Trade ({trade_tag(t)})", "worth": t["their_delta_ppw"] >= 0,
+                    # roster-depth warnings ride along with the row: the card is the whole HTML email, so a caveat
+                    # that only reached the detail tables would never be seen on a phone
+                    "warn": [w for w in t["why"] if w.startswith("leaves me")],
                     "text": f"offer {t['rival']} your {', '.join(t['give'])} for {', '.join(t['get'])} (+{t['my_delta_ppw']:.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them)"})
     return out
 
@@ -177,7 +182,8 @@ def action_card(packet: dict, reads: dict | None = None) -> str:
             L.append(f"**{pl}**")
         L.append("")
         for x in todos(lg):
-            L.append(f"- **{x['label']}:** {x['text']}")
+            warn = f" — {'; '.join(x['warn'])}" if x.get("warn") else ""
+            L.append(f"- **{x['label']}:** {x['text']}{warn}")
         L.append("")
         why = why_parts(lg)
         if why:

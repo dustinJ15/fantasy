@@ -34,3 +34,17 @@ def test_end_to_end_synthetic(monkeypatch):
     pid = str(blk["roster"][0]["espn_id"])
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)
     assert blk2["roster"][-1]["espn_id"] == int(pid) or any(r["espn_id"] == int(pid) and r["p_zero"] == 1.0 for r in blk2["roster"])
+
+
+def test_card_lists_every_worth_sending_trade(monkeypatch):
+    """More than one sendable offer means more than one checklist row, capped at 3; reaches stay a single row."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    blk = analyze_league(make_snapshot(), FakeXW(), {}, {}, {}, {}, overrides=None, sims=200)
+    rows = [t for t in report.todos(blk) if t["kind"] == "trade"]
+    worth = [t for t in blk["trades"] if t["their_delta_ppw"] >= 0][:3]
+    assert len(rows) <= 3
+    if worth:
+        assert len(rows) == len(worth) and all(r["worth"] for r in rows)
+        assert [r["text"].split(" your ")[0] for r in rows] == [f"offer {t['rival']}" for t in worth]
+    else:
+        assert len(rows) <= 1 and not any(r["worth"] for r in rows)

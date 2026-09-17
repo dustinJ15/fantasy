@@ -7,7 +7,9 @@ _1-2 · vs Team 8 · win 51% · playoffs 91.9% · title 27.8%_
 - **Waiver:** add FA_TE_27 (TE) and start him at RB/WR/TE (+6 pts this week); drop WR1_3
 - **Stream:** swap in FA_D/ST_34 at D/ST (+4.8 this week)
 - **Lineup (in order):** RB1_1: RB → bench · WR1_0: WR → bench · TE1_0: TE → RB/WR/TE · RB1_2: bench → RB · TE1_1: bench → TE · WR1_2: bench → WR
-- **Trade (worth sending):** offer Team 8 your QB1_1, WR1_1 for WR8_0 (+1.1 pts/wk for you, +7.8 for them)
+- **Trade (worth sending):** offer Team 8 your QB1_1, WR1_1 for WR8_0 (+1.1 pts/wk for you, +7.8 for them) — leaves me no backup QB
+- **Trade (worth sending):** offer Team 8 your QB1_0, TE1_1 for TE8_0 (+2.5 pts/wk for you, +6.5 for them) — leaves me no backup QB
+- **Trade (worth sending):** offer Team 8 your QB1_0, RB1_0 for RB8_1 (+2.8 pts/wk for you, +6.2 for them) — leaves me no backup QB
 
 _Why: RB1_2 30% to sit; TE1_0 30% to sit · coin flip_  
 **Claude's read:** Take the Team 2 offer only if RB1_1 is actually out this week; otherwise hold, you win this matchup on floor.  
