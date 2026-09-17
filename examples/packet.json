@@ -1,6 +1,6 @@
 {
  "version": 4,
- "generated": "2026-09-17T14:15:28",
+ "generated": "2026-09-17T14:22:53",
  "season": 2026,
  "demo": true,
  "shared": {
@@ -16,8 +16,8 @@
   {
    "name": "demo",
    "league_name": "Demo League",
-   "week": 2,
-   "weeks_remaining": 15,
+   "week": 5,
+   "weeks_remaining": 12,
    "settings": {
     "team_count": 8,
     "lineup_slots": {
@@ -39,7 +39,7 @@
     "ppr": 1.0
    },
    "my_team_id": 1,
-   "my_record": "0-2",
+   "my_record": "4-0",
    "week_state": {
     "phase": "pre",
     "my_points": 0,
@@ -55,23 +55,23 @@
      "Packers D/ST"
     ],
     "opp_left": [
-     "Trey Solano",
-     "Dontae Kowalczyk",
-     "Rico Pennington",
-     "Deon Ruiz-Hollis",
-     "Deon Nakamura",
-     "Terrell Solano",
-     "Kai McCrae",
-     "Chiefs D/ST"
+     "Elias Bassett",
+     "Dontae Rutherford",
+     "Xavier Vell",
+     "Omar Booker",
+     "Quincy Osei",
+     "Darius Solano",
+     "Darius Delacroix",
+     "Bills D/ST"
     ]
    },
    "faab_remaining": 79,
    "waiver_rank": 1,
    "opponent": {
-    "team_id": 2,
-    "name": "The Tuesday Regrets",
-    "mu": 70.4,
-    "sd": 17.3
+    "team_id": 4,
+    "name": "Bye Week Blues",
+    "mu": 70.0,
+    "sd": 14.5
    },
    "roster": [
     {
@@ -87,7 +87,7 @@
      "mu": 13.6,
      "sigma": 4.2,
      "p_zero": 0.02,
-     "mu_ros": 14.04,
+     "mu_ros": 15.85,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -129,7 +129,7 @@
      "mu": 11.4,
      "sigma": 5.7,
      "p_zero": 0.02,
-     "mu_ros": 11.79,
+     "mu_ros": 13.31,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -170,7 +170,7 @@
      "mu": 11.1,
      "sigma": 5.0,
      "p_zero": 0.02,
-     "mu_ros": 11.49,
+     "mu_ros": 12.98,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -212,7 +212,7 @@
      "mu": 14.7,
      "sigma": 6.62,
      "p_zero": 0.3,
-     "mu_ros": 15.18,
+     "mu_ros": 17.14,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -254,7 +254,7 @@
      "mu": 19.4,
      "sigma": 5.82,
      "p_zero": 0.5,
-     "mu_ros": 20.04,
+     "mu_ros": 22.62,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -298,7 +298,7 @@
      "mu": 13.5,
      "sigma": 6.75,
      "p_zero": 0.3,
-     "mu_ros": 13.93,
+     "mu_ros": 15.73,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -341,7 +341,7 @@
      "mu": 12.3,
      "sigma": 6.77,
      "p_zero": 0.3,
-     "mu_ros": 12.71,
+     "mu_ros": 14.35,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -384,7 +384,7 @@
      "mu": 9.89,
      "sigma": 4.94,
      "p_zero": 0.3,
-     "mu_ros": 8.9,
+     "mu_ros": 10.05,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -428,7 +428,7 @@
      "mu": 5.1,
      "sigma": 3.9,
      "p_zero": 0.02,
-     "mu_ros": 5.29,
+     "mu_ros": 5.97,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -470,7 +470,7 @@
      "mu": 6.5,
      "sigma": 3.9,
      "p_zero": 0.3,
-     "mu_ros": 6.7,
+     "mu_ros": 7.56,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -512,7 +512,7 @@
      "mu": 4.6,
      "sigma": 3.3,
      "p_zero": 0.02,
-     "mu_ros": 4.77,
+     "mu_ros": 5.39,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -554,7 +554,7 @@
      "mu": 4.5,
      "sigma": 3.9,
      "p_zero": 0.3,
-     "mu_ros": 4.67,
+     "mu_ros": 5.28,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -597,7 +597,7 @@
      "mu": 2.4,
      "sigma": 3.9,
      "p_zero": 0.02,
-     "mu_ros": 2.5,
+     "mu_ros": 2.82,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -639,7 +639,7 @@
      "mu": 1.0,
      "sigma": 3.0,
      "p_zero": 0.02,
-     "mu_ros": 1.03,
+     "mu_ros": 1.17,
      "bye": false,
      "sources": {
       "fp_pts": null,
@@ -734,7 +734,7 @@
     },
     "mu": 79.71,
     "sd": 18.99,
-    "p_win": 0.642,
+    "p_win": 0.658,
     "bench": [
      "Cole Ibarra",
      "Malik Okafor",
@@ -745,12 +745,12 @@
    },
    "lineup_diff": [],
    "replacement": {
-    "QB": 14.04,
-    "RB": 7.86,
-    "WR": 5.14,
-    "TE": 7.88,
-    "K": 8.66,
-    "D/ST": 4.77
+    "QB": 15.85,
+    "RB": 8.88,
+    "WR": 5.8,
+    "TE": 8.9,
+    "K": 9.78,
+    "D/ST": 5.39
    },
    "waivers": [
     {
@@ -759,19 +759,19 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 11.8,
-     "mu_ros": 12.2,
-     "delta_over_starter": 5.5,
+     "mu_ros": 13.78,
+     "delta_over_starter": 6.22,
      "slot": "RB",
      "delta_week": 7.01,
      "week_slot": "RB",
-     "vorp": 4.34,
+     "vorp": 4.9,
      "bid": 29,
-     "score": 40.45,
+     "score": 43.88,
      "streamer": false,
      "why": [
       "START NOW: +7.0 this week at RB",
-      "+5.5/wk over your RB",
-      "VORP 4.3",
+      "+6.2/wk over your RB",
+      "VORP 4.9",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -782,19 +782,19 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 11.1,
-     "mu_ros": 11.5,
-     "delta_over_starter": 4.8,
+     "mu_ros": 12.98,
+     "delta_over_starter": 5.42,
      "slot": "RB",
      "delta_week": 6.33,
      "week_slot": "RB",
-     "vorp": 3.64,
+     "vorp": 4.1,
      "bid": 29,
-     "score": 35.94,
+     "score": 38.92,
      "streamer": false,
      "why": [
       "START NOW: +6.3 this week at RB",
-      "+4.8/wk over your RB",
-      "VORP 3.6",
+      "+5.4/wk over your RB",
+      "VORP 4.1",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -805,19 +805,19 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 11.9,
-     "mu_ros": 12.28,
-     "delta_over_starter": 0.49,
+     "mu_ros": 13.86,
+     "delta_over_starter": 0.55,
      "slot": "RB/WR/TE",
      "delta_week": 4.74,
      "week_slot": "RB/WR/TE",
-     "vorp": 4.4,
+     "vorp": 4.96,
      "bid": 7,
-     "score": 20.98,
+     "score": 22.43,
      "streamer": false,
      "why": [
       "START NOW: +4.7 this week at RB/WR/TE",
-      "+0.5/wk over your RB/WR/TE",
-      "VORP 4.4",
+      "+0.6/wk over your RB/WR/TE",
+      "VORP 5.0",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -828,19 +828,19 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 8.3,
-     "mu_ros": 8.58,
-     "delta_over_starter": 1.88,
+     "mu_ros": 9.68,
+     "delta_over_starter": 2.12,
      "slot": "RB",
      "delta_week": 3.58,
      "week_slot": "RB",
-     "vorp": 0.72,
-     "bid": 21,
-     "score": 17.29,
+     "vorp": 0.8,
+     "bid": 19,
+     "score": 18.57,
      "streamer": false,
      "why": [
       "START NOW: +3.6 this week at RB",
-      "+1.9/wk over your RB",
-      "VORP 0.7",
+      "+2.1/wk over your RB",
+      "VORP 0.8",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -851,19 +851,19 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 8.2,
-     "mu_ros": 8.46,
-     "delta_over_starter": 1.76,
+     "mu_ros": 9.55,
+     "delta_over_starter": 1.99,
      "slot": "RB",
      "delta_week": 3.49,
      "week_slot": "RB",
-     "vorp": 0.6,
-     "bid": 19,
-     "score": 16.58,
+     "vorp": 0.67,
+     "bid": 17,
+     "score": 17.81,
      "streamer": false,
      "why": [
       "START NOW: +3.5 this week at RB",
-      "+1.8/wk over your RB",
-      "VORP 0.6",
+      "+2.0/wk over your RB",
+      "VORP 0.7",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -874,19 +874,19 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 9.8,
-     "mu_ros": 10.1,
-     "delta_over_starter": -1.69,
+     "mu_ros": 11.4,
+     "delta_over_starter": -1.91,
      "slot": "RB/WR/TE",
      "delta_week": 2.68,
      "week_slot": "RB/WR/TE",
-     "vorp": 2.22,
+     "vorp": 2.5,
      "bid": 3,
-     "score": 12.12,
+     "score": 12.98,
      "streamer": false,
      "why": [
       "START NOW: +2.7 this week at RB/WR/TE",
-      "+9.1/wk over worst bench",
-      "VORP 2.2",
+      "+10.2/wk over worst bench",
+      "VORP 2.5",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -897,18 +897,18 @@
      "pos": "WR",
      "team": "GB",
      "mu_week": 8.4,
-     "mu_ros": 8.68,
-     "delta_over_starter": -0.22,
+     "mu_ros": 9.8,
+     "delta_over_starter": -0.25,
      "slot": "WR",
      "delta_week": 1.31,
      "week_slot": "RB/WR/TE",
-     "vorp": 3.54,
+     "vorp": 4.0,
      "bid": 3,
-     "score": 9.98,
+     "score": 10.94,
      "streamer": false,
      "why": [
-      "+7.6/wk over worst bench",
-      "VORP 3.5",
+      "+8.6/wk over worst bench",
+      "VORP 4.0",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -919,14 +919,14 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 6.6,
-     "mu_ros": 6.83,
-     "delta_over_starter": 0.13,
+     "mu_ros": 7.71,
+     "delta_over_starter": 0.15,
      "slot": "RB",
      "delta_week": 1.92,
      "week_slot": "RB",
-     "vorp": -1.03,
+     "vorp": -1.17,
      "bid": 3,
-     "score": 7.13,
+     "score": 7.56,
      "streamer": false,
      "why": [
       "START NOW: +1.9 this week at RB",
@@ -941,17 +941,17 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 8.1,
-     "mu_ros": 8.35,
-     "delta_over_starter": -3.44,
+     "mu_ros": 9.42,
+     "delta_over_starter": -3.89,
      "slot": "RB/WR/TE",
      "delta_week": 1.01,
      "week_slot": "RB/WR/TE",
-     "vorp": 0.47,
+     "vorp": 0.52,
      "bid": 3,
-     "score": 6.15,
+     "score": 6.66,
      "streamer": false,
      "why": [
-      "+7.3/wk over worst bench",
+      "+8.2/wk over worst bench",
       "VORP 0.5",
       "fp:B"
      ],
@@ -963,60 +963,18 @@
      "pos": "WR",
      "team": "GB",
      "mu_week": 7.0,
-     "mu_ros": 7.23,
-     "delta_over_starter": -1.67,
+     "mu_ros": 8.17,
+     "delta_over_starter": -1.88,
      "slot": "WR",
      "delta_week": 0.0,
      "week_slot": "",
-     "vorp": 2.09,
+     "vorp": 2.37,
      "bid": 3,
-     "score": 5.19,
+     "score": 5.87,
      "streamer": false,
      "why": [
-      "+6.2/wk over worst bench",
-      "VORP 2.1",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 219,
-     "name": "Devin Mbeki",
-     "pos": "TE",
-     "team": "GB",
-     "mu_week": 7.6,
-     "mu_ros": 7.88,
-     "delta_over_starter": -3.91,
-     "slot": "RB/WR/TE",
-     "delta_week": 0.52,
-     "week_slot": "RB/WR/TE",
-     "vorp": 0.0,
-     "bid": 3,
-     "score": 4.46,
-     "streamer": false,
-     "why": [
-      "+6.8/wk over worst bench",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 225,
-     "name": "Marcus Duquesne",
-     "pos": "TE",
-     "team": "GB",
-     "mu_week": 7.6,
-     "mu_ros": 7.85,
-     "delta_over_starter": -3.94,
-     "slot": "RB/WR/TE",
-     "delta_week": 0.52,
-     "week_slot": "RB/WR/TE",
-     "vorp": -0.03,
-     "bid": 3,
-     "score": 4.45,
-     "streamer": false,
-     "why": [
-      "+6.8/wk over worst bench",
+      "+7.0/wk over worst bench",
+      "VORP 2.4",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -1027,17 +985,59 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 4.3,
-     "mu_ros": 4.46,
-     "delta_over_starter": -2.24,
+     "mu_ros": 5.04,
+     "delta_over_starter": -2.52,
      "slot": "RB",
      "delta_week": 0.0,
      "week_slot": "",
-     "vorp": -3.4,
+     "vorp": -3.84,
      "bid": 3,
-     "score": 1.71,
+     "score": 1.94,
      "streamer": false,
      "why": [
-      "+3.4/wk over worst bench",
+      "+3.9/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 219,
+     "name": "Devin Mbeki",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 7.6,
+     "mu_ros": 8.9,
+     "delta_over_starter": -4.41,
+     "slot": "RB/WR/TE",
+     "delta_week": 0.52,
+     "week_slot": "RB/WR/TE",
+     "vorp": 0.0,
+     "bid": 3,
+     "score": 1.04,
+     "streamer": false,
+     "why": [
+      "+7.7/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0
+    },
+    {
+     "espn_id": 225,
+     "name": "Marcus Duquesne",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 7.6,
+     "mu_ros": 8.86,
+     "delta_over_starter": -4.45,
+     "slot": "RB/WR/TE",
+     "delta_week": 0.52,
+     "week_slot": "RB/WR/TE",
+     "vorp": -0.04,
+     "bid": 3,
+     "score": 1.04,
+     "streamer": false,
+     "why": [
+      "+7.7/wk over worst bench",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -1048,19 +1048,19 @@
      "pos": "D/ST",
      "team": "GB",
      "mu_week": 7.2,
-     "mu_ros": 7.45,
-     "delta_over_starter": 2.68,
+     "mu_ros": 8.41,
+     "delta_over_starter": 3.02,
      "slot": "D/ST",
      "delta_week": 2.55,
      "week_slot": "D/ST",
-     "vorp": 2.68,
+     "vorp": 3.02,
      "bid": 3,
-     "score": 2.68,
+     "score": 3.02,
      "streamer": true,
      "why": [
       "START NOW: +2.5 this week at D/ST",
-      "+2.7/wk over your D/ST",
-      "VORP 2.7",
+      "+3.0/wk over your D/ST",
+      "VORP 3.0",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -1071,19 +1071,19 @@
      "pos": "D/ST",
      "team": "GB",
      "mu_week": 6.3,
-     "mu_ros": 6.5,
-     "delta_over_starter": 1.73,
+     "mu_ros": 7.34,
+     "delta_over_starter": 1.95,
      "slot": "D/ST",
      "delta_week": 1.67,
      "week_slot": "D/ST",
-     "vorp": 1.73,
+     "vorp": 1.95,
      "bid": 3,
-     "score": 1.73,
+     "score": 1.95,
      "streamer": true,
      "why": [
       "START NOW: +1.7 this week at D/ST",
-      "+1.7/wk over your D/ST",
-      "VORP 1.7",
+      "+1.9/wk over your D/ST",
+      "VORP 2.0",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -1094,19 +1094,19 @@
      "pos": "D/ST",
      "team": "GB",
      "mu_week": 6.3,
-     "mu_ros": 6.49,
-     "delta_over_starter": 1.72,
+     "mu_ros": 7.32,
+     "delta_over_starter": 1.93,
      "slot": "D/ST",
      "delta_week": 1.67,
      "week_slot": "D/ST",
-     "vorp": 1.72,
+     "vorp": 1.93,
      "bid": 3,
-     "score": 1.72,
+     "score": 1.93,
      "streamer": true,
      "why": [
       "START NOW: +1.7 this week at D/ST",
-      "+1.7/wk over your D/ST",
-      "VORP 1.7",
+      "+1.9/wk over your D/ST",
+      "VORP 1.9",
       "fp:B"
      ],
      "percent_owned": 20.0
@@ -1117,7 +1117,7 @@
      "starter": "Deon Castellano",
      "handcuff": "Rico Pennington",
      "owner_team_id": 2,
-     "est_value": 0.43
+     "est_value": 0.48
     },
     {
      "starter": "Jalen Haggerty",
@@ -1128,6 +1128,29 @@
    ],
    "trades": [
     {
+     "rival_team_id": 4,
+     "rival": "Bye Week Blues",
+     "give": [
+      "Omar Lindqvist",
+      "Grady Sorensen"
+     ],
+     "get": [
+      "Dontae Rutherford"
+     ],
+     "my_delta_ppw": 0.81,
+     "their_delta_ppw": 2.18,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills my RB hole",
+      "fills their WR hole",
+      "consolidates value for them"
+     ],
+     "score": 3.09,
+     "my_title_delta": 1.4,
+     "their_title_delta": 0.1
+    },
+    {
      "rival_team_id": 6,
      "rival": "Ctrl+Alt+Delete Kelce",
      "give": [
@@ -1137,8 +1160,8 @@
      "get": [
       "Kai Tremblay"
      ],
-     "my_delta_ppw": 0.98,
-     "their_delta_ppw": 2.42,
+     "my_delta_ppw": 1.11,
+     "their_delta_ppw": 2.72,
      "market_give": 0,
      "market_get": 0,
      "why": [
@@ -1147,8 +1170,8 @@
       "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 2.66,
-     "my_title_delta": 1.3,
+     "score": 3.02,
+     "my_title_delta": 1.9,
      "their_title_delta": 0.1
     },
     {
@@ -1161,8 +1184,8 @@
      "get": [
       "Xavier Vell"
      ],
-     "my_delta_ppw": 1.5,
-     "their_delta_ppw": 1.15,
+     "my_delta_ppw": 1.7,
+     "their_delta_ppw": 1.29,
      "market_give": 0,
      "market_get": 0,
      "why": [
@@ -1171,9 +1194,9 @@
       "fills their WR hole",
       "consolidates value for them"
      ],
-     "score": 2.4,
-     "my_title_delta": 2.7,
-     "their_title_delta": -0.1
+     "score": 2.64,
+     "my_title_delta": 3.2,
+     "their_title_delta": 0.0
     },
     {
      "rival_team_id": 6,
@@ -1185,8 +1208,8 @@
      "get": [
       "Omar Duquesne"
      ],
-     "my_delta_ppw": 2.29,
-     "their_delta_ppw": 1.11,
+     "my_delta_ppw": 2.59,
+     "their_delta_ppw": 1.24,
      "market_give": 0,
      "market_get": 0,
      "why": [
@@ -1195,9 +1218,7 @@
       "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 2.0,
-     "my_title_delta": 5.0,
-     "their_title_delta": 0.1
+     "score": 2.28
     },
     {
      "rival_team_id": 3,
@@ -1209,7 +1230,7 @@
      "get": [
       "Tanner Pruitt"
      ],
-     "my_delta_ppw": 1.96,
+     "my_delta_ppw": 2.23,
      "their_delta_ppw": 0.0,
      "market_give": 0,
      "market_get": 0,
@@ -1217,29 +1238,27 @@
       "fills my RB hole",
       "consolidates value for them"
      ],
-     "score": 1.48
+     "score": 1.61
     },
     {
-     "rival_team_id": 6,
-     "rival": "Ctrl+Alt+Delete Kelce",
+     "rival_team_id": 8,
+     "rival": "Punt Return Policy",
      "give": [
-      "Beau Whitlock",
-      "Nico Vell"
+      "Omar Lindqvist",
+      "Jalen Haggerty"
      ],
      "get": [
-      "Tobias Osei"
+      "Landon Farrow"
      ],
-     "my_delta_ppw": 3.61,
-     "their_delta_ppw": -0.21,
+     "my_delta_ppw": 0.82,
+     "their_delta_ppw": 0.36,
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills their QB hole",
-      "fills their WR hole",
-      "leaves me no backup QB",
+      "fills their RB hole",
       "consolidates value for them"
      ],
-     "score": 1.04
+     "score": 1.27
     },
     {
      "rival_team_id": 8,
@@ -1251,7 +1270,7 @@
      "get": [
       "Rico Sorensen"
      ],
-     "my_delta_ppw": 1.09,
+     "my_delta_ppw": 1.24,
      "their_delta_ppw": -0.06,
      "market_give": 0,
      "market_get": 0,
@@ -1259,7 +1278,7 @@
       "fills their RB hole",
       "consolidates value for them"
      ],
-     "score": 0.99
+     "score": 1.06
     },
     {
      "rival_team_id": 3,
@@ -1270,14 +1289,36 @@
      "get": [
       "Dontae Marchetti"
      ],
-     "my_delta_ppw": 1.79,
+     "my_delta_ppw": 2.03,
      "their_delta_ppw": 0.0,
      "market_give": 0,
      "market_get": 0,
      "why": [
       "fills my RB hole"
      ],
-     "score": 0.9
+     "score": 1.02
+    },
+    {
+     "rival_team_id": 6,
+     "rival": "Ctrl+Alt+Delete Kelce",
+     "give": [
+      "Beau Whitlock",
+      "Nico Vell"
+     ],
+     "get": [
+      "Tobias Osei"
+     ],
+     "my_delta_ppw": 4.08,
+     "their_delta_ppw": -0.25,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their QB hole",
+      "fills their WR hole",
+      "leaves me no backup QB",
+      "consolidates value for them"
+     ],
+     "score": 1.0
     },
     {
      "rival_team_id": 5,
@@ -1289,54 +1330,16 @@
      "get": [
       "Dontae Castellano"
      ],
-     "my_delta_ppw": 1.15,
-     "their_delta_ppw": -0.36,
+     "my_delta_ppw": 1.29,
+     "their_delta_ppw": -0.41,
      "market_give": 0,
      "market_get": 0,
      "why": [
       "fills my RB hole",
+      "rival is losing (motivated)",
       "consolidates value for them"
      ],
-     "score": 0.71
-    },
-    {
-     "rival_team_id": 7,
-     "rival": "Sunday Scaries",
-     "give": [
-      "Nico Vell"
-     ],
-     "get": [
-      "Wes Danforth"
-     ],
-     "my_delta_ppw": 0.86,
-     "their_delta_ppw": 0.0,
-     "market_give": 0,
-     "market_get": 0,
-     "why": [],
-     "score": 0.43
-    },
-    {
-     "rival_team_id": 4,
-     "rival": "Bye Week Blues",
-     "give": [
-      "Cole Ibarra",
-      "Nico Vell"
-     ],
-     "get": [
-      "Dontae Rutherford"
-     ],
-     "my_delta_ppw": 1.43,
-     "their_delta_ppw": -0.73,
-     "market_give": 0,
-     "market_get": 0,
-     "why": [
-      "fills my RB hole",
-      "fills their QB hole",
-      "fills their WR hole",
-      "leaves me no backup QB",
-      "consolidates value for them"
-     ],
-     "score": -0.27
+     "score": 0.74
     }
    ],
    "incoming_trades": [
@@ -1344,10 +1347,10 @@
      "id": "in-1",
      "rival_team_id": 2,
      "rival": "The Tuesday Regrets",
-     "proposed_iso": "2026-09-17T11:15",
-     "expires_iso": "2026-09-18T11:15",
+     "proposed_iso": "2026-09-17T11:22",
+     "expires_iso": "2026-09-18T11:22",
      "hours_left": 21.0,
-     "proposed_ts": 1789665325426,
+     "proposed_ts": 1789665769962,
      "unmatched_ids": [],
      "give": [
       "Jalen Haggerty",
@@ -1356,8 +1359,8 @@
      "get": [
       "Dontae Kowalczyk"
      ],
-     "my_delta_ppw": -5.67,
-     "their_delta_ppw": 5.16,
+     "my_delta_ppw": -6.4,
+     "their_delta_ppw": 5.82,
      "market_give": 0,
      "market_get": 0,
      "why": [
@@ -1365,8 +1368,8 @@
       "2-for-1: I consolidate, they get depth"
      ],
      "verdict": "decline",
-     "my_title_delta": -9.8,
-     "their_title_delta": 3.8
+     "my_title_delta": -8.1,
+     "their_title_delta": 4.3
     }
    ],
    "outgoing_trades": [
@@ -1374,10 +1377,10 @@
      "id": "out-1",
      "rival_team_id": 3,
      "rival": "Waiver Wire Widows",
-     "proposed_iso": "2026-09-17T11:15",
-     "expires_iso": "2026-09-18T11:15",
+     "proposed_iso": "2026-09-17T11:22",
+     "expires_iso": "2026-09-18T11:22",
      "hours_left": 21.0,
-     "proposed_ts": 1789665325426,
+     "proposed_ts": 1789665769962,
      "unmatched_ids": [],
      "give": [
       "Rico Achebe"
@@ -1390,67 +1393,67 @@
    "pending_trades_error": null,
    "odds": {
     "1": {
-     "playoff_pct": 78.4,
-     "title_pct": 14.5,
-     "exp_wins": 7.93,
+     "playoff_pct": 98.3,
+     "title_pct": 20.0,
+     "exp_wins": 10.42,
      "name": "Regression to the Mean",
-     "record": "0-2",
+     "record": "4-0",
      "is_me": true
     },
     "2": {
-     "playoff_pct": 15.6,
-     "title_pct": 0.9,
-     "exp_wins": 5.67,
+     "playoff_pct": 19.9,
+     "title_pct": 0.8,
+     "exp_wins": 6.49,
      "name": "The Tuesday Regrets",
-     "record": "1-0",
+     "record": "3-1",
      "is_me": false
     },
     "3": {
-     "playoff_pct": 95.4,
-     "title_pct": 19.7,
-     "exp_wins": 9.76,
+     "playoff_pct": 88.7,
+     "title_pct": 14.1,
+     "exp_wins": 8.57,
      "name": "Waiver Wire Widows",
-     "record": "1-0",
+     "record": "2-2",
      "is_me": false
     },
     "4": {
-     "playoff_pct": 2.8,
-     "title_pct": 0.1,
-     "exp_wins": 4.45,
+     "playoff_pct": 0.9,
+     "title_pct": 0.0,
+     "exp_wins": 4.2,
      "name": "Bye Week Blues",
-     "record": "1-0",
+     "record": "2-2",
      "is_me": false
     },
     "5": {
-     "playoff_pct": 24.7,
+     "playoff_pct": 21.1,
      "title_pct": 1.6,
-     "exp_wins": 6.07,
+     "exp_wins": 6.01,
      "name": "Gronk's Ghost",
-     "record": "0-0",
+     "record": "1-3",
      "is_me": false
     },
     "6": {
-     "playoff_pct": 0.8,
+     "playoff_pct": 0.9,
      "title_pct": 0.0,
-     "exp_wins": 3.71,
+     "exp_wins": 3.91,
      "name": "Ctrl+Alt+Delete Kelce",
-     "record": "1-0",
+     "record": "2-2",
      "is_me": false
     },
     "7": {
-     "playoff_pct": 99.3,
-     "title_pct": 51.6,
-     "exp_wins": 10.77,
+     "playoff_pct": 98.5,
+     "title_pct": 55.0,
+     "exp_wins": 9.5,
      "name": "Sunday Scaries",
-     "record": "0-0",
+     "record": "1-3",
      "is_me": false
     },
     "8": {
-     "playoff_pct": 83.0,
-     "title_pct": 11.6,
-     "exp_wins": 8.64,
+     "playoff_pct": 71.6,
+     "title_pct": 8.6,
+     "exp_wins": 7.9,
      "name": "Punt Return Policy",
-     "record": "1-0",
+     "record": "2-2",
      "is_me": false
     }
    },
@@ -1464,7 +1467,7 @@
     "3": {
      "QB": "",
      "RB": "",
-     "WR": "",
+     "WR": "surplus",
      "TE": "hole"
     },
     "4": {
@@ -1501,7 +1504,7 @@
    "standings": [
     {
      "name": "Regression to the Mean",
-     "record": "0-2",
+     "record": "4-0",
      "pf": 121.6,
      "faab_left": 79,
      "waiver_rank": 1,
@@ -1509,7 +1512,7 @@
     },
     {
      "name": "Gronk's Ghost",
-     "record": "0-0",
+     "record": "1-3",
      "pf": 119.1,
      "faab_left": 86,
      "waiver_rank": 5,
@@ -1517,7 +1520,7 @@
     },
     {
      "name": "Sunday Scaries",
-     "record": "0-0",
+     "record": "1-3",
      "pf": 115.0,
      "faab_left": 71,
      "waiver_rank": 7,
@@ -1525,7 +1528,7 @@
     },
     {
      "name": "Punt Return Policy",
-     "record": "1-0",
+     "record": "2-2",
      "pf": 114.8,
      "faab_left": 80,
      "waiver_rank": 8,
@@ -1533,31 +1536,31 @@
     },
     {
      "name": "Waiver Wire Widows",
-     "record": "1-0",
+     "record": "2-2",
      "pf": 110.4,
      "faab_left": 92,
      "waiver_rank": 3,
      "is_me": false
     },
     {
-     "name": "The Tuesday Regrets",
-     "record": "1-0",
-     "pf": 108.2,
-     "faab_left": 75,
-     "waiver_rank": 2,
-     "is_me": false
-    },
-    {
      "name": "Bye Week Blues",
-     "record": "1-0",
+     "record": "2-2",
      "pf": 95.5,
      "faab_left": 81,
      "waiver_rank": 4,
      "is_me": false
     },
     {
+     "name": "The Tuesday Regrets",
+     "record": "3-1",
+     "pf": 95.1,
+     "faab_left": 76,
+     "waiver_rank": 2,
+     "is_me": false
+    },
+    {
      "name": "Ctrl+Alt+Delete Kelce",
-     "record": "1-0",
+     "record": "2-2",
      "pf": 91.6,
      "faab_left": 86,
      "waiver_rank": 6,

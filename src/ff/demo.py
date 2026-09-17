@@ -85,17 +85,19 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
         for a, b in zip(order[::2], order[1::2]):
             sched[a].append(b)
             sched[b].append(a)
-    team_rows = [{"team_id": t, "name": TEAMS[(t - 1) % len(TEAMS)], "abbrev": f"T{t}", "owners": [], "wins": rng.randint(0, 1), "losses": 0, "ties": 0,
+    team_rows = [{"team_id": t, "name": TEAMS[(t - 1) % len(TEAMS)], "abbrev": f"T{t}", "owners": [], "wins": rng.randint(1, 3), "losses": 0, "ties": 0,
                   "points_for": rng.uniform(80, 130), "points_against": 100, "faab_spent": rng.randint(0, 30), "waiver_rank": t,
                   "streak": "W1", "seed": t, "espn_playoff_pct": 50, "schedule": sched[t], "scores": [], "outcomes": [], "is_me": t == 1} for t in ids]
-    team_rows[0]["losses"] = 2
-    matchups = [{"home": 1, "away": sched[1][1], "home_proj": None, "away_proj": None}]
+    for row in team_rows:
+        row["losses"] = 4 - row["wins"]
+    team_rows[0]["wins"], team_rows[0]["losses"] = 4, 0  # it's a demo; let me have this
+    matchups = [{"home": 1, "away": sched[1][4], "home_proj": None, "away_proj": None}]
 
     def pick(tid: int, pos: str, i: int) -> int:
         """espn_id of fantasy team `tid`'s i-th best player at `pos`."""
         return [r for r in roster if r["fantasy_team_id"] == tid and r["pos"] == pos][i]["espn_id"]
     return {
-        "ref": {"name": "demo", "espn_id": 1}, "week": 2, "my_team_id": 1, "teams": team_rows, "matchups": matchups,
+        "ref": {"name": "demo", "espn_id": 1}, "week": 5, "my_team_id": 1, "teams": team_rows, "matchups": matchups,
         "settings": {"name": "Demo League", "team_count": teams, "scoring": {"REC": 1.0}, "lineup_slots": slots, "bench_slots": 6, "ir_slots": 1,
                      "reg_season_weeks": 14, "playoff_team_count": 4, "playoff_weeks": [15, 16], "matchup_periods": {i: [i] for i in range(1, 17)},
                      "faab": True, "faab_budget": 100, "trade_deadline_ms": 0, "ppr": 1.0},
