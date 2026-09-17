@@ -34,7 +34,7 @@ VERDICT_TONE = {"accept": "good", "decline": "bad", "counter": "warn"}
 
 def _badge(text: str, tone: str = "grey") -> str:
     bg, fg = TONES[tone]
-    return f'<span style="padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;background:{bg};color:{fg}">{_e(text)}</span>'
+    return f'<span style="padding:1px 7px;border-radius:9px;white-space:nowrap;font-size:11px;font-weight:600;background:{bg};color:{fg}">{_e(text)}</span>'
 
 
 def _muted(text: str, size: int = 13) -> str:

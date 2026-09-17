@@ -22,14 +22,18 @@ def test_end_to_end_synthetic(monkeypatch):
     assert "Demo League" in md and "## Waivers" in md and "## League odds" in md and "Lineup" in md
     # incoming offer: evaluated, first in the checklist, outgoing listed separately
     inc = blk["incoming_trades"]
-    assert len(inc) == 1 and inc[0]["verdict"] in ("accept", "decline", "counter") and inc[0]["rival"] == "Team 2"
-    assert inc[0]["give"] == ["RB1_1", "WR1_1"] and inc[0]["get"] == ["RB2_0"] and "my_title_delta" in inc[0]
-    assert len(blk["outgoing_trades"]) == 1 and blk["outgoing_trades"][0]["rival"] == "Team 3"
+    by_id = {r["espn_id"]: r["name"] for r in snap["roster"]}
+    offer = snap["pending_trades"][0]
+    give, get = [by_id[i] for i in offer["give"]], [by_id[i] for i in offer["get"]]
+    rival2, rival3 = snap["teams"][1]["name"], snap["teams"][2]["name"]
+    assert len(inc) == 1 and inc[0]["verdict"] in ("accept", "decline", "counter") and inc[0]["rival"] == rival2
+    assert inc[0]["give"] == give and inc[0]["get"] == get and "my_title_delta" in inc[0]
+    assert len(blk["outgoing_trades"]) == 1 and blk["outgoing_trades"][0]["rival"] == rival3
     first = report.todos(blk)[0]
-    assert first["kind"] == "trade_in" and "Team 2 offers RB2_0 for your RB1_1, WR1_1" in first["text"]
+    assert first["kind"] == "trade_in" and f"{rival2} offers {get[0]} for your {give[0]}, {give[1]}" in first["text"]
     assert "## Incoming offers" in md and "Your open offers" in md
-    short = report.render(packet, reads={"demo": {"reply": "thanks but no", "reply_to": "Team 2"}}, only_incoming=True)
-    assert short.startswith("# FF trade offer") and "Reply to Team 2" in short and "## Waivers" not in short
+    short = report.render(packet, reads={"demo": {"reply": "thanks but no", "reply_to": rival2}}, only_incoming=True)
+    assert short.startswith("# FF trade offer") and f"Reply to {rival2}" in short and "## Waivers" not in short
     # overrides flow through
     pid = str(blk["roster"][0]["espn_id"])
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)

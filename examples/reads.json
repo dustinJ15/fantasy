@@ -1,9 +1,9 @@
 {
   "demo": {
-    "read": "Take the Team 2 offer only if RB1_1 is actually out this week; otherwise hold, you win this matchup on floor.",
-    "paste": "hey, any interest in WR1_2 for your TE? you're thin there and I've got a spare. no worries if not",
-    "paste_to": "Team 5",
-    "reply": "appreciate it but I'm gonna hold for now, hit me up if you'd do it with WR1_2 instead",
-    "reply_to": "Team 2"
+    "read": "Decline. The Tuesday Regrets are selling one good back for two of your starters and you're the favorite this week; you don't need the consolidation. Send the Bye Week Blues offer instead, it costs you nothing you start.",
+    "paste": "hey, any interest in Haggerty + Sorensen for Xavier Vell? you're thin at WR and I've got a spare. no worries if not",
+    "paste_to": "Bye Week Blues",
+    "reply": "appreciate it but I'm gonna hold for now, hit me up if you'd do Kowalczyk for Haggerty straight up",
+    "reply_to": "The Tuesday Regrets"
   }
 }

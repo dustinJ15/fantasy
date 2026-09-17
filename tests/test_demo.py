@@ -1,5 +1,6 @@
 """`ff briefing --demo` and friends run end to end with no credentials, no leagues.toml and no network."""
 import json
+import re
 
 from typer.testing import CliRunner
 
@@ -14,7 +15,8 @@ def test_briefing_demo(tmp_path):
     assert r.exit_code == 0, r.output
     md = out.read_text()
     assert "Demo League" in md and "## Waivers" in md and "## League odds" in md
-    assert "Team 2 offers RB2_0 for your RB1_1, WR1_1" in md  # incoming offer verdict is the first checklist item
+    assert "The Tuesday Regrets offers " in md  # incoming offer verdict is the first checklist item
+    assert not re.search(r"\b(RB|WR|TE|QB)\d_\d\b|FA_", md), "demo names should read like people, not fixture codes"
 
 
 def test_packet_and_incoming_demo(tmp_path):

@@ -31,6 +31,7 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 ## Layout
 `src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math, `packet.py` builds the DecisionPacket,
 `report.py` renders markdown (plain-text body), `email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
+`demo.py` is the synthetic league (fictional, seeded names); `scripts/screenshots.sh` regenerates `examples/` including the README images.
 
 ## Data gotchas
 - nflreadpy installed from git (PyPI lags). No 2026 snap counts yet.

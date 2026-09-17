@@ -37,6 +37,7 @@ def test_render_email(monkeypatch):
     assert len(html) < 20_000
     assert "Full detail" not in html and "League odds" not in html
     assert "OFFER" in html
+    assert "white-space:nowrap" in html  # "ACCEPT OFFER" badge must never wrap onto two lines
     # every closing </tr>/</table>/</div> ends a line, so no read chunk can split a tag
     assert "</tr><" not in html and "</table><" not in html and "</div><" not in html
     assert max(len(ln) for ln in html.splitlines()) < 2_000

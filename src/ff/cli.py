@@ -210,7 +210,8 @@ def incoming(league: str | None = LeagueOpt, sims: int = 1500,
         if lg.get("pending_trades_error"):
             rprint(f"[red]could not read pending trades: {lg['pending_trades_error']}[/]")
         for t in lg["incoming_trades"]:
-            rprint(f"- [bold]{t['verdict'].upper()}[/] {report.incoming_line(t)}  market {t['market_get']} for {t['market_give']}  {'; '.join(t['why'])}")
+            mk = f"  market {t['market_get']} for {t['market_give']}" if t.get("market_give") and t.get("market_get") else ""
+            rprint(f"- [bold]{t['verdict'].upper()}[/] {report.incoming_line(t)}{mk}  {'; '.join(t['why'])}")
         for t in lg["outgoing_trades"]:
             rprint(f"- [dim]sent: your {', '.join(t['give'])} for {', '.join(t['get'])} to {t['rival']}[/]")
         if not lg["incoming_trades"] and not lg["outgoing_trades"]:

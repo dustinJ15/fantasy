@@ -4,11 +4,23 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 
-I joined three fantasy football leagues this year knowing roughly nothing, so naturally I built a quant desk.
-Every morning a script pulls my ESPN leagues, runs the math, and an LLM reads the injury news and writes me an email
-that says what to do. I tap the buttons myself. I may or may not be cheating.
+*Deterministic analytics for ESPN leagues. Claude reads the news. I tap the buttons.*
 
-<p align="center"><img src="examples/briefing.png" width="640" alt="The morning briefing email, rendered from the demo league"></p>
+I joined three fantasy football leagues this year knowing roughly nothing, so naturally I built a quant desk.
+Every morning a script pulls my ESPN leagues, runs the math, and an LLM reads the injury reports and writes me an email
+that says what to do. Everything is read-only against ESPN; I make the moves myself. I may or may not be cheating.
+
+[Try it](#try-it) · [The one rule](#the-one-rule) · [What the math does](#what-the-math-does) · [Architecture](#architecture) · [Commands](#commands)
+
+<p align="center">
+  <img src="examples/briefing.png" width="640" alt="The morning briefing email, rendered from the demo league"><br>
+  <sub>The morning email, from the demo league. Every name is made up; every number comes from <code>ff</code>.</sub>
+</p>
+
+<p align="center">
+  <img src="examples/incoming.svg" width="760" alt="ff incoming --demo: an incoming trade offer with a DECLINE verdict"><br>
+  <sub>The same offer from the terminal. Someone in a league of eight always wants your two starters for their one.</sub>
+</p>
 
 ## The one rule
 
@@ -21,12 +33,12 @@ ambiguous, and hands back two small JSON files:
 
 ```jsonc
 // overrides.json: parameters, not decisions. Only for players where the news changed the picture.
-{"4429795": {"p_zero": 0.5,  "note": "Q, DNP Friday; beat writer says game-time decision"},
- "4241389": {"mu_mult": 1.15, "note": "named the starter after the trade"}}
+{"100": {"p_zero": 0.5,  "note": "Q, DNP Friday; beat writer says game-time decision"},
+ "108": {"mu_mult": 1.15, "note": "named the starter after the trade; expect a full workload"}}
 
 // reads.json: one or two plain sentences per league, plus a message I can paste to a rival.
-{"L1": {"read": "Take the offer only if RB1 is actually out; otherwise hold, you win this one on floor.",
-        "reply": "appreciate it but I'm gonna hold for now", "reply_to": "Team 2"}}
+{"demo": {"read": "Decline. They're selling one good back for two of your starters and you're the favorite this week.",
+          "reply": "appreciate it but I'm gonna hold for now", "reply_to": "The Tuesday Regrets"}}
 ```
 
 `ff` re-runs with the overrides and renders the email. Every number in the briefing comes from code; Claude never
@@ -44,38 +56,37 @@ emits a figure, never edits the HTML, and never writes to ESPN. The full playboo
 - **Monte Carlo season sim**: playoff and title odds for every team, and the common yardstick for every decision below.
 - **Trade scanner**: every 1-for-1 and 2-for-1 against every rival, scored by both sides' lineup delta and re-simulated
   title odds. Incoming offers get an accept / decline / counter verdict the same way, plus a FantasyCalc market check.
+  It also refuses to trade away your last healthy quarterback, which is more than I can say for myself.
 - **Waivers**: value over your own starter, FAAB bids sized to the upgrade, streamers for K and D/ST.
 - **Game clock**: once a player has kicked off he is locked and his actual points are banked, so the Monday email
   never suggests benching someone who already played.
 
 ## Architecture
 
-```
- ESPN (espn-api)  nflverse  FantasyPros mirror  Sleeper  FantasyCalc  ESPN odds  Open-Meteo
-        └──────────┴──────────────┴──────────────┴──────────┴─────────────┴───────────┘
-                                    src/ff/sources/*  ->  data/cache/
-                                                 │
-                     src/ff/model/  projections · vbd · lineup · sim · trades · waivers · clock
-                                                 │
-                                    src/ff/packet.py  ->  data/packets/<date>.json
-                                                 │
-                     ┌───────────────────────────┴────────────────────────────┐
-                     │  Claude Code routine (06:00 daily)                      │
-                     │  reads packet -> WebSearch -> overrides.json, reads.json│
-                     └───────────────────────────┬────────────────────────────┘
-                                                 │
-                        src/ff/report.py (markdown)  +  src/ff/email_html.py (HTML)  ->  Gmail
+```mermaid
+flowchart TB
+  sources["Sources: ESPN, nflverse, FantasyPros mirror, Sleeper, FantasyCalc, ESPN odds, Open-Meteo<br/>src/ff/sources/* → data/cache/"]
+  sources --> model["src/ff/model/: projections, vbd, lineup, sim, trades, waivers, clock"]
+  model --> packet["src/ff/packet.py → data/packets/date.json"]
+  packet --> claude["Claude Code routine, 06:00 daily<br/>reads the packet → WebSearch → overrides.json + reads.json"]
+  claude --> render["src/ff/report.py (markdown) + src/ff/email_html.py (HTML)"]
+  render --> gmail["morning briefing email"]
+
+  tp["ESPN trade proposal email"] --> bell["Gmail Apps Script doorbell, every minute"]
+  poll["GitHub Actions poller, hourly backstop"] -.-> tr
+  bell --> tr["Claude Code trade-offer routine"]
+  tr --> verdict["verdict email within minutes"]
 ```
 
 Operations, briefly: a scheduled Claude Code routine runs the playbook every morning and pings a healthchecks.io
-dead-man's switch when it succeeds. A GitHub Actions cron polls ESPN for new incoming trade offers every 30 minutes
-during the season and fires a second routine that emails a verdict within the hour. Everything is read-only against
-ESPN by construction; there is no code path that writes.
+dead-man's switch when it succeeds. When a rival sends an offer, a one-minute Apps Script in Gmail spots ESPN's
+notification and fires a second routine that emails a verdict and a reply I can paste; an hourly GitHub Actions
+poller is the backstop if the doorbell misses. There is no code path that writes to ESPN, by construction.
 
 ## Try it
 
-No ESPN account needed for the demo. It builds a synthetic 8-team league (with a pending trade offer) and runs the
-whole pipeline on it:
+No ESPN account needed for the demo. It builds a synthetic 8-team league of fictional players (with a pending trade
+offer) and runs the whole pipeline on it:
 
 ```
 uv sync
@@ -84,7 +95,8 @@ uv run ff incoming --demo            # the incoming-offer verdict
 uv run ff packet --demo              # the raw decision packet JSON
 ```
 
-The output of exactly that, plus the rendered email, is in [examples/](examples/).
+The output of exactly that, plus the rendered email, is in [examples/](examples/); `scripts/screenshots.sh` regenerates
+all of it, images included.
 
 For your own leagues:
 
@@ -113,7 +125,14 @@ uv run ff sync && uv run ff briefing
 | `ff render-email --packet p --reads f` | render the HTML email from an existing packet |
 | `ff log-projections` / `ff accuracy` | log every source daily; MAE and bias by source and position |
 
-All commands take `--league <name>`; `briefing`, `packet` and `incoming` take `--demo`. Tests: `uv run pytest`.
+All commands take `--league <name>`; `briefing`, `packet` and `incoming` take `--demo`.
+
+## How it's built
+
+Python 3.12+, [uv](https://docs.astral.sh/uv/), typer, pydantic, numpy/scipy for the sims, polars for the nflverse
+tables. `uv run pytest` runs 40 tests over the synthetic league, so the whole pipeline is exercised with no network
+and no credentials; CI runs the tests, ruff, and the demo briefing on every push. The email is hand-rolled table HTML
+because email clients are where CSS goes to die.
 
 ## Honest limits
 
@@ -124,3 +143,5 @@ you want to run it.
 
 Data sources are all free and keyless: espn-api, nflreadpy, the dynastyprocess FantasyPros mirror, Sleeper,
 FantasyCalc, the ESPN scoreboard, Open-Meteo. Nothing is scraped.
+
+MIT licensed. Current record across three leagues: withheld, for the same reason the model calls variance "a prior".
