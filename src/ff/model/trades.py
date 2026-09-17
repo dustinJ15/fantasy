@@ -1,6 +1,7 @@
 """Rival roster scan and trade candidate generation, evaluated by both-side lineup delta and title-odds delta."""
 from __future__ import annotations
 
+from collections import Counter
 from itertools import combinations
 
 from .lineup import optimize
@@ -16,8 +17,13 @@ def lineup_strength(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[fl
     return L.mu, L.var
 
 
-def needs(roster: list[PlayerProj], slots: dict[str, int], repl: dict[str, float]) -> dict:
-    """Per-position surplus/hole: starters' avg value over replacement, and count of startable depth."""
+def needs(roster: list[PlayerProj], slots: dict[str, int], repl: dict[str, float], margin: float = 0.0) -> dict:
+    """Per-position surplus/hole: starters' avg value over replacement, and count of startable depth.
+
+    A hole means the weakest starter is genuinely below what the waiver wire offers (VORP < 0). The margin is 0 on
+    purpose: in a 1-QB league replacement at QB is ~18.5 points and every starting QB but the elite few sits within a
+    point of it, so any cushion here labels the whole league as having a "QB hole" and the word stops meaning anything.
+    """
     ros = [p.ros() for p in roster]
     L = optimize(ros, slots, objective="ev")
     starters = {p.espn_id for ps in L.assignment.values() for p in ps}
@@ -30,10 +36,33 @@ def needs(roster: list[PlayerProj], slots: dict[str, int], repl: dict[str, float
         best_bench = max((p.mu for p in bench), default=None)
         out[pos] = {
             "weakest_starter": weakest_starter, "best_bench": best_bench,
-            "hole": weakest_starter is not None and weakest_starter < repl.get(pos, 0) + 1.0,
+            "hole": weakest_starter is not None and weakest_starter < repl.get(pos, 0) + margin,
             "surplus": best_bench is not None and best_bench > repl.get(pos, 0) + 3.0,
         }
     return out
+
+
+# Positions where the flex cannot cover an absence, so the last body at the position is the whole slot.
+NO_FLEX_COVER = ("QB", "TE", "K", "D/ST")
+
+
+def depth(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[bool, list[str]]:
+    """(can_field_a_lineup, positions_with_no_backup).
+
+    The trade math compares optimal lineups only, so shipping a body costs nothing there: trading down to one QB reads
+    as free right up until that QB is hurt or on bye and the slot is empty. This is the check that math is missing.
+    """
+    counts = Counter(p.pos for p in roster)
+    ok, thin = True, []
+    for pos in POS_ORDER:
+        need = slots.get(pos, 0)
+        if not need:
+            continue
+        if counts[pos] < need:
+            ok = False
+        elif counts[pos] == need and pos in NO_FLEX_COVER:
+            thin.append(pos)
+    return ok, thin
 
 
 def _swap(roster: list[PlayerProj], out_ids: set[int], incoming: list[PlayerProj]) -> list[PlayerProj]:
@@ -53,6 +82,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
     mine = rosters[my_id]
     my_mu0, _ = lineup_strength(mine, slots)
     my_needs = needs(mine, slots, repl)
+    _, thin0 = depth(mine, slots)  # positions already without a backup: a trade is not to blame for those
     cands = []
     # tradeable assets: skip K/DST
     my_assets = sorted([p for p in mine if p.pos not in ("K", "D/ST") and p.mu_ros > 0], key=lambda p: -p.mu_ros)[:10]
@@ -73,6 +103,10 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 continue
             new_mine = _swap(mine, {p.espn_id for p in give}, get)
             new_theirs = _swap(theirs, {p.espn_id for p in get}, give)
+            can_field, thin = depth(new_mine, slots)
+            if not can_field:
+                continue
+            new_thin = [pos for pos in thin if pos not in thin0]
             my_mu1, _ = lineup_strength(new_mine, slots)
             their_mu1, _ = lineup_strength(new_theirs, slots)
             d_me, d_them = my_mu1 - my_mu0, their_mu1 - their_mu0
@@ -85,6 +119,8 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 if my_needs.get(p.pos, {}).get("hole") and f"fills my {p.pos} hole" not in why: why.append(f"fills my {p.pos} hole")
             for p in give:
                 if their_needs.get(p.pos, {}).get("hole") and f"fills their {p.pos} hole" not in why: why.append(f"fills their {p.pos} hole")
+            for pos in new_thin:
+                why.append(f"leaves me no backup {pos}")
             meta = team_meta.get(rid, {})
             games = meta.get("wins", 0) + meta.get("losses", 0)
             if games >= 4 and meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
@@ -98,7 +134,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
                 "market_give": gv, "market_get": rv, "why": why,
-                "score": round(d_them + 0.5 * min(d_me, 3) + consol, 2),
+                "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin), 2),
             })
         rival_cands.sort(key=lambda c: -c["score"])
         seen_get, kept = set(), []
@@ -135,6 +171,8 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     rv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in get)
     market_ratio = (rv / gv) if gv and rv else None
 
+    can_field, thin = depth(new_mine, slots)
+    _, thin0 = depth(mine, slots)
     my_needs, their_needs = needs(mine, slots, repl), needs(theirs, slots, repl)
     why = []
     for p in get:
@@ -144,6 +182,11 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     new_needs = needs(new_mine, slots, repl)
     for pos, n in new_needs.items():
         if n["hole"] and not my_needs.get(pos, {}).get("hole"): why.append(f"opens a {pos} hole for me")
+    if not can_field:
+        why.append("leaves me unable to fill a starting slot")
+    for pos in thin:
+        if pos not in thin0:
+            why.append(f"leaves me no backup {pos}")
     if len(give) > len(get):
         why.append("2-for-1: I consolidate, they get depth")
     elif len(get) > len(give):
@@ -153,7 +196,9 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
         elif market_ratio > 1.2: why.append(f"market says I get more ({rv} vs {gv})")
     why = list(dict.fromkeys(why))
 
-    if d_me <= -0.5 or (market_ratio is not None and market_ratio < 0.65):
+    if not can_field:
+        verdict = "decline"
+    elif d_me <= -0.5 or (market_ratio is not None and market_ratio < 0.65):
         verdict = "decline"
     elif d_me >= 0.75 and (market_ratio is None or market_ratio >= 0.8):
         verdict = "accept"

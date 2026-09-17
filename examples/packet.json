@@ -1,6 +1,6 @@
 {
  "version": 4,
- "generated": "2026-09-16T16:45:09",
+ "generated": "2026-09-17T09:21:16",
  "season": 2026,
  "demo": true,
  "shared": {
@@ -74,6 +74,47 @@
     "sd": 18.0
    },
    "roster": [
+    {
+     "espn_id": 100,
+     "name": "QB1_0",
+     "pos": "QB",
+     "team": "GB",
+     "eligible": [
+      "QB"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "QB",
+     "mu": 23.2,
+     "sigma": 6.96,
+     "p_zero": 0.02,
+     "mu_ros": 23.95,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 23.2,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "ACTIVE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "percent_owned": 90.0,
+      "override_note": null
+     },
+     "flags": [
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "sigma_ros": null,
+     "ev": 22.74,
+     "sd": 7.62,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
     {
      "espn_id": 101,
      "name": "QB1_1",
@@ -194,48 +235,6 @@
      "sigma_ros": null,
      "ev": 12.05,
      "sd": 5.75,
-     "usage": null,
-     "market": null,
-     "odds_line": null
-    },
-    {
-     "espn_id": 100,
-     "name": "QB1_0",
-     "pos": "QB",
-     "team": "GB",
-     "eligible": [
-      "QB"
-     ],
-     "fantasy_team_id": 1,
-     "slot": "QB",
-     "mu": 23.2,
-     "sigma": 6.96,
-     "p_zero": 0.5,
-     "mu_ros": 23.95,
-     "bye": false,
-     "sources": {
-      "fp_pts": null,
-      "espn_pts": 23.2,
-      "sleeper_pts": null,
-      "implied_total": null,
-      "ecr": 10,
-      "fp_sd": 2.0,
-      "grade": "B",
-      "espn_status": "ACTIVE",
-      "sleeper_status": null,
-      "sleeper_notes": null,
-      "percent_owned": 90.0,
-      "override_note": "Q, DNP Friday; beat writer says game-time decision (demo)"
-     },
-     "flags": [
-      "fp:B",
-      "llm:p_zero"
-     ],
-     "locked": false,
-     "actual": null,
-     "sigma_ros": null,
-     "ev": 11.6,
-     "sd": 12.6,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -378,7 +377,7 @@
      ],
      "fantasy_team_id": 1,
      "slot": "BE",
-     "mu": 6.79,
+     "mu": 5.9,
      "sigma": 3.9,
      "p_zero": 0.02,
      "mu_ros": 6.09,
@@ -395,17 +394,16 @@
       "sleeper_status": null,
       "sleeper_notes": null,
       "percent_owned": 90.0,
-      "override_note": "named the starter after the trade; expect a full workload (demo)"
+      "override_note": null
      },
      "flags": [
-      "fp:B",
-      "llm:mu"
+      "fp:B"
      ],
      "locked": false,
      "actual": null,
      "sigma_ros": null,
-     "ev": 6.65,
-     "sd": 3.98,
+     "ev": 5.78,
+     "sd": 3.95,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -666,14 +664,14 @@
      "odds_line": null
     }
    ],
-   "current_lineup_mu": 64.5,
+   "current_lineup_mu": 75.7,
    "lineup_ev": {
     "slots": {
      "K": [
       "K1_0"
      ],
      "QB": [
-      "QB1_1"
+      "QB1_0"
      ],
      "RB": [
       "RB1_0",
@@ -693,11 +691,11 @@
       "TE1_1"
      ]
     },
-    "mu": 89.45,
-    "sd": 16.75,
+    "mu": 90.93,
+    "sd": 17.08,
     "p_win": null,
     "bench": [
-     "QB1_0",
+     "QB1_1",
      "RB1_1",
      "RB1_3",
      "WR1_0",
@@ -710,7 +708,7 @@
       "K1_0"
      ],
      "QB": [
-      "QB1_1"
+      "QB1_0"
      ],
      "RB": [
       "RB1_0",
@@ -730,11 +728,11 @@
       "TE1_0"
      ]
     },
-    "mu": 89.45,
-    "sd": 16.75,
-    "p_win": 0.486,
+    "mu": 90.93,
+    "sd": 17.08,
+    "p_win": 0.51,
     "bench": [
-     "QB1_0",
+     "QB1_1",
      "RB1_1",
      "RB1_3",
      "WR1_0",
@@ -1153,214 +1151,217 @@
      "rival_team_id": 8,
      "rival": "Team 8",
      "give": [
-      "QB1_0",
+      "QB1_1",
       "WR1_1"
      ],
      "get": [
       "WR8_0"
      ],
      "my_delta_ppw": 1.13,
-     "their_delta_ppw": 7.09,
+     "their_delta_ppw": 7.79,
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills my WR hole",
       "fills their QB hole",
+      "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 8.15,
-     "my_title_delta": -3.9,
-     "their_title_delta": 11.5
+     "score": 8.1,
+     "my_title_delta": -4.2,
+     "their_title_delta": 16.0
     },
     {
      "rival_team_id": 8,
      "rival": "Team 8",
      "give": [
-      "QB1_1",
+      "QB1_0",
       "TE1_1"
      ],
      "get": [
       "TE8_0"
      ],
-     "my_delta_ppw": 4.18,
-     "their_delta_ppw": 4.04,
+     "my_delta_ppw": 2.47,
+     "their_delta_ppw": 6.45,
      "market_give": 0,
      "market_get": 0,
      "why": [
       "fills their QB hole",
       "fills their TE hole",
+      "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 6.04,
-     "my_title_delta": 4.5,
-     "their_title_delta": 3.8
+     "score": 7.43,
+     "my_title_delta": 0.4,
+     "their_title_delta": 12.4
     },
     {
      "rival_team_id": 8,
      "rival": "Team 8",
      "give": [
-      "QB1_1",
+      "QB1_0",
       "RB1_0"
      ],
      "get": [
       "RB8_1"
      ],
-     "my_delta_ppw": 4.46,
-     "their_delta_ppw": 3.75,
+     "my_delta_ppw": 2.75,
+     "their_delta_ppw": 6.16,
      "market_give": 0,
      "market_get": 0,
      "why": [
       "fills their QB hole",
       "fills their RB hole",
+      "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 5.75,
-     "my_title_delta": 5.5,
-     "their_title_delta": 3.2
-    },
-    {
-     "rival_team_id": 3,
-     "rival": "Team 3",
-     "give": [
-      "QB1_0",
-      "TE1_0"
-     ],
-     "get": [
-      "RB3_1"
-     ],
-     "my_delta_ppw": 1.05,
-     "their_delta_ppw": 4.38,
-     "market_give": 0,
-     "market_get": 0,
-     "why": [
-      "fills their TE hole",
-      "consolidates value for them"
-     ],
-     "score": 5.4
+     "score": 7.29,
+     "my_title_delta": 1.1,
+     "their_title_delta": 11.6
     },
     {
      "rival_team_id": 7,
      "rival": "Team 7",
      "give": [
-      "QB1_0",
+      "QB1_1",
       "RB1_0"
      ],
      "get": [
       "RB7_0"
      ],
      "my_delta_ppw": 0.79,
-     "their_delta_ppw": 4.37,
+     "their_delta_ppw": 5.08,
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills their QB hole",
-      "fills their RB hole",
+      "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 5.27
+     "score": 5.22
     },
     {
      "rival_team_id": 7,
      "rival": "Team 7",
      "give": [
-      "QB1_0",
-      "TE1_0"
+      "QB1_1",
+      "WR1_0"
      ],
      "get": [
       "RB7_3"
      ],
      "my_delta_ppw": 0.82,
-     "their_delta_ppw": 4.35,
+     "their_delta_ppw": 4.62,
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills their QB hole",
-      "fills their TE hole",
+      "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 5.26
+     "score": 4.78
     },
     {
      "rival_team_id": 3,
      "rival": "Team 3",
      "give": [
       "QB1_1",
-      "TE1_1"
+      "TE1_0"
+     ],
+     "get": [
+      "RB3_1"
+     ],
+     "my_delta_ppw": 1.05,
+     "their_delta_ppw": 5.08,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "fills their TE hole",
+      "leaves me no backup QB",
+      "leaves me no backup TE",
+      "consolidates value for them"
+     ],
+     "score": 4.6
+    },
+    {
+     "rival_team_id": 3,
+     "rival": "Team 3",
+     "give": [
+      "QB1_0",
+      "WR1_1"
+     ],
+     "get": [
+      "WR3_0"
+     ],
+     "my_delta_ppw": 2.93,
+     "their_delta_ppw": 3.2,
+     "market_give": 0,
+     "market_get": 0,
+     "why": [
+      "leaves me no backup QB",
+      "consolidates value for them"
+     ],
+     "score": 4.41
+    },
+    {
+     "rival_team_id": 3,
+     "rival": "Team 3",
+     "give": [
+      "QB1_0",
+      "TE1_0"
      ],
      "get": [
       "RB3_0"
      ],
-     "my_delta_ppw": 2.25,
-     "their_delta_ppw": 3.18,
+     "my_delta_ppw": 1.81,
+     "their_delta_ppw": 4.31,
      "market_give": 0,
      "market_get": 0,
      "why": [
       "fills their TE hole",
+      "leaves me no backup QB",
+      "leaves me no backup TE",
       "consolidates value for them"
      ],
-     "score": 4.8
-    },
-    {
-     "rival_team_id": 7,
-     "rival": "Team 7",
-     "give": [
-      "QB1_1",
-      "TE1_1"
-     ],
-     "get": [
-      "RB7_1"
-     ],
-     "my_delta_ppw": 3.65,
-     "their_delta_ppw": 1.52,
-     "market_give": 0,
-     "market_get": 0,
-     "why": [
-      "fills their QB hole",
-      "fills their TE hole",
-      "consolidates value for them"
-     ],
-     "score": 3.52
+     "score": 4.22
     },
     {
      "rival_team_id": 4,
      "rival": "Team 4",
      "give": [
       "QB1_0",
-      "RB1_2"
+      "WR1_1"
      ],
      "get": [
       "WR4_2"
      ],
-     "my_delta_ppw": 1.31,
-     "their_delta_ppw": 1.95,
+     "my_delta_ppw": 1.87,
+     "their_delta_ppw": 3.52,
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills my WR hole",
-      "fills their RB hole",
+      "leaves me no backup QB",
       "consolidates value for them"
      ],
-     "score": 3.11
+     "score": 4.2
     },
     {
-     "rival_team_id": 3,
-     "rival": "Team 3",
+     "rival_team_id": 7,
+     "rival": "Team 7",
      "give": [
-      "QB1_1",
-      "WR1_1"
+      "QB1_0",
+      "TE1_1"
      ],
      "get": [
-      "WR3_0"
+      "RB7_1"
      ],
-     "my_delta_ppw": 4.64,
-     "their_delta_ppw": 0.79,
+     "my_delta_ppw": 1.94,
+     "their_delta_ppw": 3.93,
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills my WR hole",
+      "leaves me no backup QB",
+      "leaves me no backup TE",
       "consolidates value for them"
      ],
-     "score": 2.79
+     "score": 3.9
     }
    ],
    "incoming_trades": [
@@ -1370,7 +1371,7 @@
      "rival": "Team 2",
      "proposed_iso": "2026-09-15T13:20",
      "expires_iso": "2026-09-17T13:20",
-     "hours_left": 20.6,
+     "hours_left": 4.0,
      "proposed_ts": 1789500000000,
      "unmatched_ids": [],
      "give": [
@@ -1385,12 +1386,11 @@
      "market_give": 0,
      "market_get": 0,
      "why": [
-      "fills their RB hole",
       "2-for-1: I consolidate, they get depth"
      ],
      "verdict": "accept",
-     "my_title_delta": 12.7,
-     "their_title_delta": -19.4
+     "my_title_delta": 13.3,
+     "their_title_delta": -19.0
     }
    ],
    "outgoing_trades": [
@@ -1400,7 +1400,7 @@
      "rival": "Team 3",
      "proposed_iso": "2026-09-15T13:20",
      "expires_iso": "2026-09-17T13:20",
-     "hours_left": 20.6,
+     "hours_left": 4.0,
      "proposed_ts": 1789500000000,
      "unmatched_ids": [],
      "give": [
@@ -1414,65 +1414,65 @@
    "pending_trades_error": null,
    "odds": {
     "1": {
-     "playoff_pct": 85.9,
-     "title_pct": 23.2,
-     "exp_wins": 8.61,
+     "playoff_pct": 91.9,
+     "title_pct": 27.8,
+     "exp_wins": 9.12,
      "name": "Team 1",
      "record": "1-2",
      "is_me": true
     },
     "2": {
-     "playoff_pct": 96.2,
-     "title_pct": 34.0,
-     "exp_wins": 9.87,
+     "playoff_pct": 94.6,
+     "title_pct": 33.0,
+     "exp_wins": 9.58,
      "name": "Team 2",
      "record": "1-0",
      "is_me": false
     },
     "3": {
-     "playoff_pct": 2.6,
-     "title_pct": 0.0,
-     "exp_wins": 3.7,
+     "playoff_pct": 3.0,
+     "title_pct": 0.2,
+     "exp_wins": 3.69,
      "name": "Team 3",
      "record": "0-0",
      "is_me": false
     },
     "4": {
-     "playoff_pct": 46.2,
-     "title_pct": 8.2,
-     "exp_wins": 6.56,
+     "playoff_pct": 44.8,
+     "title_pct": 7.6,
+     "exp_wins": 6.52,
      "name": "Team 4",
      "record": "0-0",
      "is_me": false
     },
     "5": {
-     "playoff_pct": 2.1,
-     "title_pct": 0.0,
-     "exp_wins": 3.7,
+     "playoff_pct": 2.0,
+     "title_pct": 0.1,
+     "exp_wins": 3.55,
      "name": "Team 5",
      "record": "0-0",
      "is_me": false
     },
     "6": {
-     "playoff_pct": 38.1,
-     "title_pct": 4.7,
-     "exp_wins": 6.28,
+     "playoff_pct": 36.0,
+     "title_pct": 4.5,
+     "exp_wins": 6.26,
      "name": "Team 6",
      "record": "0-0",
      "is_me": false
     },
     "7": {
-     "playoff_pct": 42.2,
-     "title_pct": 5.5,
-     "exp_wins": 6.68,
+     "playoff_pct": 42.3,
+     "title_pct": 5.6,
+     "exp_wins": 6.72,
      "name": "Team 7",
      "record": "0-0",
      "is_me": false
     },
     "8": {
-     "playoff_pct": 86.7,
-     "title_pct": 24.3,
-     "exp_wins": 8.6,
+     "playoff_pct": 85.3,
+     "title_pct": 21.4,
+     "exp_wins": 8.56,
      "name": "Team 8",
      "record": "0-0",
      "is_me": false
@@ -1481,9 +1481,9 @@
    "rival_needs": {
     "2": {
      "QB": "",
-     "RB": "hole",
+     "RB": "",
      "WR": "",
-     "TE": "hole"
+     "TE": ""
     },
     "3": {
      "QB": "",
@@ -1493,13 +1493,13 @@
     },
     "4": {
      "QB": "",
-     "RB": "hole",
+     "RB": "",
      "WR": "",
      "TE": "hole"
     },
     "5": {
      "QB": "",
-     "RB": "hole",
+     "RB": "",
      "WR": "",
      "TE": "hole"
     },
@@ -1510,10 +1510,10 @@
      "TE": "hole"
     },
     "7": {
-     "QB": "hole",
-     "RB": "hole",
+     "QB": "",
+     "RB": "",
      "WR": "",
-     "TE": "hole"
+     "TE": ""
     },
     "8": {
      "QB": "hole",

@@ -66,3 +66,60 @@ def test_evaluate_counter_on_close_call(slots):
     # WR3 for WR3: nothing moves for either lineup
     out = evaluate(1, 2, [by_id[21]], [by_id[17]], {1: mine, 2: theirs}, slots, repl, values={})
     assert out["verdict"] == "counter" and abs(out["my_delta_ppw"]) < 0.75
+
+
+def test_hole_means_below_replacement_not_merely_close(slots):
+    """A 1-QB league's replacement QB is nearly a starter, so 'close to replacement' is not a hole."""
+    from ff.model.trades import needs
+    mine, _ = _rosters()
+    repl = {"QB": 19.8, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}  # QB1 (20.0) sits just above replacement
+    n = needs(mine, slots, repl)
+    assert not n["QB"]["hole"]
+    assert n["TE"]["hole"]  # TE starter is 3.0 against a replacement of 5.0: a real hole
+
+
+def test_scan_never_leaves_a_slot_unfillable(slots):
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={})
+    for c in out:
+        assert not ("QB" in c["give"] and "QB" not in c["get"]), f"trades away the only QB: {c}"
+
+
+def test_depth_flags_thin_positions_and_unfillable_slots(slots):
+    from ff.model.trades import depth
+    mine, _ = _rosters()
+    ok, thin = depth(mine, slots)
+    assert ok and "TE" in thin and "QB" in thin  # one of each: startable, but no backup
+    assert "RB" not in thin  # three RBs, and the flex can cover anyway
+    assert not depth([p for p in mine if p.pos != "QB"], slots)[0]
+
+
+def test_scan_flags_and_penalizes_a_trade_that_costs_my_last_backup(slots):
+    """Shipping the spare QB is allowed, but it has to say so and carry a score penalty.
+
+    A backup QB is worth nothing in my own optimal lineup, so such a package only ever clears the gain filter when the
+    rival is the one starving at QB — which is exactly the situation where it is tempting and worth a warning.
+    """
+    mine, theirs = _rosters()
+    mine = mine + [P(30, "QB2", "QB", 18, tid=1)]        # a backup to lose
+    theirs = [p for p in theirs if p.pos != "QB"] + [P(31, "QBbad", "QB", 4, tid=2)]  # rival is starving at QB
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={})
+    shipped_backup = [c for c in out if "QB2" in c["give"] and not any(g == "QB" for g in c["get"])]
+    assert shipped_backup, "expected at least one package that moves the spare QB"
+    for c in shipped_backup:
+        assert "leaves me no backup QB" in c["why"]
+        assert c["score"] < round(c["their_delta_ppw"] + 0.5 * min(c["my_delta_ppw"], 3), 2)
+
+
+def test_evaluate_declines_an_offer_for_my_only_qb(slots):
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    by_id = {p.espn_id: p for p in mine + theirs}
+    star = P(99, "RBstar", "RB", 30, tid=2)
+    theirs = theirs + [star]
+    # a genuinely juicy RB for my only QB: still a decline, because the QB slot goes empty
+    out = evaluate(1, 2, [by_id[1]], [star], {1: mine, 2: theirs}, slots, repl, values={})
+    assert out["verdict"] == "decline"
+    assert "leaves me unable to fill a starting slot" in out["why"]
