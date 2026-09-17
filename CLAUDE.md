@@ -43,9 +43,13 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/LEAGUES_TOML), model `claude-opus-5`. `scripts/cloud_setup.sh` writes `.env` and
   `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO`.
 - Incoming trade offers: every pending offer shows in the morning briefing (`incoming_trades` per league, first checklist item).
-  Faster path: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 40m` every 30 min in season and, when an offer is new,
-  POSTs to the "FF trade offer" routine's API trigger (`/trade-offer` skill), which emails `FF trade offer — <league> — <date>`.
-  GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
+  Primary alert path: a Google Apps Script doorbell (`scripts/gmail_trade_doorbell.gs`, setup in `scripts/gmail_trade_doorbell.md`)
+  runs every minute in Dustin's Gmail, finds ESPN's "Trade Proposal" email, fires the "FF trade offer" routine's API trigger
+  (`/trade-offer` skill, emails `FF trade offer — <league> — <date>`) and labels the email `ff-alerted`. The trigger id and fire
+  token live only in the script's Script Properties (nothing in the repo).
+  Backstop: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 75m` hourly in season, dedupes by offer id via
+  `actions/cache`, and fires the same routine. GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables
+  `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
 - Debug a run: `RemoteTrigger list_runs` (trigger_id in ops.local.md) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
   No credentials at all: `uv run ff briefing --demo` (synthetic league from `src/ff/demo.py`).
@@ -68,4 +72,5 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
 | Briefing says "could not read pending trades" | ESPN changed `mPendingTransactions` or cookies half-dead | check `pending_trades_error` in the packet; `ff incoming --force` locally |
 | trade-poll workflow red | cookies dead in GitHub secrets, or fire token revoked | update repo secrets; `gh workflow run trade-poll.yml -f window=48h` to test |
-| Trade offer email never arrives but the offer is in ESPN | poller window missed it (offer older than 40 min at first sight) or routine disabled | it still appears in the next morning briefing; `RemoteTrigger get` on the trade routine |
+| Trade offer email never arrives but the offer is in ESPN | doorbell silent (Apps Script trigger gone, Script Properties cleared, token rotated) and poller missed it or routine disabled | Apps Script Executions log; confirm Script Properties `FF_TRADE_ROUTINE_ID` + `FF_ROUTINE_FIRE_TOKEN` are still set and the 1-minute trigger exists; `RemoteTrigger get` on the trade routine; it still appears in the next morning briefing |
+| ESPN proposal email has no `ff-alerted` label an hour later | doorbell never ran or the fire returned non-2xx | same as above; remove the label (if any) to make the script retry |

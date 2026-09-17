@@ -1,17 +1,22 @@
-# Poll ESPN for new incoming trade offers and fire the "FF trade offer" routine when one appears.
-# Dedupe is a time window: an offer proposed within the last 40 min is "new" (poll every 30 min + slack).
-# The morning briefing lists every still-pending offer, so a missed fire only delays the verdict.
+# Hourly backstop for incoming ESPN trade offers.
+#
+# Primary path: a Google Apps Script doorbell (scripts/gmail_trade_doorbell.gs) fires the "FF trade offer"
+# routine within a minute of ESPN's "Trade Proposal" email. This workflow is the backstop in case the
+# doorbell is silent: once an hour it asks ESPN for offers proposed in the last 75 min and fires the same
+# routine for any offer id it has not fired before (ids are persisted with actions/cache, so a wide window
+# never causes duplicate emails). The morning briefing is the final net: it lists every still-pending offer.
+#
+# The schedule is a plain hourly cron; in-season and skip-Monday logic is a shell guard in the first step,
+# because GitHub rejects month/day lists mixed with ranges and its scheduler often runs late.
 name: trade-poll
 on:
   schedule:
-    # every 30 min, in season only (Sep-Jan), 12:00-23:59 UTC, Tue-Sun; offers also surface in the morning briefing
-    - cron: '*/30 12-23 * 9-12 0,2-6'
-    - cron: '*/30 12-23 * 1 0,2-6'
+    - cron: '20 * * * *'
   workflow_dispatch:
     inputs:
       window:
-        description: 'How far back counts as new (e.g. 40m, 48h)'
-        default: '40m'
+        description: 'How far back counts as new (e.g. 75m, 48h)'
+        default: '75m'
 concurrency:
   group: trade-poll
   cancel-in-progress: false
@@ -20,12 +25,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Decide whether to run (in season, not Monday, waking hours; manual runs always run)
+        id: gate
+        run: |
+          month=$(date -u +%-m); dow=$(date -u +%u); hour=$(date -u +%-H)
+          run=true
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            case "$month" in 9|10|11|12|1) ;; *) run=false ;; esac   # season: Sep-Jan
+            [ "$dow" = "1" ] && run=false                              # Monday: nothing to react to
+            [ "$hour" -lt 12 ] && run=false                            # before 6 AM Denver
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "month=$month dow=$dow hour=$hour run=$run"
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
       - uses: astral-sh/setup-uv@v5
+        if: steps.gate.outputs.run == 'true'
         with:
           enable-cache: true
-      - run: uv python install 3.13 && uv sync --quiet
+      - if: steps.gate.outputs.run == 'true'
+        run: uv python install 3.13 && uv sync --quiet
+      - name: Restore the set of offer ids already fired
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: seen_ids.txt
+          key: trade-poll-seen-${{ github.run_id }}
+          restore-keys: trade-poll-seen-
       - name: Write .env and leagues.toml from secrets/variables
+        if: steps.gate.outputs.run == 'true'
         run: |
           printf 'ESPN_S2=%s\nSWID=%s\nSEASON=%s\n' "$ESPN_S2" "$SWID" "${SEASON:-2026}" > .env
           case "$LEAGUES_TOML" in *"[[league]]"*) printf '%s\n' "$LEAGUES_TOML" > leagues.toml ;; *) printf '%s' "$LEAGUES_TOML" | tr -d ' \r\n\t' | base64 -d > leagues.toml ;; esac
@@ -36,16 +64,27 @@ jobs:
           LEAGUES_TOML: ${{ vars.LEAGUES_TOML }}
       - name: Look for new offers
         id: look
+        if: steps.gate.outputs.run == 'true'
         run: |
-          uv run ff incoming --json --new-since "${{ github.event.inputs.window || '40m' }}" > new.json
+          uv run ff incoming --json --new-since "${{ github.event.inputs.window || '75m' }}" > all.json
+          touch seen_ids.txt
+          python3 - <<'PY'
+          import json
+          seen = {l.strip() for l in open("seen_ids.txt") if l.strip()}
+          offers = json.load(open("all.json"))
+          new = [o for o in offers if str(o.get("id")) not in seen]
+          json.dump(new, open("new.json", "w"))
+          print(f"{len(offers)} offer(s) in window, {len(new)} not yet fired")
+          for o in new:
+              print(json.dumps(o))
+          PY
           echo "count=$(python3 -c 'import json;print(len(json.load(open("new.json"))))')" >> "$GITHUB_OUTPUT"
-          cat new.json
         env:
           NFLREADPY_TIMEOUT: '120'
       - name: Fire the trade-offer routine
-        if: steps.look.outputs.count != '0'
+        if: steps.gate.outputs.run == 'true' && steps.look.outputs.count != '0'
         run: |
-          python3 - <<'PY' > payload.json
+          python3 - <<'PY'
           import json
           offers = json.load(open("new.json"))
           lines = [f"{o['league']} ({o['league_name']}): {o['rival']} offers {', '.join(o['get'])} for {', '.join(o['give'])}; verdict {o['verdict']}" for o in offers]
@@ -58,6 +97,15 @@ jobs:
             -H "anthropic-version: 2023-06-01" \
             -H "Content-Type: application/json" \
             --data @payload.json
+          # Only after a successful fire do the ids count as seen.
+          python3 -c 'import json;[print(o["id"]) for o in json.load(open("new.json"))]' >> seen_ids.txt
+          tail -n 500 seen_ids.txt > seen_ids.tmp && mv seen_ids.tmp seen_ids.txt
         env:
           ROUTINE_ID: ${{ vars.FF_TRADE_ROUTINE_ID }}
           FF_ROUTINE_FIRE_TOKEN: ${{ secrets.FF_ROUTINE_FIRE_TOKEN }}
+      - name: Save the set of offer ids already fired
+        if: steps.gate.outputs.run == 'true' && steps.look.outputs.count != '0'
+        uses: actions/cache/save@v4
+        with:
+          path: seen_ids.txt
+          key: trade-poll-seen-${{ github.run_id }}
