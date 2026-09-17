@@ -2,7 +2,7 @@
 
 Rendered straight from the packet (no markdown round-trip) so lists, tables and spacing are deterministic. Constraints:
 Gmail strips <style>, so everything is inline; table-based layout; cellpadding/bgcolor/align attributes instead of per-cell
-styles to keep the document small enough to paste as a tool argument (~≤60 KB); no images or web fonts; colors chosen to
+styles to keep the document small enough to paste as a tool argument (well under 20 KB); no images or web fonts; colors chosen to
 survive Gmail's dark-mode inversion (no pure-black text, badges are tinted backgrounds with dark text).
 
 Claude's prose comes in via `reads`: {"<league name>": {"read": "...", "paste": "...", "paste_to": "...",
@@ -10,6 +10,7 @@ Claude's prose comes in via `reads`: {"<league name>": {"read": "...", "paste": 
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from html import escape as _e
 
@@ -331,8 +332,14 @@ def render_offer_email(packet: dict, reads: dict | None = None) -> str:
     return _page(head + "".join(cards))
 
 
+def _wrap(html: str) -> str:
+    """Newline after every closing </tr>, </table> and </div> so the file can be read (and re-typed) in chunks
+    without a chunk boundary ever splitting a tag. HTML ignores the whitespace."""
+    return re.sub(r"(</(?:tr|table|div)>)", r"\1\n", html)
+
+
 def _page(inner: str) -> str:
-    return (
+    return _wrap(
         '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
         '<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head>'
         f'<body style="margin:0;padding:0;background:{PAGE}">'
@@ -342,7 +349,9 @@ def _page(inner: str) -> str:
     )
 
 
-def render_email(packet: dict, reads: dict | None = None, only_incoming: bool = False) -> str:
+def render_email(packet: dict, reads: dict | None = None, only_incoming: bool = False, full: bool = False) -> str:
+    """Action cards only by default (small enough to transcribe into a mail tool); `full` appends the detail appendix,
+    which otherwise lives only in the plain-text/markdown part (`report.render`)."""
     reads = reads or {}
     if only_incoming:
         return render_offer_email(packet, reads)
@@ -356,12 +365,16 @@ def render_email(packet: dict, reads: dict | None = None, only_incoming: bool = 
             f'<div style="color:{MUTED};font-size:13px;margin-bottom:14px">Week {week} · {_e(when)}</div>')
     actions = "".join(_league_action(lg, reads.get(lg["name"]) or {}) for lg in packet["leagues"])
     shared = _shared(packet["shared"])
-    divider = (f'<div style="margin:22px 0 12px;border-top:2px dashed #c4c9d0"></div>'
-               f'<div style="font-size:12px;font-weight:700;color:{MUTED};text-transform:uppercase;margin-bottom:10px">Full detail</div>')
-    details = "".join(_league_detail(lg) for lg in packet["leagues"])
+    body = head + actions + shared
+    if full:
+        body += (f'<div style="margin:22px 0 12px;border-top:2px dashed #c4c9d0"></div>'
+                 f'<div style="font-size:12px;font-weight:700;color:{MUTED};text-transform:uppercase;margin-bottom:10px">Full detail</div>')
+        body += "".join(_league_detail(lg) for lg in packet["leagues"])
+    else:
+        body += _muted("Every roster, waiver and odds table is in the plain-text version of this email.", 11)
     if packet["shared"].get("usage_error"):
-        details += _muted("Usage metrics unavailable this run.", 11)
+        body += _muted("Usage metrics unavailable this run.", 11)
     if packet["shared"].get("pending_trades_error"):
-        details += _muted("Could not read pending trades from ESPN this run; check the app for offers.", 11)
-    foot = _muted(f"Generated {_e(packet['generated'][:16].replace('T', ' '))} · numbers from ff, read from Claude · read-only against ESPN", 11)
-    return _page(head + actions + shared + divider + details + foot)
+        body += _muted("Could not read pending trades from ESPN this run; check the app for offers.", 11)
+    body += _muted(f"Generated {_e(packet['generated'][:16].replace('T', ' '))} · numbers from ff, read from Claude · read-only against ESPN", 11)
+    return _page(body)

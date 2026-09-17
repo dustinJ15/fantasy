@@ -45,8 +45,11 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
      the patterns it can detect; fix reads.json and re-run before sending.
 7. `uv run ff render-email --packet <packet path from step 5> --reads reads.json --out briefing.html --md briefing.md`
    (seconds, no sims). Then send with the Gmail connector. To: the address in the `BRIEFING_TO` environment variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
-   Pass the full contents of briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). Read
-   briefing.html with the Read tool in halves if needed, then paste it verbatim; there is no attachment or FILE: syntax.
+   Pass the full contents of briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). briefing.html
+   is the action cards only (well under 20 KB, one tag per line); the full detail tables are in briefing.md. There is no attachment
+   or FILE: syntax. Read briefing.html in order, from the first line to the last, and paste every line verbatim, including
+   the closing `</body></html>`. Before sending, run `wc -c briefing.html` and compare it to the length of what you
+   assembled; if they differ, re-read the file and fix the body rather than sending a truncated email.
    Send exactly one email.
    If Gmail is unavailable, fall back to `uv run ff email briefing.md --html briefing.html` (needs GMAIL_USER/GMAIL_APP_PASSWORD),
    and if that also fails, print the full briefing.md so it's in the run log.

@@ -110,14 +110,15 @@ def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JS
                      out: str = typer.Option("briefing.html", "--out"),
                      reads: str | None = typer.Option(None, "--reads", help="reads.json with Claude's per-league read"),
                      md: str | None = typer.Option(None, "--md", help="Also rewrite the markdown (plain-text body) with the reads"),
-                     only_incoming: bool = typer.Option(False, "--only-incoming", help="Short alert email: just the incoming offers and the reply")):
+                     only_incoming: bool = typer.Option(False, "--only-incoming", help="Short alert email: just the incoming offers and the reply"),
+                     full: bool = typer.Option(False, "--full", help="Append the full detail tables to the HTML (default: action cards only; the detail is in the markdown part)")):
     """Render the HTML email from an existing packet (seconds, no sims)."""
     from .email_html import render_email
     p = json.load(open(packet))
     r = _load_json(reads)
     for warn in report.voice_lint(r or {}):
         rprint(f"[yellow]voice: {warn}[/]")
-    open(out, "w").write(render_email(p, r, only_incoming=only_incoming))
+    open(out, "w").write(render_email(p, r, only_incoming=only_incoming, full=full))
     if md:
         open(md, "w").write(report.render(p, reads=r, only_incoming=only_incoming))
     rprint(f"[green]wrote {out}{' and ' + md if md else ''}[/]")

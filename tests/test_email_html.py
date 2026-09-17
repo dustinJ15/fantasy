@@ -33,16 +33,26 @@ def test_render_email(monkeypatch):
             assert escape(todo["text"])[:30] in html
     for jargon in ("p_zero", "fp:", "llm:", "espn:", "sleeper:"):
         assert jargon not in html
-    assert len(html) < 80_000
-    assert "Full detail" in html and "League odds" in html
-    assert "OFFER" in html and "Offers on the table" in html and "SENT" in html
+    # default: action cards only, small enough to transcribe into a mail tool
+    assert len(html) < 20_000
+    assert "Full detail" not in html and "League odds" not in html
+    assert "OFFER" in html
+    # every closing </tr>/</table>/</div> ends a line, so no read chunk can split a tag
+    assert "</tr><" not in html and "</table><" not in html and "</div><" not in html
+    assert max(len(ln) for ln in html.splitlines()) < 2_000
+    # --full keeps the old appendix
+    detailed = render_email(p, reads, full=True)
+    assert "Full detail" in detailed and "League odds" in detailed
+    assert "Offers on the table" in detailed and "SENT" in detailed
+    # the detail always lives in the plain-text part
+    assert "League odds" in report.render(p, reads=reads)
     # alert-tier email: only the offer, with the reply callout
     short = render_email(p, {"L9": {"reply": "how about RB2 straight up?", "reply_to": "Team 2"}}, only_incoming=True)
     assert "FF trade offer" in short and "how about RB2 straight up?" in short and "Waivers" not in short
     assert len(short) < 20_000
     # no reads -> no callouts
     bare = render_email(p)
-    assert "Claude" not in bare.split("Full detail")[0].replace("read from Claude", "")
+    assert "Claude" not in bare.replace("read from Claude", "")
 
 
 def test_markdown_lists_render(monkeypatch):
