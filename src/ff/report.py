@@ -110,8 +110,9 @@ def todos(lg: dict) -> list[dict]:
     for t in worth or lg["trades"][:1]:
         out.append({"kind": "trade", "label": f"Trade ({trade_tag(t)})", "worth": t["their_delta_ppw"] >= 0,
                     # roster-depth warnings ride along with the row: the card is the whole HTML email, so a caveat
-                    # that only reached the detail tables would never be seen on a phone
-                    "warn": [w for w in t["why"] if w.startswith("leaves me")],
+                    # that only reached the detail tables would never be seen on a phone. The model's why-vocabulary is
+                    # written in its own voice ("fills my QB hole"); the checklist is addressed to Dustin, so flip it.
+                    "warn": [w.replace("leaves me", "leaves you") for w in t["why"] if w.startswith("leaves me")],
                     "text": f"offer {t['rival']} your {', '.join(t['give'])} for {', '.join(t['get'])} (+{t['my_delta_ppw']:.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them)"})
     return out
 
