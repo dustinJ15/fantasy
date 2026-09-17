@@ -52,7 +52,9 @@ def depth(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[bool, list[s
     The trade math compares optimal lineups only, so shipping a body costs nothing there: trading down to one QB reads
     as free right up until that QB is hurt or on bye and the slot is empty. This is the check that math is missing.
     """
-    counts = Counter(p.pos for p in roster)
+    # Only bodies that could actually start count as depth: a QB out for the season is not a backup QB, and
+    # counting him hides the cost of shipping the healthy one (mu_ros is 0 for out/IR players).
+    counts = Counter(p.pos for p in roster if p.mu_ros > 0)
     ok, thin = True, []
     for pos in POS_ORDER:
         need = slots.get(pos, 0)

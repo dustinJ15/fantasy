@@ -123,3 +123,24 @@ def test_evaluate_declines_an_offer_for_my_only_qb(slots):
     out = evaluate(1, 2, [by_id[1]], [star], {1: mine, 2: theirs}, slots, repl, values={})
     assert out["verdict"] == "decline"
     assert "leaves me unable to fill a starting slot" in out["why"]
+
+
+def test_an_out_for_the_season_body_is_not_a_backup(slots):
+    """A QB with no rest-of-season expectation is on the roster but cannot start, so he is not depth."""
+    from ff.model.trades import depth
+    mine, _ = _rosters()
+    healthy_backup = mine + [P(30, "QB2", "QB", 15, tid=1)]
+    assert "QB" not in depth(healthy_backup, slots)[1]
+    shelved = mine + [P(30, "QB2", "QB", 15, ros=0.0, tid=1)]
+    ok, thin = depth(shelved, slots)
+    assert ok and "QB" in thin, "an IR'd QB should not hide that I am one injury from an empty slot"
+
+
+def test_scan_charges_for_shipping_the_last_healthy_qb(slots):
+    """thin0 must be judged on healthy bodies too: with a dead QB2 on the bench, trading QB1's backup still costs."""
+    from ff.model.trades import depth
+    mine, _ = _rosters()
+    mine = mine + [P(30, "QB2", "QB", 18, tid=1), P(31, "QB3", "QB", 2, ros=0.0, tid=1)]
+    assert "QB" not in depth(mine, slots)[1]
+    without_backup = [p for p in mine if p.espn_id != 30]
+    assert "QB" in depth(without_backup, slots)[1]
