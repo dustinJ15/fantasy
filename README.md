@@ -13,12 +13,12 @@ that says what to do. Everything is read-only against ESPN; I make the moves mys
 [Try it](#try-it) · [The one rule](#the-one-rule) · [What the math does](#what-the-math-does) · [Architecture](#architecture) · [Commands](#commands)
 
 <p align="center">
-  <img src="examples/briefing.png" width="640" alt="The morning briefing email, rendered from the demo league"><br>
+  <img src="examples/briefing-email.png" width="640" alt="The morning briefing email, rendered from the demo league"><br>
   <sub>The morning email, from the demo league. Every name is made up; every number comes from <code>ff</code>.</sub>
 </p>
 
 <p align="center">
-  <img src="examples/incoming.svg" width="760" alt="ff incoming --demo: an incoming trade offer with a DECLINE verdict"><br>
+  <img src="examples/incoming-terminal.svg" width="760" alt="ff incoming --demo: an incoming trade offer with a DECLINE verdict"><br>
   <sub>The same offer from the terminal. Someone in a league of eight always wants your two starters for their one.</sub>
 </p>
 

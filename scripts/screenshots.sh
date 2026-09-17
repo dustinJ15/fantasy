@@ -17,8 +17,8 @@ sed 's#</body>#<script>document.title=document.documentElement.scrollHeight</scr
 H="$("$CHROME" --headless=new --disable-gpu --no-sandbox --window-size=640,800 --dump-dom "file://$TMP/measure.html" 2>/dev/null \
     | grep -o '<title>[0-9]*</title>' | grep -o '[0-9]*')"
 "$CHROME" --headless=new --disable-gpu --no-sandbox --hide-scrollbars --force-device-scale-factor=2 \
-    --window-size="640,$H" --screenshot=examples/briefing.png "file://$PWD/examples/briefing.html" 2>/dev/null
-echo "  examples/briefing.png (640x$H css px @2x)"
+    --window-size="640,$H" --screenshot=examples/briefing-email.png "file://$PWD/examples/briefing.html" 2>/dev/null
+echo "  examples/briefing-email.png (640x$H css px @2x)"
 
 echo "terminal svg"
 uv run python - <<'PY'
@@ -32,6 +32,6 @@ with patch.object(cli, "rprint", con.print):
         cli.app(["incoming", "--demo", "--sims", "1500"], standalone_mode=False)
     except SystemExit:
         pass
-con.save_svg("examples/incoming.svg", title="ff incoming --demo")
-print("  examples/incoming.svg")
+con.save_svg("examples/incoming-terminal.svg", title="ff incoming --demo")
+print("  examples/incoming-terminal.svg")
 PY
