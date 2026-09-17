@@ -19,7 +19,7 @@ fi
 if [ ! -f leagues.toml ] && [ -n "${LEAGUES_TOML:-}" ]; then
   case "$LEAGUES_TOML" in
     *"[[league]]"*) printf '%s\n' "$LEAGUES_TOML" > leagues.toml ;;
-    *) printf '%s' "$LEAGUES_TOML" | base64 -d > leagues.toml ;;
+    *) printf '%s' "$LEAGUES_TOML" | tr -d ' \r\n\t' | base64 -d > leagues.toml ;;
   esac
 fi
 if [ ! -f leagues.toml ]; then
