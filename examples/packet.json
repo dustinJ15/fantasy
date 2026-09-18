@@ -1,6 +1,6 @@
 {
  "version": 4,
- "generated": "2026-09-17T14:22:53",
+ "generated": "2026-09-18T18:16:07",
  "season": 2026,
  "demo": true,
  "shared": {
@@ -1141,6 +1141,8 @@
      "their_delta_ppw": 2.18,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills my RB hole",
       "fills their WR hole",
@@ -1164,6 +1166,8 @@
      "their_delta_ppw": 2.72,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills my RB hole",
       "fills their QB hole",
@@ -1188,6 +1192,8 @@
      "their_delta_ppw": 1.29,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills my RB hole",
       "fills their RB hole",
@@ -1212,6 +1218,8 @@
      "their_delta_ppw": 1.24,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills my RB hole",
       "fills their QB hole",
@@ -1234,6 +1242,8 @@
      "their_delta_ppw": 0.0,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills my RB hole",
       "consolidates value for them"
@@ -1254,6 +1264,8 @@
      "their_delta_ppw": 0.36,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills their RB hole",
       "consolidates value for them"
@@ -1274,6 +1286,8 @@
      "their_delta_ppw": -0.06,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": false,
      "why": [
       "fills their RB hole",
       "consolidates value for them"
@@ -1293,6 +1307,8 @@
      "their_delta_ppw": 0.0,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": true,
      "why": [
       "fills my RB hole"
      ],
@@ -1312,6 +1328,8 @@
      "their_delta_ppw": -0.25,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": false,
      "why": [
       "fills their QB hole",
       "fills their WR hole",
@@ -1334,6 +1352,8 @@
      "their_delta_ppw": -0.41,
      "market_give": 0,
      "market_get": 0,
+     "market_ratio": null,
+     "sendable": false,
      "why": [
       "fills my RB hole",
       "rival is losing (motivated)",
@@ -1347,10 +1367,10 @@
      "id": "in-1",
      "rival_team_id": 2,
      "rival": "The Tuesday Regrets",
-     "proposed_iso": "2026-09-17T11:22",
-     "expires_iso": "2026-09-18T11:22",
+     "proposed_iso": "2026-09-18T15:16",
+     "expires_iso": "2026-09-19T15:16",
      "hours_left": 21.0,
-     "proposed_ts": 1789665769962,
+     "proposed_ts": 1789744563362,
      "unmatched_ids": [],
      "give": [
       "Jalen Haggerty",
@@ -1377,10 +1397,10 @@
      "id": "out-1",
      "rival_team_id": 3,
      "rival": "Waiver Wire Widows",
-     "proposed_iso": "2026-09-17T11:22",
-     "expires_iso": "2026-09-18T11:22",
+     "proposed_iso": "2026-09-18T15:16",
+     "expires_iso": "2026-09-19T15:16",
      "hours_left": 21.0,
-     "proposed_ts": 1789665769962,
+     "proposed_ts": 1789744563362,
      "unmatched_ids": [],
      "give": [
       "Rico Achebe"

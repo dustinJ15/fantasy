@@ -51,10 +51,14 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
             continue  # not a real fantasy asset, however much he's trending
         d_start, slot = own_starter_value(p, my_lineup)
         d_week, week_slot = (0.0, "")
-        if week_lineup:
+        if week_lineup and not p.locked:
             for ws, starters in week_lineup.items():
                 if ws in p.eligible:
-                    weakest = min((s.ev for s in starters), default=None)
+                    # Only slots I can still change: a starter whose game has kicked off is pinned there by ESPN, so
+                    # beating his (already banked) score is not an available move. If every body in the slot has
+                    # played, the slot is closed for the week however good the free agent looks.
+                    movable = [s for s in starters if not s.locked]
+                    weakest = min((s.ev for s in movable), default=None)
                     if weakest is None:
                         continue
                     d = p.ev - weakest
@@ -70,7 +74,10 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
         trend = min(trending.get(str(p.espn_id), 0) / 40000, 1.5)
         score = max(d_start, 0) * 3 + bench_val + max(vorp, 0) + trend + max(d_week, 0) * 2
         if streamer:
-            score = d_start  # only worth listing if clearly better than my current K/DST this week
+            # Only worth listing if clearly better than my current K/DST. `d_start` compares rest-of-season, which
+            # says nothing when my kicker is the problem *this* week: a starter who is 50% to sit has half the EV of
+            # a healthy body on the wire, and that gap only shows up in `d_week`.
+            score = max(d_start, d_week)
             if score < 1.0:
                 continue
         if score <= 0.2:

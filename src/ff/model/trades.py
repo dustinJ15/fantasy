@@ -45,6 +45,10 @@ def needs(roster: list[PlayerProj], slots: dict[str, int], repl: dict[str, float
 # Positions where the flex cannot cover an absence, so the last body at the position is the whole slot.
 NO_FLEX_COVER = ("QB", "TE", "K", "D/ST")
 
+# Market value I get back as a fraction of what I ship. Below this I am the one overpaying, which is not an offer
+# worth putting in front of a coworker however well the lineup math reads. Same floor `evaluate` uses on offers I receive.
+MARKET_FLOOR = 0.8
+
 
 def depth(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[bool, list[str]]:
     """(can_field_a_lineup, positions_with_no_backup).
@@ -123,6 +127,12 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 if their_needs.get(p.pos, {}).get("hole") and f"fills their {p.pos} hole" not in why: why.append(f"fills their {p.pos} hole")
             for pos in new_thin:
                 why.append(f"leaves me no backup {pos}")
+            # Same lowball check `evaluate` applies to offers people send me, applied to the ones I would send.
+            # Without it the only market guard is the 2.2x prefilter above, so the scan happily proposes handing
+            # over twice the market value for a fraction of a point per week.
+            ratio = (rv / gv) if gv and rv else None
+            if ratio is not None and ratio < MARKET_FLOOR:
+                why.append(f"market says I give more ({rv} vs {gv})")
             meta = team_meta.get(rid, {})
             games = meta.get("wins", 0) + meta.get("losses", 0)
             if games >= 4 and meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
@@ -135,7 +145,10 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
-                "market_give": gv, "market_get": rv, "why": why,
+                "market_give": gv, "market_get": rv, "market_ratio": round(ratio, 2) if ratio is not None else None,
+                # Worth actually sending: helps them (or is neutral) *and* I am not overpaying at market.
+                "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR),
+                "why": why,
                 "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin), 2),
             })
         rival_cands.sort(key=lambda c: -c["score"])
@@ -194,7 +207,7 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     elif len(get) > len(give):
         why.append("1-for-2: I take on depth and need a roster spot")
     if market_ratio is not None:
-        if market_ratio < 0.8: why.append(f"market says I give more ({rv} vs {gv})")
+        if market_ratio < MARKET_FLOOR: why.append(f"market says I give more ({rv} vs {gv})")
         elif market_ratio > 1.2: why.append(f"market says I get more ({rv} vs {gv})")
     why = list(dict.fromkeys(why))
 
@@ -202,7 +215,7 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
         verdict = "decline"
     elif d_me <= -0.5 or (market_ratio is not None and market_ratio < 0.65):
         verdict = "decline"
-    elif d_me >= 0.75 and (market_ratio is None or market_ratio >= 0.8):
+    elif d_me >= 0.75 and (market_ratio is None or market_ratio >= MARKET_FLOOR):
         verdict = "accept"
     else:
         verdict = "counter"
@@ -211,3 +224,25 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
         "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
         "market_give": gv, "market_get": rv, "why": why, "verdict": verdict,
     }
+
+
+def drop_already_offered(cands: list[dict], pending: list[dict] | None, by_id: dict[int, PlayerProj]) -> list[dict]:
+    """Remove candidates that re-propose a deal already sitting in a rival's inbox.
+
+    Open offers are the one piece of state the scan cannot see: it re-derives the same package every morning, so the
+    card says "offer Maye for Jameson Williams" while exactly that ask is pending with a day left on it. A `get` set
+    identifies the rival on its own (a player is on one roster), so this needs no team ids.
+    """
+    open_offers = []
+    for tx in pending or []:
+        if tx.get("direction") == "incoming":
+            continue
+        open_offers.append(({by_id[i].name for i in tx["give"] if i in by_id},
+                            {by_id[i].name for i in tx["get"] if i in by_id}))
+    out = []
+    for c in cands:
+        give, get = set(c["give"]), set(c["get"])
+        if any(get == o_get or (get & o_get and give & o_give) for o_give, o_get in open_offers):
+            continue
+        out.append(c)
+    return out

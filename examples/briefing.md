@@ -1,18 +1,18 @@
-# FF briefing — 2026-09-17
+# FF briefing — 2026-09-18
 
 ## Demo League
 _4-0 · vs Bye Week Blues · win 66% · playoffs 98.3% · title 20.0%_  
 
 - **Incoming offer (DECLINE):** The Tuesday Regrets offers Dontae Kowalczyk for your Jalen Haggerty, Silas Pennington: -6.4 pts/wk for you, +5.8 for them, title odds -8.1; expires in 21h
-- **Waiver:** add Jaxon Bassett (RB) and start him at RB (+7 pts this week); drop Rico Achebe
+- **Already sent:** your Rico Achebe for Rico Saldana is still waiting on Waiver Wire Widows, 21h left
+- **Waiver:** add Jaxon Bassett (RB) and start him at RB (+7 pts this week); drop Rico Achebe — **note:** worth the claim, but he's the lead back only while Achebe is out
 - **Stream:** swap in Texans D/ST at D/ST (+3.0 this week)
 - **Lineup (in order):** Cole Ibarra: QB → bench · Beau Whitlock: bench → QB · Nico Vell: bench → RB/WR/TE
-- **Trade (worth sending):** offer Bye Week Blues your Omar Lindqvist, Grady Sorensen for Dontae Rutherford (+0.8 pts/wk for you, +2.2 for them)
-- **Trade (worth sending):** offer Ctrl+Alt+Delete Kelce your Cole Ibarra, Jalen Haggerty for Kai Tremblay (+1.1 pts/wk for you, +2.7 for them) — leaves you no backup QB
+- **~~Trade (worth sending)~~:** ~~offer Bye Week Blues your Omar Lindqvist, Grady Sorensen for Dontae Rutherford (+0.8 pts/wk for you, +2.2 for them)~~ — **skip:** in a boot since Thursday, no practice, don't buy this week
+- **~~Trade (worth sending)~~:** ~~offer Ctrl+Alt+Delete Kelce your Cole Ibarra, Jalen Haggerty for Kai Tremblay (+1.1 pts/wk for you, +2.7 for them)~~ — **skip:** ships Ibarra and he's your only cover for the week 9 bye
 - **Trade (worth sending):** offer Bye Week Blues your Jalen Haggerty, Grady Sorensen for Xavier Vell (+1.7 pts/wk for you, +1.3 for them)
 
-_Why: Deon Castellano 30% to sit; Silas Pennington 30% to sit; Reggie Lindqvist 30% to sit; Nico Vell 30% to sit; Jalen Haggerty 30% to sit · favorite, play it safe_  
-**Claude's read:** Decline. The Tuesday Regrets are selling one good back for two of your starters and you're the favorite this week; you don't need the consolidation. Send the Bye Week Blues offer instead, it costs you nothing you start.  
+**Claude's read:** Rutherford was in a boot Thursday and hasn't practiced since, so I'd wait a week before buying him.  
 **Paste to Bye Week Blues:** "hey, any interest in Haggerty + Sorensen for Xavier Vell? you're thin at WR and I've got a spare. no worries if not"  
 **Reply to The Tuesday Regrets:** "appreciate it but I'm gonna hold for now, hit me up if you'd do Kowalczyk for Haggerty straight up"  
 
@@ -21,7 +21,7 @@ _Why: Deon Castellano 30% to sit; Silas Pennington 30% to sit; Reggie Lindqvist 
 
 _Full detail below._
 
-# Detail — 2026-09-17
+# Detail — 2026-09-18
 
 
 ---

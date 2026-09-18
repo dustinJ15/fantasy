@@ -16,9 +16,11 @@ Claude returns *parameters and prose*, never *decisions or state*. Every number 
 4. Write `overrides.json`: `{"<espn_id>": {"p_zero": 0.15, "mu_mult": 1.1, "note": "..."}}` only where news changes the picture.
    The `note` is shown next to the player in the email.
 5. `uv run ff briefing --overrides overrides.json` → markdown + packet path. Then write `reads.json`
-   (`{"L1": {"read": "...", "paste": "...", "paste_to": "...", "reply": "...", "reply_to": "..."}}`: 1-2 plain sentences per league,
-   what you'd actually do and why; `reply` only when `incoming_trades` has an offer)
-   and `uv run ff render-email --packet <path> --reads reads.json --out briefing.html --md briefing.md`. Never hand-edit the HTML;
+   (`{"L1": {"read": "...", "items": {"<row id>": {"verdict": "do|skip|amend", "note": "..."}}, "paste": "...", "paste_to": "...",
+   "reply": "...", "reply_to": "..."}}`): rule on rows in `items` (the ids print in backticks at the end of each briefing.md
+   checklist line) rather than arguing with the card in prose, every `trade` row needs a verdict, and `read` carries only
+   what the research adds; `reply` only when `incoming_trades` has an offer.
+   Then `uv run ff render-email --packet <path> --reads reads.json --out briefing.html --md briefing.md`. Never hand-edit the HTML;
    `src/ff/email_html.py` owns the layout.
 6. Email it to Dustin via the Gmail connector (subject: `FF briefing — Week N — <date>`).
 
@@ -30,7 +32,9 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 
 ## Layout
 `src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math, `packet.py` builds the DecisionPacket,
-`report.py` renders markdown (plain-text body), `email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
+`report.py` renders markdown (plain-text body) and owns the checklist itself (`todos` builds the rows and their ids,
+`apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id or an unruled trade),
+`email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
 `demo.py` is the synthetic league (fictional, seeded names); `scripts/screenshots.sh` regenerates `examples/` including the README images.
 
 ## Data gotchas
@@ -70,6 +74,7 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Monday email suggests moving players who played Sunday | `model/clock.py` locks players by kickoff/points; check `lines` (vegas scoreboard cache) has kickoffs and `actual_week` is populated | `ff sync --force`; look at `week_state` in the packet |
 | Sleeper projections missing for many players | crosswalk join | `Crosswalk.sleeper_id()`; check `shared.unmatched_ids` in the packet |
 | Agent sent >1 email or investigated git/Gmail history | skill scope drift | SKILL.md step 10 forbids it; tighten wording if it recurs |
+| Email card says do it and Claude's read says don't | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
 | Briefing says "could not read pending trades" | ESPN changed `mPendingTransactions` or cookies half-dead | check `pending_trades_error` in the packet; `ff incoming --force` locally |
 | trade-poll workflow red | cookies dead in GitHub secrets, or fire token revoked | update repo secrets; `gh workflow run trade-poll.yml -f window=48h` to test |

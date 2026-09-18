@@ -1,6 +1,12 @@
 {
   "demo": {
-    "read": "Decline. The Tuesday Regrets are selling one good back for two of your starters and you're the favorite this week; you don't need the consolidation. Send the Bye Week Blues offer instead, it costs you nothing you start.",
+    "read": "Rutherford was in a boot Thursday and hasn't practiced since, so I'd wait a week before buying him.",
+    "items": {
+      "trade:dontae-rutherford": {"verdict": "skip", "note": "in a boot since Thursday, no practice, don't buy this week"},
+      "trade:kai-tremblay": {"verdict": "skip", "note": "ships Ibarra and he's your only cover for the week 9 bye"},
+      "trade:xavier-vell": {"verdict": "do"},
+      "waiver:jaxon-bassett": {"verdict": "amend", "note": "worth the claim, but he's the lead back only while Achebe is out"}
+    },
     "paste": "hey, any interest in Haggerty + Sorensen for Xavier Vell? you're thin at WR and I've got a spare. no worries if not",
     "paste_to": "Bye Week Blues",
     "reply": "appreciate it but I'm gonna hold for now, hit me up if you'd do Kowalczyk for Haggerty straight up",
