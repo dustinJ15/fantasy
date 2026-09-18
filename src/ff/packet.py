@@ -13,7 +13,7 @@ from .model.clock import apply_clock, week_state
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
-from .model.trades import evaluate, lineup_strength, needs, scan
+from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
 from .sources import espn, fantasycalc, sleeper, vegas, weather
@@ -143,7 +143,9 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     # trades
     values = fantasycalc.by_espn_id(num_teams=s["team_count"], ppr=s["ppr"])
     team_meta = {tid: {"name": t["name"], "wins": t["wins"], "losses": t["losses"]} for tid, t in teams.items()}
+    by_id = {p.espn_id: p for ps in by_team.values() for p in ps}
     trades = scan(my_id, by_team, slots, repl, team_meta, values) if my_id else []
+    trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
     # attach title-odds delta for the top few (re-sim is expensive; do 3)
     for c in trades[:3]:
         rid = c["rival_team_id"]
@@ -157,7 +159,6 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         c["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
 
     # offers other managers sent me (and mine still open), from ESPN's pending transactions
-    by_id = {p.espn_id: p for ps in by_team.values() for p in ps}
     incoming, outgoing = [], []
     for tx in snap.get("pending_trades") or []:
         rid = tx.get("rival_team_id")

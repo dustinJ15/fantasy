@@ -28,22 +28,30 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    Read briefing.md and note the packet path printed on the last line (`packet data/packets/<date>.json`).
 6. Write `reads.json` at repo root — your judgment, as parameters. One entry per league keyed by its `name` from
    leagues.toml (L1/L2/L3); omit a league if you have nothing to add:
-   `{"L1": {"read": "<1-2 plain sentences: confirm or adjust the checklist based on your research>",
+   `{"L1": {"read": "<1-2 plain sentences of what your research adds that the math could not know>",
+            "items": {"<row id>": {"verdict": "do|skip|amend", "note": "<one short reason, required unless do>"}},
             "paste": "<exact message Dustin can paste to the rival, only if a trade is worth sending>", "paste_to": "<rival team name>",
             "reply": "<what Dustin sends back on an incoming offer: a polite no for decline, a concrete tweak for counter; omit for accept>", "reply_to": "<rival team name>"}}`
    Only include `reply` when that league has an entry in `incoming_trades`.
-   If your research says a checklist item is wrong, say so in the first words of the read, in plain words, naming the
-   item: "skip the trade item below, Herbert and Daniels are the same player this year" or "don't make the waiver claim".
+   **Rule on rows in `items`, do not argue with them in `read`.** briefing.md prints each row's id in backticks at the
+   end of the line (`[trade:jayden-daniels]`, `[waiver:devaughn-vele]`, `[lineup]`, `[cover:k]`); copy it exactly.
+   - `skip` strikes the row out in the email and prints your note as the reason. Use it when the row is wrong.
+   - `amend` keeps the row and attaches your correction (e.g. "add him, but that flex slot is locked, he starts next week").
+   - `do` is confirmation, and is the only verdict that needs no note.
    The card is the model's math and your read is judgment; they are allowed to disagree, but the email has to end with
-   one answer, not a card saying do it and a paragraph saying don't. A card may list up to three trade ideas: if you
-   only disagree with one, name which.
-   Do NOT edit briefing.md or the HTML by hand. If research changes a checklist item (a player ruled out, a role change),
+   one answer per row, not a card saying do it and a paragraph underneath saying don't. Every `trade` row needs a
+   verdict — the card lists up to three and Dustin cannot tell which one you meant otherwise. `ff render-email`
+   warns about a typo'd id, a missing reason and an unruled trade; fix reads.json and re-run before sending.
+   Leave `read` for what is genuinely new: the news, the practice report, the thing the model has no column for.
+   If it only repeats a row's verdict, drop it.
+   Do NOT edit briefing.md or the HTML by hand. If research changes a player's availability (ruled out, a role change),
    that belongs in overrides.json (re-run step 5); the override `note` shows up next to the player in the email.
    Dustin reads this on a phone: keep each read short.
-   Voice (`read`, `paste` and `reply`): write like a guy texting a coworker about football, not like an assistant.
+   Voice (`read`, `paste`, `reply` and each `note`): write like a guy texting a coworker about football, not like an assistant.
    - The `paste` message goes to a real person in Dustin's league. One or two casual sentences, first person, lowercase is fine,
      say what you want and why it helps *them*, end with a question. Example: "hey, any interest in Rice + Montgomery for Henry?
      you're thin at WR and I could use the RB. no worries if not". Never mention projections, models, points per week, or Claude.
+     Set `paste_to` to the rival named in the trade row you gave a `do`, so the message renders under that row.
    - Avoid the known AI tells: no em dashes (use a comma or a period), no "not X, but Y" reframes, no lists of three, no
      "label: explanation" openers, no "worth noting"/"that said"/"ultimately", no hedging stacks. Vary sentence length. Contractions.
      If a sentence sounds like a press release or a LinkedIn post, rewrite it. `ff render-email` prints a warning for

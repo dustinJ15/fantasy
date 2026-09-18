@@ -1,6 +1,13 @@
 """Render a DecisionPacket to markdown. Works with no LLM."""
 from __future__ import annotations
 
+import re
+
+
+def slug(text: str) -> str:
+    """Stable, typeable id fragment: 'Jameson Williams' -> 'jameson-williams'."""
+    return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", str(text).lower())).strip("-")
+
 
 def _flags(p: dict) -> str:
     f = [x for x in p.get("flags", []) if not x.startswith("fp:")]
@@ -46,6 +53,11 @@ def _drop_candidate(lg: dict) -> str | None:
     return min(bench, key=lambda p: p["mu_ros"])["name"]
 
 
+# Below this many starters still to play, naming them is the point (Monday morning: two guys decide the week).
+# Above it the names are a roster dump — the count is the whole signal.
+NAME_LEFT_AT = 3
+
+
 def phase_line(lg: dict) -> str | None:
     """One plain sentence about where the week stands, or None before kickoff."""
     ws = lg.get("week_state") or {}
@@ -58,12 +70,17 @@ def phase_line(lg: dict) -> str | None:
         return f"Week {lg['week']} final: {res} {me}–{op}"
     left = ws.get("my_left") or []
     ol = ws.get("opp_left") or []
-    return (f"Week {lg['week']} in progress: you {me}, them {op} · you have {len(left)} left ({', '.join(left) or 'none'}), "
-            f"they have {len(ol)} left")
+    who = f" ({', '.join(left)})" if 0 < len(left) <= NAME_LEFT_AT else ""
+    return f"Week {lg['week']} in progress: you {me} – {op} · {len(left)} starters left{who} vs their {len(ol)}"
+
+
+def sendable(t: dict) -> bool:
+    """Worth putting in front of a rival: helps them too, and I am not overpaying at market value."""
+    return bool(t.get("sendable", t["their_delta_ppw"] >= 0))
 
 
 def trade_tag(t: dict) -> str:
-    return "worth sending" if t["their_delta_ppw"] >= 0 else "a reach, send only if bored"
+    return "worth sending" if sendable(t) else "a reach, send only if bored"
 
 
 VERDICT_WORD = {"accept": "ACCEPT", "decline": "DECLINE", "counter": "COUNTER"}
@@ -77,57 +94,160 @@ def incoming_line(t: dict) -> str:
             f"{t['my_delta_ppw']:+.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them{td}{left}")
 
 
+# Slots the flex cannot cover, so the last healthy body at the position is the whole slot.
+COVER_POS = ("QB", "TE", "K", "D/ST")
+# Chance of sitting at which a starter needs a contingency plan rather than a note.
+RISKY_TO_SIT = 0.4
+# The model's why-vocabulary is first person ("leaves me no backup QB"); the checklist is addressed to Dustin.
+TO_DUSTIN = (("leaves me ", "leaves you "), ("market says I give", "market says you give"), ("for me", "for you"))
+
+
+def _to_dustin(s: str) -> str:
+    for a, b in TO_DUSTIN:
+        s = s.replace(a, b)
+    return s
+
+
+def _cover_items(lg: dict) -> list[dict]:
+    """A starter at a slot the flex cannot cover is in real doubt and nothing healthy sits behind him.
+
+    The optimizer never proposes this: a backup kicker is worth ~nothing in expectation, so he loses every ranking
+    we have right up to the Sunday his starter is scratched and the slot scores zero. It is still a button to press.
+    """
+    slots = lg["settings"]["lineup_slots"]
+    rec = lg["lineup_win"]["slots"]
+    by_name = {p["name"]: p for p in lg["roster"]}
+    starters = {n for ns in rec.values() for n in ns}
+    out = []
+    for pos in COVER_POS:
+        if not slots.get(pos):
+            continue
+        risky = [by_name[n] for n in rec.get(pos, []) if n in by_name and not by_name[n].get("locked")
+                 and (by_name[n]["p_zero"] >= RISKY_TO_SIT or by_name[n]["bye"])]
+        if not risky:
+            continue
+        if any(p["pos"] == pos and p["name"] not in starters and p["mu_ros"] > 0 and p["p_zero"] < RISKY_TO_SIT
+               for p in lg["roster"]):
+            continue  # a healthy body on the bench already covers it
+        who = risky[0]
+        fa = next((w for w in lg["waivers"] if w["pos"] == pos), None)
+        risk = "on bye" if who["bye"] else f"{who['p_zero']:.0%} to sit"
+        plan = f"add {fa['name']} ({fa['team']}) before kickoff" if fa else "grab a startable one off the wire before kickoff"
+        out.append({"kind": "cover", "id": f"cover:{slug(pos)}", "label": f"Cover {pos}",
+                    "text": f"{who['name']} is {risk} and he is your only {pos}; {plan}"})
+    return out
+
+
 def todos(lg: dict) -> list[dict]:
-    """The literal things to do today in one league. Each item: {kind, label, text, moves?}.
-    kind ∈ trade_in | waiver | waiver_up | stream | lineup | trade. Shared by the markdown and HTML renderers."""
+    """The literal things to do today in one league. Each item: {id, kind, label, text, moves?}.
+    kind ∈ trade_in | sent | waiver | waiver_up | stream | cover | lineup | trade. Shared by both renderers.
+
+    `id` is stable for a given packet, so reads.json can rule on one row by name instead of arguing with the
+    whole card in prose. Player names make the ids readable and are unique within a league.
+    """
     out = []
     for t in lg.get("incoming_trades") or []:
-        out.append({"kind": "trade_in", "label": f"Incoming offer ({VERDICT_WORD[t['verdict']]})", "verdict": t["verdict"],
+        out.append({"kind": "trade_in", "id": f"offer:{slug('-'.join(t['get']) or t['rival'] or 'offer')}",
+                    "label": f"Incoming offer ({VERDICT_WORD[t['verdict']]})", "verdict": t["verdict"],
                     "text": incoming_line(t)})
+    # Offers I already sent are the reason half the "why didn't it know that" moments happen: without them the card
+    # re-proposes a deal that is sitting in the rival's inbox with a day left on it.
+    for t in lg.get("outgoing_trades") or []:
+        left = f", {t['hours_left']:.0f}h left" if t.get("hours_left") is not None else ""
+        out.append({"kind": "sent", "id": f"sent:{slug('-'.join(t['get']) or t['rival'] or 'sent')}", "label": "Already sent",
+                    "text": f"your {', '.join(t['give']) or 'nothing'} for {', '.join(t['get']) or 'nothing'} is still "
+                            f"waiting on {t['rival'] or 'them'}{left}"})
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5]
     ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts]
     drop = _drop_candidate(lg)
     for w in starts[:1]:
-        out.append({"kind": "waiver", "label": "Waiver",
+        out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"add {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)" + (f"; drop {drop}" if drop else "")})
     for w in ups[:1]:
-        out.append({"kind": "waiver_up", "label": "Waiver (upgrade)",
+        out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
                     "text": f"add {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}" + (f"; drop {drop}" if drop else "")})
     for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]:
-        out.append({"kind": "stream", "label": "Stream", "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
+        out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
+                    "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
+    out += _cover_items(lg)
     ph = (lg.get("week_state") or {}).get("phase", "pre")
     ch = _lineup_changes(lg) if ph != "final" else []
     if ph == "final":
-        out.append({"kind": "lineup", "label": "Lineup", "moves": [],
+        out.append({"kind": "lineup", "id": "lineup", "label": "Lineup", "moves": [],
                     "text": f"week {lg['week']} is over; set next week's lineup once ESPN rolls to week {lg['week'] + 1} (Tuesday)"})
     elif ch:
-        out.append({"kind": "lineup", "label": "Lineup (in order)" if ph == "pre" else "Lineup (only unplayed slots)", "text": " · ".join(ch), "moves": ch})
+        out.append({"kind": "lineup", "id": "lineup", "label": "Lineup (in order)" if ph == "pre" else "Lineup (only unplayed slots)",
+                    "text": " · ".join(ch), "moves": ch})
     else:
-        out.append({"kind": "lineup", "label": "Lineup", "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []})
+        out.append({"kind": "lineup", "id": "lineup", "label": "Lineup",
+                    "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []})
     # Every offer that helps both sides is a thing I could actually send today, so list them (capped at 3 so the card
     # stays a checklist). A "reach" only helps me, so at most one of those, and only when there is nothing better.
-    worth = [t for t in lg["trades"] if t["their_delta_ppw"] >= 0][:3]
+    worth = [t for t in lg["trades"] if sendable(t)][:3]
     for t in worth or lg["trades"][:1]:
-        out.append({"kind": "trade", "label": f"Trade ({trade_tag(t)})", "worth": t["their_delta_ppw"] >= 0,
-                    # roster-depth warnings ride along with the row: the card is the whole HTML email, so a caveat
-                    # that only reached the detail tables would never be seen on a phone. The model's why-vocabulary is
-                    # written in its own voice ("fills my QB hole"); the checklist is addressed to Dustin, so flip it.
-                    "warn": [w.replace("leaves me", "leaves you") for w in t["why"] if w.startswith("leaves me")],
-                    "text": f"offer {t['rival']} your {', '.join(t['give'])} for {', '.join(t['get'])} (+{t['my_delta_ppw']:.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them)"})
+        # Depth and market warnings ride along with the row: the card is the whole HTML email, so a caveat that only
+        # reached the detail tables would never be seen on a phone.
+        warn = [_to_dustin(w) for w in t["why"] if w.startswith("leaves me") or w.startswith("market says I")]
+        them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
+        out.append({"kind": "trade", "id": f"trade:{slug('-'.join(t['get']))}", "label": f"Trade ({trade_tag(t)})",
+                    "worth": sendable(t), "rival": t.get("rival"), "give": list(t["give"]), "warn": warn,
+                    "text": f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
+                            f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them})"})
     return out
 
 
+RULINGS = ("do", "skip", "amend")
+
+
+def apply_reads(items: list[dict], r: dict | None) -> list[dict]:
+    """Merge Claude's per-row verdicts from reads.json into the checklist.
+
+    The card is the model's math and the read is judgment, and they are allowed to disagree — but the email has to
+    end with one answer per row, not a card saying do it and a paragraph underneath saying don't. `skip` strikes the
+    row and prints the reason on it; `amend` keeps it with the correction attached.
+    """
+    ruling = (r or {}).get("items") or {}
+    for it in items:
+        v = ruling.get(it["id"])
+        if isinstance(v, str):
+            v = {"verdict": v}
+        v = v or {}
+        it["ruling"] = (v.get("verdict") or "").lower() or None
+        it["ruling_note"] = v.get("note")
+    # Trades that ship the same player are alternatives, not a to-do list, and the card has to say so. Computed
+    # after the rulings because a skipped row is no longer an alternative to anything: if two of three are struck,
+    # the survivor is just the move.
+    committed: dict[str, None] = {}
+    for it in items:
+        if it["kind"] != "trade" or it.get("ruling") == "skip":
+            continue
+        dup = next((g for g in it.get("give") or [] if g in committed), None)
+        if dup:
+            it["warn"] = [*it.get("warn", []), f"ships the same {dup} as the offer above, so these are alternatives, pick one"]
+        committed.update(dict.fromkeys(it.get("give") or []))
+    return items
+
+
+# Sit risk worth a line in the card. An untouched Questionable sits at exactly 0.30, so anything at or below that is
+# a designation rather than a decision, and listing them all just reprints the injury report beside the checklist.
+# Above it means the research (or a bye) actually moved the number.
+SIT_RISK_SHOWN = 0.35
+
+
 def why_parts(lg: dict) -> list[str]:
-    """Short reasons behind the checklist: risky starters and the game script."""
+    """Short reasons behind the checklist: the starters actually in doubt, and the game script when it moved a slot."""
     lw = lg["lineup_win"]
     starters = {n for names in lw["slots"].values() for n in names}
-    flagged = [p for p in lg["roster"] if p["name"] in starters and not p.get("locked") and (p["p_zero"] >= 0.15 or p["bye"])]
+    flagged = [p for p in lg["roster"] if p["name"] in starters and not p.get("locked") and (p["p_zero"] >= SIT_RISK_SHOWN or p["bye"])]
+    flagged.sort(key=lambda p: -p["p_zero"])
     why = []
     if flagged:
-        why.append("; ".join(f"{p['name']} {p['p_zero']:.0%} to sit" for p in flagged))
+        why.append("; ".join(f"{p['name']} " + ("on bye" if p["bye"] else f"{p['p_zero']:.0%} to sit") for p in flagged[:2]))
     ph = (lg.get("week_state") or {}).get("phase", "pre")
-    if lw.get("p_win") is not None and ph != "final":
-        why.append(game_script(lw["p_win"]) + (f" ({lw['p_win']:.0%} with what's left)" if ph == "in_progress" else ""))
+    # P(win) is already a badge at the top of the card. The game script only earns a line when it actually changed
+    # something: that is exactly when the P(win) lineup differs from the plain highest-points one.
+    if lg.get("lineup_diff") and lw.get("p_win") is not None and ph != "final":
+        why.append(game_script(lw["p_win"]) + ", so this is not the highest-points lineup")
     return why
 
 
@@ -135,9 +255,34 @@ def game_script(p_win: float) -> str:
     return "underdog, favor upside" if p_win < 0.42 else ("favorite, play it safe" if p_win > 0.58 else "coin flip")
 
 
+def watchlist(packet: dict) -> list[dict]:
+    """Cross-league injury watch, one row per player instead of one per (player, league).
+
+    Only two kinds of row survive: someone in this week's lineup, and someone the research actually turned up
+    something on. A bare designation on a bench player is the injury report, not a briefing.
+    """
+    starters = {lg["name"]: {n for ns in lg["lineup_win"]["slots"].values() for n in ns} for lg in packet["leagues"]}
+    rows: dict[str, dict] = {}
+    for w in packet["shared"]["injury_watchlist"]:
+        if w.get("locked"):
+            continue  # already played this week; nothing to decide
+        starting = w["name"] in starters.get(w["league"], set())
+        if not starting and not w.get("override_note"):
+            continue
+        r = rows.get(w["name"])
+        if r is None:
+            r = rows[w["name"]] = {**w, "leagues": []}
+            r["starting"] = False
+        r["leagues"].append(w["league"])
+        r["starting"] = r["starting"] or starting
+        r["override_note"] = r.get("override_note") or w.get("override_note")
+        r["p_zero"] = max(r.get("p_zero") or 0.0, w.get("p_zero") or 0.0)
+    return sorted(rows.values(), key=lambda r: (not r["starting"], -(r["p_zero"] or 0.0), r["name"]))
+
+
 def watch_line(w: dict) -> str:
     """One watchlist entry with the override note (Claude's research) if there is one."""
-    s = f"{w['name']} {w['status'].title()} ({w['league']})"
+    s = f"{w['name']} {w['status'].title()} ({', '.join(w.get('leagues') or [w['league']])})"
     return s + (f" — {w['override_note']}" if w.get("override_note") else "")
 
 
@@ -167,10 +312,55 @@ def voice_lint(reads: dict) -> list[str]:
     return out
 
 
-def action_card(packet: dict, reads: dict | None = None) -> str:
-    """Checklist-first: literal things to do today per league, then a one-line why and Claude's read."""
+def item_line(x: dict) -> str:
+    """One checklist row for the markdown body, with Claude's ruling folded into it rather than argued below it."""
+    label, text = x["label"], x["text"]
+    if x.get("ruling") == "skip":
+        label, text = f"~~{label}~~", f"~~{text}~~"
+    line = f"**{label}:** {text}"
+    if x.get("warn") and x.get("ruling") != "skip":
+        line += f" — {'; '.join(x['warn'])}"
+    if x.get("ruling_note"):
+        line += f" — **{'skip' if x.get('ruling') == 'skip' else 'note'}:** {x['ruling_note']}"
+    return line
+
+
+def read_lint(packet: dict, reads: dict | None) -> list[str]:
+    """Check reads.json against the checklist it is ruling on: typo'd ids silently do nothing, and a trade row with
+    no ruling is the old failure mode — three offers on the card and a paragraph that only picks one."""
+    reads = reads or {}
+    out = []
+    ids_by_league = {lg["name"]: {x["id"]: x for x in todos(lg)} for lg in packet["leagues"]}
+    for name in reads:
+        if name not in ids_by_league:
+            out.append(f"{name}: no league by that name in the packet ({', '.join(ids_by_league) or 'none'})")
+    for name, known in ids_by_league.items():
+        ruled = (reads.get(name) or {}).get("items") or {}
+        for key, v in ruled.items():
+            if key not in known:
+                out.append(f"{name}.items['{key}']: no such row; ids are {', '.join(known)}")
+                continue
+            verdict = (v if isinstance(v, str) else (v or {}).get("verdict") or "").lower()
+            if verdict not in RULINGS:
+                out.append(f"{name}.items['{key}']: verdict must be one of {', '.join(RULINGS)}, got '{verdict}'")
+            elif verdict != "do" and not (isinstance(v, dict) and v.get("note")):
+                out.append(f"{name}.items['{key}']: '{verdict}' needs a note saying why")
+        for key, x in known.items():
+            if x["kind"] == "trade" and key not in ruled:
+                out.append(f"{name}.items['{key}']: trade row has no ruling (do / skip / amend)")
+    return out
+
+
+def action_card(packet: dict, reads: dict | None = None, show_ids: bool | None = None) -> str:
+    """Checklist-first: literal things to do today per league, then a one-line why and Claude's read.
+
+    `show_ids` prints each row's reads.json key. It defaults to on exactly when there are no reads yet, which is the
+    draft the routine reads before writing its rulings; the copy that reaches Dustin never carries them.
+    """
     L = [f"# FF briefing — {packet['generated'][:10]}", ""]
-    sh = packet["shared"]; reads = reads or {}
+    sh = packet["shared"]
+    show_ids = (not reads) if show_ids is None else show_ids
+    reads = reads or {}
     for lg in packet["leagues"]:
         me = lg["odds"].get(str(lg["my_team_id"])) or {}
         opp = lg["opponent"]; lw = lg["lineup_win"]
@@ -182,14 +372,13 @@ def action_card(packet: dict, reads: dict | None = None) -> str:
         if pl:
             L.append(f"**{pl}**")
         L.append("")
-        for x in todos(lg):
-            warn = f" — {'; '.join(x['warn'])}" if x.get("warn") else ""
-            L.append(f"- **{x['label']}:** {x['text']}{warn}")
+        r = reads.get(lg["name"]) or {}
+        for x in apply_reads(todos(lg), r):
+            L.append(f"- {item_line(x)}" + (f"  `[{x['id']}]`" if show_ids else ""))
         L.append("")
         why = why_parts(lg)
         if why:
             L.append("_Why: " + " · ".join(why) + "_")
-        r = reads.get(lg["name"]) or {}
         if r.get("read"):
             L.append(f"**Claude's read:** {r['read']}")
         if r.get("paste"):
@@ -197,8 +386,9 @@ def action_card(packet: dict, reads: dict | None = None) -> str:
         if r.get("reply"):
             L.append(f"**Reply to {r.get('reply_to') or 'the offer'}:** \"{r['reply']}\"")
         L.append("")
-    if sh["injury_watchlist"]:
-        L.append("**Watch:** " + "; ".join(watch_line(w) for w in sh["injury_watchlist"]))
+    watch = watchlist(packet)
+    if watch:
+        L.append("**Watch:** " + "; ".join(watch_line(w) for w in watch))
     if sh["exposure"]:
         L.append("**Exposure:** " + ", ".join(f"{k} ({len(v)}x)" for k, v in sh["exposure"].items()))
     return "\n".join(line if (not line or line.startswith("#") or line.startswith("- ")) else line + "  " for line in L)

@@ -86,3 +86,34 @@ def test_depth_warning_reaches_both_renderers(monkeypatch):
     for w in warns:
         assert escape(w) in html, f"missing from the card: {w}"
         assert w in md, f"missing from the plain text: {w}"
+
+
+def test_a_skipped_row_is_struck_through_with_its_reason(monkeypatch):
+    """The whole point of the rulings: the email ends with one answer per row, not a card saying do it and a
+    paragraph underneath saying don't."""
+    p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    trade_ids = [t["id"] for t in report.todos(lg) if t["kind"] == "trade"]
+    assert trade_ids, "fixture should offer at least one trade to rule on"
+    reads = {"L9": {"items": {trade_ids[0]: {"verdict": "skip", "note": "he is in a boot, not this week"}}}}
+    html = render_email(p, reads)
+    assert "line-through" in html and "SKIP" in html
+    assert escape("he is in a boot, not this week") in html
+
+
+def test_the_paste_message_rides_on_the_trade_it_belongs_to(monkeypatch):
+    p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    trades = [t for t in report.todos(lg) if t["kind"] == "trade"]
+    assert trades, "fixture should offer at least one trade for the message to attach to"
+    reads = {"L9": {"paste": "any interest in this one?", "paste_to": trades[0]["rival"]}}
+    html = render_email(p, reads)
+    assert html.count("any interest in this one?") == 1
+    # the message sits inside the checklist, above the "Why" line, not adrift at the bottom of the card
+    assert html.index("any interest in this one?") < html.index("Why:")
+
+
+def test_title_odds_are_not_in_the_action_card(monkeypatch):
+    p = _packet(monkeypatch)
+    html = render_email(p, {})
+    assert "Playoffs" in html and "Title" not in html

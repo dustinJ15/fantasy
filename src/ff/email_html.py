@@ -28,7 +28,8 @@ TONES = {
 FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 TEXT, MUTED, BORDER, PAGE, CARD, ZEBRA = "#1f2933", "#6b7280", "#e3e6ea", "#eef0f3", "#ffffff", "#f6f7f9"
 LABELS = {"waiver": ("WAIVER", "info"), "waiver_up": ("WAIVER", "info"), "stream": ("STREAM", "info"),
-          "lineup": ("LINEUP", "move"), "trade": ("TRADE", "good"), "trade_in": ("OFFER", "warn")}
+          "lineup": ("LINEUP", "move"), "trade": ("TRADE", "good"), "trade_in": ("OFFER", "warn"),
+          "sent": ("SENT", "grey"), "cover": ("COVER", "bad")}
 VERDICT_TONE = {"accept": "good", "decline": "bad", "counter": "warn"}
 
 
@@ -141,15 +142,19 @@ def _stat_row(lg: dict) -> str:
         f"<b>{_e(lg['my_record'])}</b>",
         f"vs {_e(opp.get('name') or 'TBD')}",
         *([] if final else [f"Win {_badge(_pct(pw * 100 if pw is not None else None), tone)}"]),
+        # Title odds are two decimal places of noise in September and they are in the detail tables either way.
         f"Playoffs <b>{_pct(me.get('playoff_pct'))}</b>",
-        f"Title <b>{_pct(me.get('title_pct'))}</b>",
     ]
     return f'<div style="color:{MUTED};font-size:13px;margin-top:3px">{" &nbsp;·&nbsp; ".join(cells)}</div>'
 
 
-def _todo_rows(lg: dict) -> str:
+def _todo_rows(lg: dict, r: dict) -> tuple[str, bool]:
+    """The checklist. Returns (html, paste_attached): Claude's paste message rides on the trade row it belongs to,
+    so three trade ideas can never leave you guessing which one the message is for."""
+    paste, paste_to = r.get("paste"), r.get("paste_to") or ""
+    attached = False
     rows = []
-    for t in report.todos(lg):
+    for t in report.apply_reads(report.todos(lg), r):
         label, tone = LABELS[t["kind"]]
         if t["kind"] == "trade":
             tone = "good" if t.get("worth") else "grey"
@@ -157,17 +162,27 @@ def _todo_rows(lg: dict) -> str:
         if t["kind"] == "trade_in":
             tone = VERDICT_TONE[t["verdict"]]
             label = report.VERDICT_WORD[t["verdict"]] + " OFFER"
+        skip = t.get("ruling") == "skip"
+        if skip:
+            label, tone = "SKIP", "grey"
         if t["kind"] == "lineup" and t.get("moves"):
             body = "<b>In this order:</b><br>" + "<br>".join(
                 _e(m).replace(" → ", f' <span style="color:{MUTED}">→</span> ') for m in t["moves"])
         else:
             body = _e(t["text"])
-        if t.get("warn"):
-            warn_fg = TONES["bad"][1]
-            body += f'<div style="color:{warn_fg};font-size:11px;margin-top:2px">{_e("; ".join(t["warn"]))}</div>'
+        if skip:
+            body = f'<span style="text-decoration:line-through;color:{MUTED}">{body}</span>'
+        elif t.get("warn"):
+            body += f'<div style="color:{TONES["bad"][1]};font-size:11px;margin-top:2px">{_e("; ".join(t["warn"]))}</div>'
+        if t.get("ruling_note"):
+            fg = MUTED if skip else TONES["warn"][1]
+            body += f'<div style="color:{fg};font-size:12px;margin-top:3px">{_e(t["ruling_note"])}</div>'
+        if t["kind"] == "trade" and not skip and paste and not attached and paste_to in (t.get("rival") or "", ""):
+            body += _callout(f"Paste to {t.get('rival') or paste_to or 'the rival'}", paste, "good", quote=True)
+            attached = True
         rows.append(f'<tr><td valign="top" width="1" style="padding:6px 8px 6px 0">{_badge(label, tone)}</td>'
                     f'<td valign="top" style="padding:6px 0;font-size:14px;border-bottom:1px solid {BORDER}">{body}</td></tr>')
-    return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>'
+    return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>', attached
 
 
 def _phase(lg: dict) -> str:
@@ -180,13 +195,14 @@ def _phase(lg: dict) -> str:
 
 
 def _league_action(lg: dict, r: dict) -> str:
-    body = _phase(lg) + _todo_rows(lg)
+    rows, pasted = _todo_rows(lg, r)
+    body = _phase(lg) + rows
     why = report.why_parts(lg)
     if why:
         body += _muted("Why: " + _e(" · ".join(why)))
     if r.get("read"):
         body += _callout("Claude's read", r["read"], "info")
-    if r.get("paste"):
+    if r.get("paste") and not pasted:
         body += _callout(f"Paste to {r.get('paste_to') or 'the rival'}", r["paste"], "good", quote=True)
     if r.get("reply"):
         body += _callout(f"Reply to {r.get('reply_to') or 'the offer'}", r["reply"], "warn", quote=True)
@@ -195,13 +211,17 @@ def _league_action(lg: dict, r: dict) -> str:
     return _card(lg["league_name"], _stat_row(lg), body, accent)
 
 
-def _shared(sh: dict) -> str:
+def _shared(packet: dict) -> str:
+    sh = packet["shared"]
     parts = []
-    if sh["injury_watchlist"]:
+    watch = report.watchlist(packet)
+    if watch:
         items = []
-        for w in sh["injury_watchlist"]:
+        for w in watch:
             tone = "bad" if w["status"] == "OUT" else "warn"
-            s = f"{_badge(w['status'], tone)} <b>{_e(w['name'])}</b> <span style='color:{MUTED}'>({_e(w['pos'])}, {_e(w['league'])})</span>"
+            where = ", ".join(w.get("leagues") or [w["league"]])
+            s = (f"{_badge(w['status'], tone)} <b>{_e(w['name'])}</b> "
+                 f"<span style='color:{MUTED}'>({_e(w['pos'])}, {_e(where)}{'' if w['starting'] else ', bench'})</span>")
             if w.get("override_note"):
                 s += f" — {_e(w['override_note'])}"
             items.append(s)
@@ -367,7 +387,7 @@ def render_email(packet: dict, reads: dict | None = None, only_incoming: bool = 
     head = (f'<div style="font-size:22px;font-weight:800;margin:4px 0 2px">FF briefing</div>'
             f'<div style="color:{MUTED};font-size:13px;margin-bottom:14px">Week {week} · {_e(when)}</div>')
     actions = "".join(_league_action(lg, reads.get(lg["name"]) or {}) for lg in packet["leagues"])
-    shared = _shared(packet["shared"])
+    shared = _shared(packet)
     body = head + actions + shared
     if full:
         body += (f'<div style="margin:22px 0 12px;border-top:2px dashed #c4c9d0"></div>'

@@ -144,3 +144,56 @@ def test_scan_charges_for_shipping_the_last_healthy_qb(slots):
     assert "QB" not in depth(mine, slots)[1]
     without_backup = [p for p in mine if p.espn_id != 30]
     assert "QB" in depth(without_backup, slots)[1]
+
+
+def test_drop_already_offered_removes_a_deal_that_is_already_pending():
+    """The same ask, sitting in the rival's inbox with a day left on it, is not a thing to do today."""
+    from ff.model.trades import drop_already_offered
+    by_id = {1: P(1, "Maye", "QB", 18, tid=1), 2: P(2, "Dart", "QB", 12, tid=1), 3: P(3, "Jameson", "WR", 14, tid=2),
+             4: P(4, "Odunze", "WR", 13, tid=3)}
+    pending = [{"direction": "outgoing", "give": [1, 2], "get": [3]}]
+    cands = [{"give": ["Maye"], "get": ["Jameson"]}, {"give": ["Maye"], "get": ["Odunze"]}]
+    kept = drop_already_offered(cands, pending, by_id)
+    assert [c["get"] for c in kept] == [["Odunze"]]
+
+
+def test_drop_already_offered_leaves_incoming_offers_alone():
+    from ff.model.trades import drop_already_offered
+    by_id = {1: P(1, "Maye", "QB", 18, tid=1), 3: P(3, "Jameson", "WR", 14, tid=2)}
+    pending = [{"direction": "incoming", "give": [1], "get": [3]}]
+    cands = [{"give": ["Maye"], "get": ["Jameson"]}]
+    assert drop_already_offered(cands, pending, by_id) == cands
+
+
+def test_scan_will_not_call_an_overpay_sendable(slots):
+    """Lineup math alone happily ships twice the market value for a fraction of a point per week."""
+    mine = [P(1, "QB", "QB", 20, tid=1), P(2, "RB1", "RB", 16, tid=1), P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1),
+            P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1),
+            P(7, "TE", "TE", 3, tid=1), P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "QB", "QB", 20, tid=2), P(12, "RB1", "RB", 8, tid=2), P(13, "RB2", "RB", 6, tid=2),
+              P(15, "WR1", "WR", 14, tid=2), P(16, "WR2", "WR", 12, tid=2), P(17, "WR3", "WR", 11, tid=2),
+              P(18, "TEgood", "TE", 12, tid=2), P(22, "TE2", "TE", 6, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    meta = {2: {"name": "Rival", "wins": 0, "losses": 2}}
+    # The trade the lineup math loves (my spare RB for their good TE) is a 2:1 overpay at market.
+    values = {str(i): {"redraft_value": 6000} for i in (2, 3, 4)} | {"18": {"redraft_value": 3000}}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values)
+    overpays = [c for c in out if "TEgood" in c["get"] and c["market_ratio"] is not None and c["market_ratio"] < 0.8]
+    assert overpays, "expected the overpay candidate to survive the prefilter so the floor has something to judge"
+    for c in overpays:
+        assert not c["sendable"]
+        assert any("market says I give more" in w for w in c["why"])
+
+
+def test_scan_still_sends_a_fair_deal(slots):
+    mine = [P(1, "QB", "QB", 20, tid=1), P(2, "RB1", "RB", 16, tid=1), P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1),
+            P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1),
+            P(7, "TE", "TE", 3, tid=1), P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "QB", "QB", 20, tid=2), P(12, "RB1", "RB", 8, tid=2), P(13, "RB2", "RB", 6, tid=2),
+              P(15, "WR1", "WR", 14, tid=2), P(16, "WR2", "WR", 12, tid=2), P(17, "WR3", "WR", 11, tid=2),
+              P(18, "TEgood", "TE", 12, tid=2), P(22, "TE2", "TE", 6, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    meta = {2: {"name": "Rival", "wins": 0, "losses": 2}}
+    values = {str(i): {"redraft_value": 5000} for i in (2, 3, 4, 18)}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values)
+    assert any(c["sendable"] for c in out if "TEgood" in c["get"])
