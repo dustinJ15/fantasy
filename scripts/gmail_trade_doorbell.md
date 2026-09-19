@@ -43,15 +43,37 @@ Nothing in the script is secret; the two secrets live only in Script Properties 
 From now on, each ESPN proposal email gets the label `ff-alerted` after the routine is fired, and you
 should get an `FF trade offer — <league> — <date>` email a few minutes later.
 
+## How it handles its own failures
+- **Transient Google faults** (`We're sorry, a server error occurred`) are retried three times with
+  backoff inside the run. If the run still fails it stays quiet, because the trigger fires again in a
+  minute. Only **5 consecutive** failed runs are allowed to raise an Apps Script failure notification,
+  so a one-off blip no longer emails you.
+- **A rejected fire** (rotated token, deleted routine) is the dangerous case: it means no alert will
+  ever arrive, and the only other record is a log nobody reads. After **3 rejections in a row** the
+  script emails you `FF trade doorbell — cannot reach the trade routine`, at most once an hour.
+- **A proposal is never alerted twice.** The message id is recorded as fired *before* the thread is
+  labeled, so a failed label write makes the next run repair the label rather than fire again.
+
 ## Debugging
 - **Execution log:** click the list icon (**Executions**) in the left sidebar. Each run shows its
-  status and any `console.log` lines: "Fired routine for ...", "Fire endpoint returned HTTP ...", or
-  "Missing Script Property ...".
+  status and any `console.log` lines: "Fired routine for ...", "Fire failed (N in a row) ...",
+  "Already fired ...; label repaired", or "Missing Script Property ...".
+- **Prove the fire path works:** pick `fireTestOffer` in the function dropdown and click **Run**. It
+  fires the routine once; with no pending offers the routine stops without emailing, so it is safe to
+  run any time. The log says `Fire succeeded: HTTP 2xx` or `Fire FAILED: ...`.
 - **Nothing fires:** confirm both Script Properties are still set (Project Settings), that the
   trigger still exists (Triggers), and that the ESPN email is in the inbox from `fantasy@espnmail.com`
   with "Trade Proposal" in the subject. Remove the `ff-alerted` label from the email to make the script
-  retry it.
+  retry it — and run `resetDoorbellState` if the message was already fired once, since the id cache
+  would otherwise treat it as handled.
 - **HTTP 401/403 in the log:** the fire token was rotated. Copy the new one from the routine page into
-  the Script Property.
+  the Script Property. This is the case the escalation email is for.
 - **HTTP 404:** the trigger id is wrong or the routine was deleted.
 - **Rotating the token:** only the Script Property changes; the script file never does.
+- **After editing the script:** run `node scripts/gmail_trade_doorbell.test.js` in the repo first. It
+  exercises the retry, escalation and no-double-fire paths against a stubbed Apps Script runtime.
+
+## Script Properties the script manages itself
+Alongside the two you set, the script keeps `ff_failed_runs`, `ff_fire_failures`,
+`ff_last_escalation_ms` and `ff_fired_message_ids`. `resetDoorbellState` clears those four and leaves
+your two credentials alone.
