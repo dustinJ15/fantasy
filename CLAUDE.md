@@ -36,6 +36,8 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 `apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id or an unruled trade),
 `email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
 `demo.py` is the synthetic league (fictional, seeded names); `scripts/screenshots.sh` regenerates `examples/` including the README images.
+The Gmail doorbell is Apps Script, so pytest cannot see it: `node scripts/gmail_trade_doorbell.test.js` runs it against a stubbed
+Apps Script runtime (retries, escalation, no-double-fire). Run it after editing the `.gs`, before pasting into the editor.
 
 ## Data gotchas
 - nflreadpy installed from git (PyPI lags). No 2026 snap counts yet.
@@ -52,9 +54,10 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   runs every minute in Dustin's Gmail, finds ESPN's "Trade Proposal" email, fires the "FF trade offer" routine's API trigger
   (`/trade-offer` skill, emails `FF trade offer — <league> — <date>`) and labels the email `ff-alerted`. The trigger id and fire
   token live only in the script's Script Properties (nothing in the repo).
-  Backstop: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 75m` hourly in season, dedupes by offer id via
-  `actions/cache`, and fires the same routine. GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables
-  `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
+  Backstop: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 6h` in season, dedupes by offer id via
+  `actions/cache`, and fires the same routine. The cron asks for hourly but GitHub delivers roughly every 3h on a quiet
+  repo, so the window is deliberately wider than the cadence; overlap is free because ids are deduped.
+  GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
 - Debug a run: `RemoteTrigger list_runs` (trigger_id in ops.local.md) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
   No credentials at all: `uv run ff briefing --demo` (synthetic league from `src/ff/demo.py`).
@@ -78,5 +81,7 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
 | Briefing says "could not read pending trades" | ESPN changed `mPendingTransactions` or cookies half-dead | check `pending_trades_error` in the packet; `ff incoming --force` locally |
 | trade-poll workflow red | cookies dead in GitHub secrets, or fire token revoked | update repo secrets; `gh workflow run trade-poll.yml -f window=48h` to test |
+| "Summary of failures for Google Apps Script" naming one or two runs | transient Google backend fault | ignore; the doorbell retries in-run and re-runs the next minute. Apps Script only reports it after 5 consecutive failed runs |
+| Email "FF trade doorbell — cannot reach the trade routine" | 3 fires in a row rejected: token rotated (401/403) or routine id wrong (404) | fix the Script Property; `fireTestOffer` in the Apps Script editor re-checks the path |
 | Trade offer email never arrives but the offer is in ESPN | doorbell silent (Apps Script trigger gone, Script Properties cleared, token rotated) and poller missed it or routine disabled | Apps Script Executions log; confirm Script Properties `FF_TRADE_ROUTINE_ID` + `FF_ROUTINE_FIRE_TOKEN` are still set and the 1-minute trigger exists; `RemoteTrigger get` on the trade routine; it still appears in the next morning briefing |
 | ESPN proposal email has no `ff-alerted` label an hour later | doorbell never ran or the fire returned non-2xx | same as above; remove the label (if any) to make the script retry |

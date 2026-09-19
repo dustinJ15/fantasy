@@ -2,12 +2,17 @@
 #
 # Primary path: a Google Apps Script doorbell (scripts/gmail_trade_doorbell.gs) fires the "FF trade offer"
 # routine within a minute of ESPN's "Trade Proposal" email. This workflow is the backstop in case the
-# doorbell is silent: once an hour it asks ESPN for offers proposed in the last 75 min and fires the same
-# routine for any offer id it has not fired before (ids are persisted with actions/cache, so a wide window
-# never causes duplicate emails). The morning briefing is the final net: it lists every still-pending offer.
+# doorbell is silent: it asks ESPN for recently proposed offers and fires the same routine for any offer id
+# it has not fired before (ids are persisted with actions/cache, so a wide window never causes duplicate
+# emails). The morning briefing is the final net: it lists every still-pending offer.
 #
 # The schedule is a plain hourly cron; in-season and skip-Monday logic is a shell guard in the first step,
 # because GitHub rejects month/day lists mixed with ranges and its scheduler often runs late.
+#
+# The window is 6h, not the hour the cron asks for, because GitHub does not honor the cron on a quiet repo:
+# observed scheduled runs land roughly 3h apart (16:32, 19:44, 22:40 UTC on 2026-09-18). A 75-minute window
+# against a 3-hour cadence covered under half the day and silently dropped the rest. The window only has to
+# exceed the real gap between runs; id-dedupe means overlapping it costs nothing.
 name: trade-poll
 on:
   schedule:
@@ -15,8 +20,8 @@ on:
   workflow_dispatch:
     inputs:
       window:
-        description: 'How far back counts as new (e.g. 75m, 48h)'
-        default: '75m'
+        description: 'How far back counts as new (e.g. 6h, 48h)'
+        default: '6h'
 concurrency:
   group: trade-poll
   cancel-in-progress: false
@@ -66,7 +71,7 @@ jobs:
         id: look
         if: steps.gate.outputs.run == 'true'
         run: |
-          uv run ff incoming --json --new-since "${{ github.event.inputs.window || '75m' }}" > all.json
+          uv run ff incoming --json --new-since "${{ github.event.inputs.window || '6h' }}" > all.json
           touch seen_ids.txt
           python3 - <<'PY'
           import json
