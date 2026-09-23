@@ -11,9 +11,12 @@ POS_ORDER = ("QB", "RB", "WR", "TE", "K", "D/ST")
 
 
 def lineup_strength(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[float, float]:
-    """(mu, var) of the E[points]-optimal lineup using rest-of-season per-game expectations."""
-    ros = [p.ros(min(p.p_zero, 0.15) if not (p.bye or p.locked) else 0.05) for p in roster]
-    L = optimize(ros, slots, objective="ev")
+    """(mu, var) of the E[points]-optimal lineup using rest-of-season per-week expectations.
+
+    The injury lives in `mu_ros` (games missed are already netted out), so every player gets the same small residual
+    sit risk here. The old `min(p_zero, 0.15)` cap flattened "questionable this week" and "torn ACL" into one number.
+    """
+    L = optimize([p.ros() for p in roster], slots, objective="ev")
     return L.mu, L.var
 
 
@@ -48,6 +51,31 @@ NO_FLEX_COVER = ("QB", "TE", "K", "D/ST")
 # Market value I get back as a fraction of what I ship. Below this I am the one overpaying, which is not an offer
 # worth putting in front of a coworker however well the lineup math reads. Same floor `evaluate` uses on offers I receive.
 MARKET_FLOOR = 0.8
+# FantasyCalc reprices an injury days late. For a player I would ship who is out for weeks, judge the market checks on
+# his value discounted by availability so the scan neither refuses to propose the deal ("I give more") nor proposes
+# handing over a season-ender as if he were healthy. The raw figure still rides on the row as a caveat.
+MARKET_INJURY_FLOOR = 0.25
+
+
+def market_value(players: list[PlayerProj], values: dict[str, dict], discount_injured: bool = False) -> float:
+    total = 0.0
+    for p in players:
+        v = values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0
+        if discount_injured and p.weeks_out >= 1:
+            v *= max(p.avail_ros, MARKET_INJURY_FLOOR)
+        total += v
+    return round(total, 1)
+
+
+def injury_caveats(players: list[PlayerProj], values: dict[str, dict]) -> list[str]:
+    """One line per hurt player whose market value predates the injury."""
+    out = []
+    for p in players:
+        v = values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0
+        if p.weeks_out >= 1 and v:
+            wk = "the season" if p.avail_ros == 0 else f"~{p.weeks_out:.0f} wks"
+            out.append(f"market still prices {p.name} healthy ({v:.0f}); he is out {wk}")
+    return out
 
 
 def depth(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[bool, list[str]]:
@@ -102,9 +130,9 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
         packages = [((a,), (b,)) for a in my_assets for b in their_assets]
         packages += [((a1, a2), (b,)) for a1, a2 in combinations(my_assets, 2) for b in their_assets[:5]]
         for give, get in packages:
-            # crude pre-filter on market value to avoid absurd asks
-            gv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in give)
-            rv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in get)
+            # crude pre-filter on market value to avoid absurd asks; my hurt players count at their discounted value
+            gv, gv_raw = market_value(give, values, discount_injured=True), market_value(give, values)
+            rv = market_value(get, values)
             if gv and rv and (rv > gv * 1.2 or gv > rv * 2.2):
                 continue
             new_mine = _swap(mine, {p.espn_id for p in give}, get)
@@ -133,6 +161,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             ratio = (rv / gv) if gv and rv else None
             if ratio is not None and ratio < MARKET_FLOOR:
                 why.append(f"market says I give more ({rv} vs {gv})")
+            why += injury_caveats(give, values)
             meta = team_meta.get(rid, {})
             games = meta.get("wins", 0) + meta.get("losses", 0)
             if games >= 4 and meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
@@ -145,7 +174,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
-                "market_give": gv, "market_get": rv, "market_ratio": round(ratio, 2) if ratio is not None else None,
+                "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_ratio": round(ratio, 2) if ratio is not None else None,
                 # Worth actually sending: helps them (or is neutral) *and* I am not overpaying at market.
                 "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR),
                 "why": why,
@@ -182,8 +211,8 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     my_mu1, _ = lineup_strength(new_mine, slots)
     their_mu1, _ = lineup_strength(new_theirs, slots)
     d_me, d_them = my_mu1 - my_mu0, their_mu1 - their_mu0
-    gv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in give)
-    rv = sum(values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0 for p in get)
+    gv, gv_raw = market_value(give, values, discount_injured=True), market_value(give, values)
+    rv = market_value(get, values)
     market_ratio = (rv / gv) if gv and rv else None
 
     can_field, thin = depth(new_mine, slots)
@@ -209,6 +238,7 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     if market_ratio is not None:
         if market_ratio < MARKET_FLOOR: why.append(f"market says I give more ({rv} vs {gv})")
         elif market_ratio > 1.2: why.append(f"market says I get more ({rv} vs {gv})")
+    why += injury_caveats(give, values)
     why = list(dict.fromkeys(why))
 
     if not can_field:
@@ -222,7 +252,7 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     return {
         "give": [p.name for p in give], "get": [p.name for p in get],
         "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
-        "market_give": gv, "market_get": rv, "why": why, "verdict": verdict,
+        "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "why": why, "verdict": verdict,
     }
 
 

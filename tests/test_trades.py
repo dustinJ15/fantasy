@@ -1,3 +1,5 @@
+import pytest
+
 from ff.model.trades import evaluate, scan
 from tests.conftest import P
 
@@ -197,3 +199,64 @@ def test_scan_still_sends_a_fair_deal(slots):
     values = {str(i): {"redraft_value": 5000} for i in (2, 3, 4, 18)}
     out = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values)
     assert any(c["sendable"] for c in out if "TEgood" in c["get"])
+
+
+def _out(p, weeks_out, weeks_remaining=12, status="OUT"):
+    p.mu_ros_active = p.mu_ros
+    p.weeks_out = min(weeks_out, weeks_remaining)
+    p.avail_ros = (weeks_remaining - p.weeks_out) / weeks_remaining
+    p.mu_ros = round(p.mu_ros_active * p.avail_ros, 2)
+    p.sources = {"espn_status": status}
+    return p
+
+
+def test_trade_math_sees_the_injury(slots):
+    """Identical per-game value; one is out for the season, one misses a game. The lineup math has to tell them apart."""
+    from ff.model.trades import lineup_strength
+    healthy, _ = lineup_strength(_rosters()[0], slots)
+    one_week = [_out(p, 1) if p.name == "RB1" else p for p in _rosters()[0]]
+    season = [_out(p, 12) if p.name == "RB1" else p for p in _rosters()[0]]
+    assert healthy > lineup_strength(one_week, slots)[0] > lineup_strength(season, slots)[0]
+    assert lineup_strength(one_week, slots)[0] == pytest.approx(healthy - 0.95 * 16 / 12, abs=0.05)
+
+
+def test_scan_offers_a_hurt_starter_at_his_discounted_market_value(slots):
+    """FantasyCalc still prices him healthy. Judged raw, the market floor calls every sell an overpay by me; judged at
+    his availability the deal is sendable, and the caveat rides on the row for Claude to rule on."""
+    mine, theirs = _rosters()
+    mine = [_out(p, 4) if p.name == "RB1" else p for p in mine]          # 16/g, out 4 of 12
+    theirs = [P(22, "TE2", "TE", 9, tid=2) if p.name == "TE2" else p for p in theirs]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    # my healthy RBs are priced out of the ask (the scan keeps one package per rival `get`, and a healthy RB for the TE
+    # would win that slot), so the hurt one is the package on the table
+    values = {"2": {"redraft_value": 4000}, "3": {"redraft_value": 8000}, "4": {"redraft_value": 8000}, "18": {"redraft_value": 3000}}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values)
+    sells = [c for c in out if c["give"] == ["RB1"] and c["get"] == ["TEgood"]]
+    assert sells, [(c["give"], c["get"]) for c in out]
+    c = sells[0]
+    assert c["sendable"] and c["market_give"] == 4000 and c["market_give_eff"] == pytest.approx(4000 * 8 / 12, abs=1)
+    assert any(w.startswith("market still prices RB1 healthy") for w in c["why"])
+    # control: the same package with a healthy RB1 is the overpay the floor exists for
+    healthy = scan(1, {1: _rosters()[0], 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values)
+    ctl = [c for c in healthy if c["give"] == ["RB1"] and c["get"] == ["TEgood"]]
+    assert not ctl or not ctl[0]["sendable"]
+
+
+def test_scan_never_offers_a_season_ender(slots):
+    mine, theirs = _rosters()
+    mine = [_out(p, 12) if p.name == "RB1" else p for p in mine]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={})
+    assert out and all("RB1" not in c["give"] for c in out)
+
+
+def test_evaluate_discounts_my_hurt_player_too(slots):
+    """A rival offering to take my hurt RB off my hands is not a lowball just because the market has not caught up."""
+    mine, theirs = _rosters()
+    mine = [_out(p, 4) if p.name == "RB1" else p for p in mine]
+    by_id = {p.espn_id: p for p in mine + theirs}
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = evaluate(1, 2, [by_id[2]], [by_id[18]], {1: mine, 2: theirs}, slots, repl,
+                   values={"2": {"redraft_value": 4000}, "18": {"redraft_value": 3000}})
+    assert out["market_give"] == 4000 and out["market_give_eff"] < 3000 and out["verdict"] == "accept"
+    assert any("market still prices RB1 healthy" in w for w in out["why"])

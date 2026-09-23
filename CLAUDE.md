@@ -10,11 +10,13 @@ Claude returns *parameters and prose*, never *decisions or state*. Every number 
 ## Morning routine (`/briefing` skill encodes this)
 1. `uv run ff doctor` — stop and tell Dustin if cookies are dead.
 2. `uv run ff sync && uv run ff packet` → `data/packets/<date>.json`.
-3. Read the packet. `shared.injury_watchlist` lists players with ambiguous designations across all my rosters.
+3. Read the packet. `shared.injury_watchlist` lists players with ambiguous designations across all my rosters;
+   `shared.injured` lists the ones out a week or more (or on IR) whose return timeline needs a number.
    WebSearch each one (beat writers, practice reports). Also skim for narrative shifts on my players and top waiver targets
    (committee → bellcow, QB change, coach comments).
-4. Write `overrides.json`: `{"<espn_id>": {"p_zero": 0.15, "mu_mult": 1.1, "note": "..."}}` only where news changes the picture.
-   The `note` is shown next to the player in the email.
+4. Write `overrides.json`: `{"<espn_id>": {"p_zero": 0.15, "mu_mult": 1.1, "weeks_out": 4, "ros_mult": 0.9, "note": "..."}}` only where
+   news changes the picture. `p_zero`/`mu_mult` are this week; `weeks_out` (games, or `"season"`) and `ros_mult` are the rest of the
+   season and decide the hold / IR / drop / trade row for a hurt player. The `note` is shown next to the player in the email.
 5. `uv run ff briefing --overrides overrides.json` → markdown + packet path. Then write `reads.json`
    (`{"L1": {"read": "...", "items": {"<row id>": {"verdict": "do|skip|amend", "note": "..."}}, "paste": "...", "paste_to": "...",
    "reply": "...", "reply_to": "..."}}`): rule on rows in `items` (the ids print in backticks at the end of each briefing.md
@@ -31,7 +33,8 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 `ff incoming` = offers other managers sent me, with an accept/decline/counter verdict (`--json --new-since 40m` is the poller path).
 
 ## Layout
-`src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math, `packet.py` builds the DecisionPacket,
+`src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math (`injuries.py` is the hold / IR / drop / trade
+rule; `mu_ros` is availability-weighted, `mu_ros_active` is per game played), `packet.py` builds the DecisionPacket,
 `report.py` renders markdown (plain-text body) and owns the checklist itself (`todos` builds the rows and their ids,
 `apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id or an unruled trade),
 `email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
@@ -79,6 +82,8 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Agent sent >1 email or investigated git/Gmail history | skill scope drift | SKILL.md step 10 forbids it; tighten wording if it recurs |
 | Email card says do it and Claude's read says don't | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
+| Email says hold a player who is done for the year, or trade/drop one who is back Sunday | `weeks_out` still at its designation default (IR = 4, Out = 1) | the player is in `shared.injured`; write `weeks_out` (or `"season"`) in overrides.json and re-run step 5 |
+| Card says move a player to IR and the app refuses | league's IR eligibility is stricter than `IR_ELIGIBLE` in `model/injuries.py` | `scripts/probe_injuries.py` shows what ESPN says; narrow the constant |
 | Briefing says "could not read pending trades" | ESPN changed `mPendingTransactions` or cookies half-dead | check `pending_trades_error` in the packet; `ff incoming --force` locally |
 | trade-poll workflow red | cookies dead in GitHub secrets, or fire token revoked | update repo secrets; `gh workflow run trade-poll.yml -f window=48h` to test |
 | "Summary of failures for Google Apps Script" naming one or two runs | transient Google backend fault | ignore; the doorbell retries in-run and re-runs the next minute. Apps Script only reports it after 5 consecutive failed runs |

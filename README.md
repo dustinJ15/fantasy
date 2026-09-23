@@ -34,7 +34,8 @@ ambiguous, and hands back two small JSON files:
 ```jsonc
 // overrides.json: parameters, not decisions. Only for players where the news changed the picture.
 {"100": {"p_zero": 0.5,  "note": "Q, DNP Friday; beat writer says game-time decision"},
- "108": {"mu_mult": 1.15, "note": "named the starter after the trade; expect a full workload"}}
+ "108": {"mu_mult": 1.15, "note": "named the starter after the trade; expect a full workload"},
+ "115": {"weeks_out": 6, "note": "high ankle sprain, team says 4-6 weeks; the card decides IR / hold / drop / trade"}}
 
 // reads.json: one or two plain sentences per league, plus a message I can paste to a rival.
 {"demo": {"read": "Decline. They're selling one good back for two of your starters and you're the favorite this week.",

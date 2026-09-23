@@ -89,6 +89,8 @@ class PlayerRow:
     percent_owned: float
     pos_rank: int | None
     bye: bool
+    injured: bool = False           # ESPN's own flag on the player record
+    ir_eligible_raw: bool = False   # ESPN listed the IR slot in eligibleSlots (evidence for whether that is a real signal)
 
 
 def _week_stat(p, week: int, key: str) -> float:
@@ -110,6 +112,7 @@ def roster_rows(league: League, week: int) -> list[PlayerRow]:
                 proj_season=p.projected_total_points,
                 percent_owned=p.percent_owned, pos_rank=p.posRank,
                 bye=(str(week) not in p.schedule) if p.schedule else False,
+                injured=bool(getattr(p, "injured", False)), ir_eligible_raw="IR" in p.eligibleSlots,
             ))
     return rows
 
@@ -126,6 +129,7 @@ def free_agent_rows(league: League, week: int, size: int = 300) -> list[PlayerRo
             proj_season=p.projected_total_points,
             percent_owned=p.percent_owned, pos_rank=p.posRank,
             bye=(str(week) not in p.schedule) if p.schedule else False,
+            injured=bool(getattr(p, "injured", False)), ir_eligible_raw="IR" in p.eligibleSlots,
         ))
     return rows
 

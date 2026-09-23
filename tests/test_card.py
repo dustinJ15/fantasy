@@ -221,3 +221,72 @@ def test_watchlist_drops_players_who_already_played(two_leagues):
 def test_watchlist_puts_starters_first(two_leagues):
     two_leagues["shared"]["injury_watchlist"] = [watch("Bowers", "L1", "note"), watch("Olave", "L1", "note")]
     assert [r["name"] for r in report.watchlist(two_leagues)] == ["Olave", "Bowers"]
+
+
+# ---------- hurt players ----------
+
+def injury(name, verdict, pos="RB", weeks_out=4.0, return_week=7, avail=0.6, fa=("Pickup", 1.2), occupant=None, trades=()):
+    return {"espn_id": 1, "name": name, "pos": pos, "slot": "BE", "weeks_out": weeks_out, "return_week": return_week,
+            "avail_ros": avail, "mu_ros_active": 14.0, "hold_ppw": 3.0, "hold_value": 29.4, "drop_value": 13.8,
+            "back_eff": 9.8, "w_eff": 13.8, "ir_eligible": True, "ir_open": 1, "ir_occupant": occupant,
+            "best_fa": {"name": fa[0], "pos": pos, "delta_over_starter": fa[1]} if fa else None,
+            "trades": list(trades), "market": None, "verdict": verdict, "why": []}
+
+
+def test_each_verdict_is_a_row_with_the_numbers_in_words():
+    lg = league(injuries=[injury("Ankle Guy", "hold"), injury("Knee Guy", "ir", weeks_out=15, return_week=None, avail=0.0),
+                          injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0),
+                          injury("Sell Guy", "trade", trades=[{"rival": "Them", "get": ["Star"]}]),
+                          injury("Back Guy", "activate", weeks_out=1, return_week=4)])
+    rows = by_id(lg)
+    assert rows["injury:ankle-guy"]["label"] == "Hurt (hold)" and "(back wk 7) for 10 games at ~14/g" in rows["injury:ankle-guy"]["text"]
+    assert rows["injury:ankle-guy"]["text"].endswith("hold him")
+    assert "out the season; move him to IR, then add Pickup" in rows["injury:knee-guy"]["text"]
+    assert rows["injury:done-guy"]["label"] == "Hurt (drop)" and "drop him for Pickup (+1.2/wk)" in rows["injury:done-guy"]["text"]
+    assert "the offer to Them for Star ships him" in rows["injury:sell-guy"]["text"] and rows["injury:sell-guy"]["trade_ids"] == ["trade:star"]
+    assert rows["injury:back-guy"]["label"] == "Back (activate)"
+
+
+def test_a_one_game_hold_is_not_a_row():
+    """Out this week and worth keeping is the lineup's business; a row saying "hold him" is just the injury report."""
+    lg = league(injuries=[injury("Ankle Guy", "hold", weeks_out=1.0, return_week=4), injury("Knee Guy", "ir", weeks_out=1.0, return_week=4)])
+    assert ids(lg) == ["injury:knee-guy", "lineup"]
+
+
+def test_ir_swap_names_the_occupant():
+    lg = league(injuries=[injury("Knee Guy", "ir", occupant="Old Stash")])
+    assert "in place of Old Stash" in by_id(lg)["injury:knee-guy"]["text"]
+
+
+def test_the_ir_occupant_is_never_the_drop_candidate():
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), {**player("Stash", ros=0.0), "slot": "IR"}])
+    assert report._drop_candidate(lg) == "Bench WR"
+
+
+def test_a_season_ender_on_the_bench_is_the_drop_candidate():
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Done", ros=0.0)])
+    assert report._drop_candidate(lg) == "Done"
+
+
+def test_read_lint_wants_a_ruling_on_a_drop_but_not_a_hold():
+    p = packet(league(injuries=[injury("Done Guy", "drop"), injury("Ankle Guy", "hold")]))
+    warns = report.read_lint(p, {})
+    assert any("injury:done-guy" in w and "no ruling" in w for w in warns)
+    assert not any("injury:ankle-guy" in w for w in warns)
+    assert not any("injury:done-guy" in w for w in report.read_lint(p, {"L1": {"items": {"injury:done-guy": {"verdict": "skip", "note": "IR-eligible per the app"}}}}))
+
+
+def test_a_skipped_injury_row_is_struck_like_any_other():
+    lg = league(injuries=[injury("Done Guy", "drop")])
+    row = by_id(lg, {"items": {"injury:done-guy": {"verdict": "skip", "note": "he is in a boot, not done"}}})["injury:done-guy"]
+    assert row["ruling"] == "skip" and row["ruling_note"]
+
+
+def test_out_line_merges_leagues_and_carries_the_note():
+    p = packet(league())
+    p["shared"]["injured"] = [{"name": "Olave", "pos": "WR", "team": "NO", "league": "L1", "weeks_out": 4, "return_week": 7, "override_note": None},
+                              {"name": "Olave", "pos": "WR", "team": "NO", "league": "L3", "weeks_out": 6, "return_week": 9, "override_note": "Schefter: 4-6 weeks"}]
+    rows = report.injured_list(p)
+    assert len(rows) == 1 and rows[0]["leagues"] == ["L1", "L3"] and rows[0]["weeks_out"] == 6
+    line = report.injured_line(rows[0])
+    assert "Olave out ~6 wks, back wk 9 (L1, L3)" in line and "Schefter" in line

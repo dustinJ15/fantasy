@@ -15,6 +15,11 @@ def test_end_to_end_synthetic(monkeypatch):
     assert blk["lineup_win"]["p_win"] is not None
     assert abs(sum(o["title_pct"] for o in blk["odds"].values()) - 100) < 2
     assert blk["waivers"] and all(w["bid"] <= blk["faab_remaining"] for w in blk["waivers"])
+    assert blk["settings"]["ir_slots"] == 1 and blk["settings"]["reg_season_weeks"] == 14
+    hurt = {r["name"]: r for r in blk["injuries"]}
+    ir_guy = next(p for p in blk["roster"] if p["sources"]["espn_status"] == "INJURY_RESERVE")
+    assert ir_guy["weeks_out"] == 4 and ir_guy["mu_ros"] < ir_guy["mu_ros_active"] and hurt[ir_guy["name"]]["verdict"] == "ir"
+    assert any(x["kind"] == "injury" for x in report.todos(blk))
     packet = {"version": PACKET_VERSION, "generated": "2026-09-10T07:00:00", "season": 2026,
               "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": []},
               "leagues": [blk]}
@@ -34,7 +39,12 @@ def test_end_to_end_synthetic(monkeypatch):
     assert "## Incoming offers" in md and "Your open offers" in md
     short = report.render(packet, reads={"demo": {"reply": "thanks but no", "reply_to": rival2}}, only_incoming=True)
     assert short.startswith("# FF trade offer") and f"Reply to {rival2}" in short and "## Waivers" not in short
-    # overrides flow through
+    # overrides flow through, including the season horizon into the research list
+    done = {str(ir_guy["espn_id"]): {"weeks_out": "season", "note": "torn ACL"}}
+    blk3 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=done, sims=100)
+    gone = next(p for p in blk3["roster"] if p["espn_id"] == ir_guy["espn_id"])
+    assert gone["mu_ros"] == 0 and gone["return_week"] is None and gone["sources"]["weeks_out_source"] == "override"
+    assert {r["verdict"] for r in blk3["injuries"] if r["espn_id"] == ir_guy["espn_id"]} == {"ir"}
     pid = str(blk["roster"][0]["espn_id"])
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)
     assert blk2["roster"][-1]["espn_id"] == int(pid) or any(r["espn_id"] == int(pid) and r["p_zero"] == 1.0 for r in blk2["roster"])

@@ -29,7 +29,8 @@ FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-
 TEXT, MUTED, BORDER, PAGE, CARD, ZEBRA = "#1f2933", "#6b7280", "#e3e6ea", "#eef0f3", "#ffffff", "#f6f7f9"
 LABELS = {"waiver": ("WAIVER", "info"), "waiver_up": ("WAIVER", "info"), "stream": ("STREAM", "info"),
           "lineup": ("LINEUP", "move"), "trade": ("TRADE", "good"), "trade_in": ("OFFER", "warn"),
-          "sent": ("SENT", "grey"), "cover": ("COVER", "bad")}
+          "sent": ("SENT", "grey"), "cover": ("COVER", "bad"), "injury": ("HURT", "warn")}
+INJURY_BADGE = {"ir": ("IR", "info"), "hold": ("HOLD", "warn"), "drop": ("DROP", "bad"), "trade": ("TRADE", "warn"), "activate": ("ACTIVATE", "info")}
 VERDICT_TONE = {"accept": "good", "decline": "bad", "counter": "warn"}
 
 
@@ -109,6 +110,8 @@ def _status_cell(p: dict) -> str:
         tone = "good" if g.startswith("A") else ("info" if g.startswith("B") else ("warn" if g.startswith("C") else "grey"))
         bits.append(_badge(g, tone))
     notes = []
+    if (p.get("weeks_out") or 0) >= 1:
+        notes.append(f"back wk {p['return_week']}" if p.get("return_week") else "out for the season")
     if p["sources"].get("sleeper_notes") and st:
         notes.append(str(p["sources"]["sleeper_notes"]))
     if p["sources"].get("override_note"):
@@ -162,6 +165,8 @@ def _todo_rows(lg: dict, r: dict) -> tuple[str, bool]:
         if t["kind"] == "trade_in":
             tone = VERDICT_TONE[t["verdict"]]
             label = report.VERDICT_WORD[t["verdict"]] + " OFFER"
+        if t["kind"] == "injury":
+            label, tone = INJURY_BADGE[t["verdict"]]
         skip = t.get("ruling") == "skip"
         if skip:
             label, tone = "SKIP", "grey"
@@ -226,6 +231,18 @@ def _shared(packet: dict) -> str:
                 s += f" — {_e(w['override_note'])}"
             items.append(s)
         parts.append(_h("Watch") + "<div style='font-size:13px;line-height:1.7'>" + "<br>".join(items) + "</div>")
+    hurt = report.injured_list(packet)
+    if hurt:
+        items = []
+        for w in hurt:
+            where = ", ".join(w.get("leagues") or [w["league"]])
+            when = "SEASON" if w.get("return_week") is None and (w.get("weeks_out") or 0) >= 4 else f"~{w['weeks_out']:.0f} WK"
+            s = f"{_badge(when, 'bad')} <b>{_e(w['name'])}</b> <span style='color:{MUTED}'>({_e(w['pos'])}, {_e(where)}" \
+                + (f", back wk {w['return_week']}" if w.get("return_week") else "") + ")</span>"
+            if w.get("override_note"):
+                s += f" — {_e(w['override_note'])}"
+            items.append(s)
+        parts.append(_h("Out") + "<div style='font-size:13px;line-height:1.7'>" + "<br>".join(items) + "</div>")
     if sh["exposure"]:
         parts.append(_h("Exposure") + _muted(", ".join(f"<b>{_e(k)}</b> ({', '.join(map(_e, v))})" for k, v in sh["exposure"].items())))
     if not parts:
