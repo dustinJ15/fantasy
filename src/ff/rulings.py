@@ -103,7 +103,9 @@ def record_pushes(packet: dict, reads: dict, path: Path = PUSHES_PATH, today: da
                     cur["status"], cur["closed"], cur["skip_note"] = "skipped", today.isoformat(), row.get("ruling_note")
                     events.append(f"{key}: skipped")
                 continue
-            if row.get("ruling") == "push" or row.get("must_try"):
+            if row.get("ruling") == "push" or row.get("push"):  # `push` on the row: the math flagged it, or it is remembered
+                if cur and cur.get("status") in ("sent", "skipped") and cur.get("closed") == today.isoformat():
+                    continue  # closed this morning (sent, or skipped with a reason): the same row does not reopen it
                 if cur and cur.get("status") == "open":
                     cur["last"] = today.isoformat()
                     if row.get("ruling") == "push" and row.get("ruling_note"):
