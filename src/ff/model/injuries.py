@@ -22,6 +22,7 @@ IR_ELIGIBLE = {"INJURY_RESERVE", "IR", "OUT"}
 DROP_MARGIN = 3.0
 DROP_RATIO = 0.25
 NOT_DROPPABLE = ("K", "D/ST")
+ONE_STARTER = ("QB", "K", "D/ST")
 # A bench player is mostly insurance: he starts in the weeks a starter is hurt or on bye. Count a quarter of his margin
 # over the wire (the position's replacement level) for that, on top of any lineup spot he wins outright. Without this
 # term a hurt backup and the best pickup both score 0 against the starting lineup and the rule can never drop anyone.
@@ -70,7 +71,10 @@ def fill_spot(p: PlayerProj | None, waivers: list[dict], handcuffs: list[dict], 
     handcuff for one of my RB1s, else the best body at his position by the waiver score, else the best body on the
     wire. `used` keeps two spots from naming the same player."""
     skill = [w for w in waivers if not w.get("streamer") and w["name"] not in used]
-    fit = [w for w in skill if p is not None and (w.get("slot") in p.eligible or w.get("pos") == p.pos)]
+    # Like for like only at the flex positions. A backup at a one-starter position (QB, K, D/ST) is near-worthless
+    # in a bench spot, so losing one is no reason to add another; the best skill body on the wire is.
+    fit = [w for w in skill if p is not None and p.pos not in ONE_STARTER
+           and (w.get("slot") in p.eligible or w.get("pos") == p.pos)]
     best = max(fit or skill, key=fa_ppw) if (fit or skill) else None
     if best and fa_ppw(best) > 0:
         return {"name": best["name"], "pos": best["pos"], "kind": "upgrade", "why": f"+{fa_ppw(best):.1f}/wk"}
@@ -78,7 +82,8 @@ def fill_spot(p: PlayerProj | None, waivers: list[dict], handcuffs: list[dict], 
                key=lambda h: h.get("est_value", 0), default=None)
     if cuff:
         return {"name": cuff["handcuff"], "pos": "RB", "kind": "handcuff", "why": f"handcuff for {cuff['starter']}"}
-    body = max(fit, key=lambda w: w.get("score", 0), default=None) or max(skill, key=lambda w: w.get("score", 0), default=None)
+    by_score = lambda w: (w.get("score", 0), w.get("mu_ros", 0))  # the waiver score ties at the trend cap; per-game breaks it
+    body = max(fit, key=by_score, default=None) or max(skill, key=by_score, default=None)
     if body:
         return {"name": body["name"], "pos": body["pos"], "kind": "depth", "why": "best body on the wire, depth only"}
     return None

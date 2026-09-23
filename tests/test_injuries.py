@@ -210,3 +210,14 @@ def test_an_open_spot_with_no_player_leaving_still_gets_a_name():
     assert fill_spot(None, [depth_fa("Body B")], cuffs, set())["name"] == "Backup"
     assert fill_spot(None, [depth_fa("Body B")], cuffs, {"Backup"})["name"] == "Body B"
     assert fill_spot(None, [], [], set()) is None
+
+
+def test_a_dropped_backup_qb_is_replaced_by_the_best_skill_body_not_another_qb():
+    from ff.model.injuries import fill_spot
+    qb2 = P(99, "QB2", "QB", 12)
+    pool = [dict(depth_fa("Some QB", pos="QB", score=1.5), mu_ros=8.0), dict(depth_fa("Better QB", pos="QB", score=1.5), mu_ros=16.0),
+            dict(depth_fa("Skill WR", pos="WR", score=5.0), mu_ros=10.0)]
+    assert fill_spot(qb2, pool, [], set())["name"] == "Skill WR"
+    rb = P(98, "RB4", "RB", 6)
+    tied = [dict(depth_fa("Low RB", score=1.5), mu_ros=5.0), dict(depth_fa("High RB", score=1.5), mu_ros=9.0)]
+    assert fill_spot(rb, tied, [], set())["name"] == "High RB"
