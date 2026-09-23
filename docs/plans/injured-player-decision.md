@@ -1,6 +1,7 @@
 # Plan: what to do with an injured player (hold / IR / drop / trade)
 
-Status: plan only, nothing implemented. Written 2026-09-23 against `main` at 72ee11c (75 tests passing).
+Status: implemented in the same PR, under the recommendation on each open question below. Written 2026-09-23 against
+`main` at 72ee11c (75 tests passing); two things moved during the build and are noted under **Deviations** at the end.
 Every finding below was re-run in this checkout with a probe script; the container had no ESPN cookies, no
 `leagues.toml` and no `data/cache`, so anything that needs a live ESPN pull is marked **needs live pull**.
 
@@ -396,3 +397,19 @@ Each has a recommendation so the work can start under it; the answer changes the
   `rank_free_agents`.
 - Handcuff logic. When my RB1 is hurt his backup's own projection already rises at the source, so the backup
   surfaces through the normal waiver ranking.
+
+## Deviations from the plan as built
+
+- **A one-game `hold` is not a row.** A bench player out this week and worth keeping produced "hold him" rows that
+  were just the injury report; `report._injury_items` skips `hold` when `weeks_out < 2`. He still appears in
+  `shared.injured` and on the across-leagues Out line, and `ir` / `drop` / `trade` / `activate` show at any length.
+- **The market discount is `max(avail_ros, 0.25)` on the give side only**, applied in both `scan` and `evaluate`
+  (an offer that takes a hurt player off my hands should not read as a lowball either). The scan still keeps one
+  package per rival `get`, so a healthy player who fits the same ask outranks the hurt one; the sell only surfaces
+  when the hurt player is the piece that fits, which is the honest answer.
+- **`ros_mult` instead of reordering** the override block, as recommended; `mu_mult` is unchanged.
+- **The `proj_season` question is untouched** (open question 7) and `scripts/probe_injuries.py` is the live pull that
+  settles it and the IR-eligibility signal; `PlayerRow` now keeps `injured` and `ir_eligible_raw` so the next
+  snapshot carries the evidence.
+- Step 7's README screenshots were not regenerated here (`scripts/screenshots.sh` needs a browser); the demo league
+  does carry an IR stash and an Out player so `ff briefing --demo` shows the row.

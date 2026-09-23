@@ -8,6 +8,9 @@ dominant, which the model attributes to variance.
 - **Win-probability lineups**: maximizes P(beat this week's opponent), not expected points. Favorites get floor, underdogs get ceiling, automatically.
 - **Injury-aware distributions + Claude research**: designation → probability of a zero, adjusted by morning news.
 - **Monte Carlo season sim**: consistent title-odds yardstick for every decision.
+- **Hurt players get a verdict**: `weeks_out` (designation default, Claude's research overrides) nets games missed out of every
+  rest-of-season number, and `model/injuries.py` says IR-stash, trade, drop or hold with the weeks weighted by playoff odds.
+  Design and the open calls: `docs/plans/injured-player-decision.md`.
 
 ## Projection sourcing (decided 2026-09-10, research-backed)
 - Equal-weight mean of stat-based sources: ESPN (Mike Clay) + Sleeper (Rotowire). FantasyPros rank-to-points is a fallback

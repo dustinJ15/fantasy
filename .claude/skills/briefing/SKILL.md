@@ -14,6 +14,10 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    `timeout` set to 600000 (ms) so it is not cut off. Note the packet path it prints and read that JSON.
 3. Research (WebSearch), in this order, spending at most ~10 searches total:
    - every entry in `shared.injury_watchlist` (latest practice report / beat-writer status),
+   - every entry in `shared.injured` (players out for a week or more, or on IR): how many more games he misses, from a
+     team statement or beat writer. Skip the search when its `notes` (Sleeper) already says ("out for the season",
+     "placed on IR, eligible to return week 9"). The packet's `weeks_out` is a designation default (IR = 4) until you
+     write a real number,
    - each starter in any league's `lineup_win.slots` whose flags include QUESTIONABLE/DOUBTFUL/OUT or `sleeper:`,
    - the top 3 waiver targets per league (is the role change real?),
    - every player named in any league's `incoming_trades` (an offer someone sent Dustin; the packet already has a verdict).
@@ -21,8 +25,13 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    Mon = only Monday-night players can still move (each league's `week_state` in the packet says the phase, the score so
    far, and who is left to play); do not research or suggest lineup changes for players marked `locked`.
 4. Write `overrides.json` at repo root containing only players where news moves the picture:
-   `{"<espn_id>": {"p_zero": <0-1>, "mu_mult": <0.5-1.5>, "note": "<source + one-line reason>"}}`
+   `{"<espn_id>": {"p_zero": <0-1>, "mu_mult": <0.5-1.5>, "weeks_out": <games or "season">, "ros_mult": <0.5-1.5>, "note": "<source + one-line reason>"}}`
+   `p_zero` and `mu_mult` are this week only. `weeks_out` and `ros_mult` are the rest of the season and drive the
+   hold / IR / drop / trade row for a hurt player; write `weeks_out` for every `shared.injured` entry you researched.
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
+   weeks_out guide: IR 4 unless the report says longer; `"season"` for an ACL, Achilles or season-ending surgery;
+   suspension = games announced; count from this week (an Out this week with a return next week is 1).
+   ros_mult only for a changed role or a diminished return (hamstring at 85%), not for this week's snap count.
    If nothing changed, write `{}`.
 5. `uv run ff briefing --overrides overrides.json --sims 2000 --out briefing.md` (also 3-5 minutes; timeout 600000).
    Read briefing.md and note the packet path printed on the last line (`packet data/packets/<date>.json`).
@@ -40,8 +49,10 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    - `do` is confirmation, and is the only verdict that needs no note.
    The card is the model's math and your read is judgment; they are allowed to disagree, but the email has to end with
    one answer per row, not a card saying do it and a paragraph underneath saying don't. Every `trade` row needs a
-   verdict — the card lists up to three and Dustin cannot tell which one you meant otherwise. `ff render-email`
-   warns about a typo'd id, a missing reason and an unruled trade; fix reads.json and re-run before sending.
+   verdict — the card lists up to three and Dustin cannot tell which one you meant otherwise. So does every
+   `injury:` row whose label is `Hurt (drop)` or `Hurt (trade)`: a drop is final, and its biggest input is your
+   `weeks_out`. `ff render-email` warns about a typo'd id, a missing reason and an unruled trade or drop; fix
+   reads.json and re-run before sending.
    Leave `read` for what is genuinely new: the news, the practice report, the thing the model has no column for.
    If it only repeats a row's verdict, drop it.
    Do NOT edit briefing.md or the HTML by hand. If research changes a player's availability (ruled out, a role change),
