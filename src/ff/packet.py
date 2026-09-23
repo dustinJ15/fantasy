@@ -10,6 +10,7 @@ from .config import PACKET_DIR, LeagueRef, env, leagues
 from .ids import Crosswalk
 from .model import usage as usage_mod
 from .model.clock import apply_clock, week_state
+from .model.injuries import decide as decide_injuries
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
@@ -18,7 +19,7 @@ from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
 from .sources import espn, fantasycalc, sleeper, vegas, weather
 
-PACKET_VERSION = 4
+PACKET_VERSION = 5
 AMBIGUOUS = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE"}
 
 
@@ -31,7 +32,7 @@ def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
 
 
 def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining: int, overrides: dict | None,
-           sl_proj: dict | None = None, lines: dict | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
+           sl_proj: dict | None = None, lines: dict | None = None, week: int | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
     ppr = snap["settings"].get("ppr", 1.0)
     key = "pts_ppr" if ppr >= 0.75 else ("pts_half_ppr" if ppr > 0 else "pts_std")
     sl_proj, lines = sl_proj or {}, lines or {}
@@ -48,9 +49,19 @@ def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining
             spts = float(sp[key]) if sp and sp.get(key) is not None else None
             ln = lines.get(r["team"]) or {}
             out.append(blend(r, fp, inj.get(str(r["espn_id"])), weeks_remaining, overrides,
-                             sleeper_pts=spts, implied_total=ln.get("implied")))
+                             sleeper_pts=spts, implied_total=ln.get("implied"), week=week))
         return out
     return mk(snap["roster"]), mk(snap["free_agents"])
+
+
+def injured_entry(p: dict, league: str) -> dict:
+    """One row of `shared.injured`, the research list for return timelines: Claude's `weeks_out` override lands here."""
+    src = p["sources"]
+    return {"name": p["name"], "pos": p["pos"], "team": p["team"], "league": league, "espn_id": p["espn_id"],
+            "espn_status": src.get("espn_status"), "sleeper_status": src.get("sleeper_status"),
+            "sleeper_roster_status": src.get("sleeper_roster_status"), "body_part": src.get("body_part"), "notes": src.get("sleeper_notes"),
+            "weeks_out": p["weeks_out"], "weeks_out_source": src.get("weeks_out_source"), "return_week": p.get("return_week"),
+            "slot": p.get("slot"), "override_note": src.get("override_note")}
 
 
 def _ms_iso(ms) -> str | None:
@@ -74,7 +85,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     total_weeks = len(s["matchup_periods"])
     weeks_remaining = max(total_weeks - week + 1, 1)
     my_id = snap["my_team_id"]
-    rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines)
+    rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines, week=week)
     apply_clock(rostered, snap["roster"], lines or {}, now)
     apply_clock(fas, snap["free_agents"], lines or {}, now, free_agents=True)
     pool = rostered + fas
@@ -129,7 +140,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     # waivers
     my_lineup_ros = optimize([p.ros() for p in mine], slots, objective="ev")
     my_lineup = my_lineup_ros.assignment
-    my_bench = my_lineup_ros.bench
+    # Dropping an IR occupant frees an IR slot, not a bench spot, so he is not the bench a pickup competes with.
+    my_bench = [p for p in my_lineup_ros.bench if p.slot != "IR"]
     if s["faab"]:
         budget = s["faab_budget"] - teams[my_id]["faab_spent"] if my_id in teams else 0
         rival_max = max((s["faab_budget"] - t["faab_spent"] for tid, t in teams.items() if tid != my_id), default=None)
@@ -157,6 +169,12 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=1500, seed=11)
         c["my_title_delta"] = round(o2[my_id]["title_pct"] - odds[my_id]["title_pct"], 1)
         c["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
+
+    # hurt players: IR / trade / drop / hold, from the waiver and trade results above
+    me_odds = odds.get(my_id) or {}
+    injuries = decide_injuries(mine, slots, week, weeks_remaining, s["reg_season_weeks"], me_odds.get("playoff_pct"),
+                               s.get("ir_slots", 0), waivers, trades, values,
+                               {p.espn_id for ps in win_lu.assignment.values() for p in ps}) if my_id else []
 
     # offers other managers sent me (and mine still open), from ESPN's pending transactions
     incoming, outgoing = [], []
@@ -196,7 +214,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     rival_needs = {tid: needs(ps, slots, repl) for tid, ps in by_team.items() if tid != my_id}
     return {
         "name": snap["ref"]["name"], "league_name": s["name"], "week": week, "weeks_remaining": weeks_remaining,
-        "settings": {k: s[k] for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr")},
+        "settings": {k: s.get(k) for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr",
+                                           "reg_season_weeks", "ir_slots", "bench_slots")},
         "my_team_id": my_id, "my_record": f"{teams[my_id]['wins']}-{teams[my_id]['losses']}" if my_id in teams else None,
         "week_state": wstate,
         "faab_remaining": budget if s["faab"] else None,
@@ -207,7 +226,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "current_lineup_mu": round(cur_mu, 1),
         "lineup_ev": ev_lu.to_dict(), "lineup_win": win_lu.to_dict(), "lineup_diff": compare(ev_lu, win_lu),
         "replacement": repl,
-        "waivers": waivers, "handcuffs": cuffs, "trades": trades,
+        "waivers": waivers, "handcuffs": cuffs, "trades": trades, "injuries": injuries,
         "incoming_trades": incoming, "outgoing_trades": outgoing,
         "pending_trades_error": snap.get("pending_trades_error"),
         "odds": {str(tid): {**o, "name": teams[tid]["name"], "record": f"{teams[tid]['wins']}-{teams[tid]['losses']}", "is_me": tid == my_id} for tid, o in odds.items()},
@@ -245,7 +264,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     except Exception:
         sl_proj = {}
 
-    league_blocks, watch, exposure = [], [], defaultdict(list)
+    league_blocks, watch, injured, exposure = [], [], [], defaultdict(list)
     for ref in leagues(only):
         snap = league_snapshot(ref, force)
         wk = int(snap.get("week") or 0)
@@ -260,6 +279,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
                 watch.append({"name": p["name"], "pos": p["pos"], "team": p["team"], "league": ref.name, "status": st,
                               "notes": p["sources"].get("sleeper_notes"), "espn_id": p["espn_id"], "p_zero": p["p_zero"],
                               "override_note": p["sources"].get("override_note"), "locked": p.get("locked", False)})
+            if p.get("weeks_out", 0) >= 1 or p.get("slot") == "IR":
+                injured.append(injured_entry(p, ref.name))
             ln = lines.get(p["team"])
             if ln:
                 p["odds_line"] = {"opp": ln["opp"], "implied": ln["implied"], "spread": ln["spread"], "total": ln["total"], "kickoff": ln["kickoff"]}
@@ -271,6 +292,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
         "version": PACKET_VERSION, "generated": datetime.now().isoformat(timespec="seconds"), "season": e.season,
         "shared": {
             "injury_watchlist": watch,
+            "injured": injured,
             "exposure": {k: v for k, v in exposure.items() if len(v) > 1},
             "trending_adds": [{"espn_id": k, "count": v} for k, v in sorted(trending.items(), key=lambda kv: -kv[1])[:15]],
             "usage_error": usage_err, "unmatched_ids": xw.unmatched[:50],

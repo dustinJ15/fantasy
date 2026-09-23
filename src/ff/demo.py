@@ -12,7 +12,7 @@ from datetime import date, datetime
 from unittest.mock import patch
 
 from .config import PACKET_DIR
-from .packet import PACKET_VERSION, analyze_league, fantasycalc
+from .packet import PACKET_VERSION, analyze_league, fantasycalc, injured_entry
 
 # Fictional people and fictional franchises. Any resemblance to a real player is a coincidence and a bad omen.
 FIRST = ["Marcus", "Dontae", "Kellen", "Jalen", "Trey", "Deshawn", "Cole", "Rashad", "Tyrek", "Amari", "Brody", "Darius", "Zeke",
@@ -69,6 +69,12 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
                                "proj_week": round(mu, 1), "actual_week": 0, "proj_season": round(mu * 16, 1), "percent_owned": 90.0,
                                "pos_rank": i + 1, "bye": False})
                 pid += 1
+    # Two hurt players on my side so the card shows the hurt-player row: my fourth WR went on NFL injured reserve with a
+    # knee (ESPN zeroes his weekly projection) and is still sitting on my bench, and my third RB is out this week.
+    def mine_at(pos: str, i: int) -> dict:
+        return [r for r in roster if r["fantasy_team_id"] == 1 and r["pos"] == pos][i]
+    mine_at("WR", 3).update(injury_status="INJURY_RESERVE", proj_week=0.0)
+    mine_at("RB", 2).update(injury_status="OUT")
     fas = []
     for _ in range(40):
         pos = rng.choice(["RB", "WR", "TE", "QB", "K", "D/ST"])
@@ -118,8 +124,10 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
 def analyze(snap: dict | None = None, overrides: dict | None = None, sims: int = 300) -> dict:
     """analyze_league over the synthetic snapshot with the market lookup stubbed out."""
     snap = snap or make_snapshot()
+    inj = {str(r["espn_id"]): {"status": "IR", "roster_status": "Injured Reserve", "body_part": "Knee", "notes": "Placed on IR (knee); eligible to return in four weeks"}
+           for r in snap["roster"] if r.get("injury_status") == "INJURY_RESERVE"}
     with patch.object(fantasycalc, "by_espn_id", lambda **kw: {}):
-        return analyze_league(snap, FakeCrosswalk(), {}, {}, {}, {}, overrides, sims)
+        return analyze_league(snap, FakeCrosswalk(), {}, inj, {}, {}, overrides, sims)
 
 
 def build_packet(overrides_path: str | None = None, sims: int = 300, write: bool = True) -> dict:
@@ -129,6 +137,7 @@ def build_packet(overrides_path: str | None = None, sims: int = 300, write: bool
     packet = {
         "version": PACKET_VERSION, "generated": datetime.now().isoformat(timespec="seconds"), "season": 2026, "demo": True,
         "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": [],
+                   "injured": [injured_entry(p, blk["name"]) for p in blk["roster"] if p.get("weeks_out", 0) >= 1 or p.get("slot") == "IR"],
                    "pending_trades_error": None, "incoming_trade_count": len(blk["incoming_trades"])},
         "leagues": [blk],
     }

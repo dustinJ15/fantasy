@@ -14,6 +14,8 @@ def _flags(p: dict) -> str:
     g = p["sources"].get("grade")
     if g:
         f.append(g)
+    if (p.get("weeks_out") or 0) >= 1:
+        f.append(f"out ~{p['weeks_out']:.0f}w" + (f", back wk {p['return_week']}" if p.get("return_week") else " (season)"))
     return ", ".join(f)
 
 
@@ -45,9 +47,13 @@ def _lineup_changes(lg: dict) -> list[str]:
 
 
 def _drop_candidate(lg: dict) -> str | None:
-    """Weakest bench player by ROS value who isn't a K/DST starter or injured stash worth keeping."""
+    """Weakest bench player by rest-of-season value, skipping K/DST and the IR slot.
+
+    `mu_ros` already nets out the games a hurt player will miss, so a season-ender is the cheapest cut and a
+    four-week stash is not. The IR occupant is skipped because dropping him frees an IR slot, not a bench spot.
+    """
     starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
-    bench = [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST")]
+    bench = [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"]
     if not bench:
         return None
     return min(bench, key=lambda p: p["mu_ros"])["name"]
@@ -138,9 +144,53 @@ def _cover_items(lg: dict) -> list[dict]:
     return out
 
 
+INJURY_LABEL = {"ir": "Hurt (IR)", "hold": "Hurt (hold)", "drop": "Hurt (drop)", "trade": "Hurt (trade)", "activate": "Back (activate)"}
+# Verdicts that move a player off the roster or out the door: Claude has to rule on them, like trade rows.
+INJURY_NEEDS_RULING = ("drop", "trade")
+
+
+def _weeks(r: dict) -> str:
+    if r.get("return_week") is None and (r.get("avail_ros") or 0) == 0:
+        return "the season"
+    return f"~{r['weeks_out']:.0f} wk{'s' if r['weeks_out'] >= 1.5 else ''}"
+
+
+def _injury_items(lg: dict, drop: str | None) -> list[dict]:
+    """One row per hurt player, the verb decided by `model.injuries`; this only puts words on the numbers."""
+    out = []
+    for r in lg.get("injuries") or []:
+        who, v = f"{r['name']} ({r['pos']})", r["verdict"]
+        if v == "hold" and r["weeks_out"] < 2:
+            continue  # out one game and worth keeping: the lineup row already handles him, this would be the injury report
+        back = f" (back wk {r['return_week']})" if r.get("return_week") else ""
+        fa = r.get("best_fa")
+        if v == "ir":
+            text = f"{who} is out {_weeks(r)}{back}; move him to IR"
+            if r.get("ir_occupant"):
+                text += f" in place of {r['ir_occupant']}"
+            elif fa and fa["delta_over_starter"] > 0:
+                text += f", then add {fa['name']} on the freed spot"
+        elif v == "activate":
+            text = f"{who} is back; move him off IR" + (f" and drop {drop}" if drop and drop != r["name"] else "")
+        elif v == "drop":
+            text = f"{who} is out {_weeks(r)} and worth ~{r['hold_value']:.0f} pts the rest of the way; drop him"
+            if fa and fa["delta_over_starter"] > 0:
+                text += f" for {fa['name']} (+{fa['delta_over_starter']:.1f}/wk)"
+        elif v == "trade":
+            t = r["trades"][0]
+            text = f"{who} is out {_weeks(r)}{back}; the offer to {t['rival']} for {', '.join(t['get'])} ships him, else hold"
+        else:
+            games = f"{r['back_eff']:.0f} game{'s' if r['back_eff'] >= 1.5 else ''}"
+            text = f"{who} is out {_weeks(r)}{back} for {games} at ~{r['mu_ros_active']:.0f}/g"
+            text += f"; {r['why'][0]}, hold him" if r.get("why") else "; hold him"
+        out.append({"kind": "injury", "id": f"injury:{slug(r['name'])}", "label": INJURY_LABEL[v], "verdict": v, "text": text,
+                    "trade_ids": [f"trade:{slug('-'.join(t['get']))}" for t in r.get("trades") or []]})
+    return out
+
+
 def todos(lg: dict) -> list[dict]:
     """The literal things to do today in one league. Each item: {id, kind, label, text, moves?}.
-    kind ∈ trade_in | sent | waiver | waiver_up | stream | cover | lineup | trade. Shared by both renderers.
+    kind ∈ trade_in | sent | waiver | waiver_up | stream | cover | injury | lineup | trade. Shared by both renderers.
 
     `id` is stable for a given packet, so reads.json can rule on one row by name instead of arguing with the
     whole card in prose. Player names make the ids readable and are unique within a league.
@@ -170,6 +220,7 @@ def todos(lg: dict) -> list[dict]:
         out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
                     "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
     out += _cover_items(lg)
+    out += _injury_items(lg, drop)
     ph = (lg.get("week_state") or {}).get("phase", "pre")
     ch = _lineup_changes(lg) if ph != "final" else []
     if ph == "final":
@@ -280,9 +331,30 @@ def watchlist(packet: dict) -> list[dict]:
     return sorted(rows.values(), key=lambda r: (not r["starting"], -(r["p_zero"] or 0.0), r["name"]))
 
 
+def injured_list(packet: dict) -> list[dict]:
+    """Cross-league return timelines, one row per player, longest absence first."""
+    rows: dict[str, dict] = {}
+    for w in packet["shared"].get("injured") or []:
+        r = rows.get(w["name"])
+        if r is None:
+            r = rows[w["name"]] = {**w, "leagues": []}
+        r["leagues"].append(w["league"])
+        r["override_note"] = r.get("override_note") or w.get("override_note")
+        if (w.get("weeks_out") or 0) > (r.get("weeks_out") or 0):
+            r["weeks_out"], r["return_week"] = w["weeks_out"], w.get("return_week")  # the longer absence sets the date
+    return sorted(rows.values(), key=lambda r: (-(r["weeks_out"] or 0), r["name"]))
+
+
 def watch_line(w: dict) -> str:
     """One watchlist entry with the override note (Claude's research) if there is one."""
     s = f"{w['name']} {w['status'].title()} ({', '.join(w.get('leagues') or [w['league']])})"
+    return s + (f" — {w['override_note']}" if w.get("override_note") else "")
+
+
+def injured_line(w: dict) -> str:
+    when = "the season" if w.get("return_week") is None and (w.get("weeks_out") or 0) >= 4 else f"~{w['weeks_out']:.0f} wk{'s' if w['weeks_out'] >= 1.5 else ''}"
+    back = f", back wk {w['return_week']}" if w.get("return_week") else ""
+    s = f"{w['name']} out {when}{back} ({', '.join(w.get('leagues') or [w['league']])})"
     return s + (f" — {w['override_note']}" if w.get("override_note") else "")
 
 
@@ -348,6 +420,8 @@ def read_lint(packet: dict, reads: dict | None) -> list[str]:
         for key, x in known.items():
             if x["kind"] == "trade" and key not in ruled:
                 out.append(f"{name}.items['{key}']: trade row has no ruling (do / skip / amend)")
+            if x["kind"] == "injury" and x.get("verdict") in INJURY_NEEDS_RULING and key not in ruled:
+                out.append(f"{name}.items['{key}']: {x['verdict']} verdict on a hurt player has no ruling (do / skip / amend)")
     return out
 
 
@@ -389,6 +463,9 @@ def action_card(packet: dict, reads: dict | None = None, show_ids: bool | None =
     watch = watchlist(packet)
     if watch:
         L.append("**Watch:** " + "; ".join(watch_line(w) for w in watch))
+    hurt = injured_list(packet)
+    if hurt:
+        L.append("**Out:** " + "; ".join(injured_line(w) for w in hurt))
     if sh["exposure"]:
         L.append("**Exposure:** " + ", ".join(f"{k} ({len(v)}x)" for k, v in sh["exposure"].items()))
     return "\n".join(line if (not line or line.startswith("#") or line.startswith("- ")) else line + "  " for line in L)
