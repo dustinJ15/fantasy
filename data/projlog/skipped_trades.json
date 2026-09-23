@@ -1,0 +1,66 @@
+{
+ "L1|Tyler Shough": {
+  "date": "2026-09-23",
+  "league": "L1",
+  "rival": "CTESPN",
+  "give": [
+   "Justin Herbert"
+  ],
+  "get": [
+   "Tyler Shough"
+  ],
+  "note": "Shough is two starts into the job. Herbert's floor is worth more than a paper edge, not selling him for a hot streak"
+ },
+ "L1|Nico Collins": {
+  "date": "2026-09-23",
+  "league": "L1",
+  "rival": "The fUNCtion",
+  "give": [
+   "Jalen Coker",
+   "Travis Etienne Jr."
+  ],
+  "get": [
+   "Nico Collins"
+  ],
+  "note": "same Etienne as the Allen deal, and Allen is the one worth chasing"
+ },
+ "L2|Zay Flowers": {
+  "date": "2026-09-23",
+  "league": "L2",
+  "rival": "Let me see your TDs ",
+  "give": [
+   "Parker Washington",
+   "Sam LaPorta"
+  ],
+  "get": [
+   "Zay Flowers"
+  ],
+  "note": "same Parker Washington as the Chase deal, and Chase is the bigger prize"
+ },
+ "L2|Josh Allen": {
+  "date": "2026-09-23",
+  "league": "L2",
+  "rival": "Mikiko Squad",
+  "give": [
+   "Drake Maye",
+   "Trey McBride"
+  ],
+  "get": [
+   "Josh Allen"
+  ],
+  "note": "with Daniels on IR I'm not shipping Maye, that leaves Mariota-level QB play for a month"
+ },
+ "L3|Josh Allen": {
+  "date": "2026-09-23",
+  "league": "L3",
+  "rival": "Down Bad",
+  "give": [
+   "Chris Olave",
+   "Quinshon Judkins"
+  ],
+  "get": [
+   "Josh Allen"
+  ],
+  "note": "same Judkins as the Mahomes deal, pick Mahomes"
+ }
+}
