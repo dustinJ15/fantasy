@@ -170,3 +170,81 @@ def test_a_skipped_trade_is_remembered_for_two_weeks(tmp_path):
     assert len(rulings.drop_recently_skipped(cands, skips, "L1", today=date(2026, 10, 30))) == 2   # memory expires
     assert len(rulings.drop_recently_skipped(cands, skips, "L2", today=date(2026, 9, 30))) == 2    # per league
     assert rulings.record_skips(packet, {"L1": {"items": {"trade:kai": "do"}}}, path, today=date(2026, 9, 23)) == []
+
+
+# ---------- pushes: keep asking about a great trade ----------
+
+def big(get="Star", give=("A",), mine=2.5, title=None, **kw):
+    t = {"rival": "Them", "give": list(give), "get": [get], "my_delta_ppw": mine, "their_delta_ppw": 0.5, "why": [], "sendable": True,
+         "must_try": mine >= 2.0, **kw}
+    if title is not None:
+        t["my_title_delta"] = title
+    return t
+
+
+def test_the_math_flags_a_big_package_and_the_card_puts_it_first():
+    lg = league(trades=[{**big("Meh", mine=1.0), "must_try": False}, big("Star", mine=2.5)])
+    rows = ids(lg)
+    assert rows.index("trade:star") < rows.index("trade:meh")
+    row = by_id(lg)["trade:star"]
+    assert row["label"] == "Trade (do this one)" and row["push"] and "first ask" in row["text"] and "skip it with a reason" in row["text"]
+
+
+def test_a_push_survives_the_three_row_cap():
+    trades = [{**big(f"P{i}", give=(f"G{i}",), mine=1.0), "must_try": False} for i in range(3)] + [big("Star", give=("Z",), mine=2.5)]
+    assert "trade:star" in ids(league(trades=trades))
+
+
+def test_claude_can_push_a_row_and_lint_wants_a_reason():
+    from tests.test_card import packet
+    lg = league(trades=[{**big("Star", mine=1.0), "must_try": False}])
+    p = packet(lg)
+    assert any("needs a note" in w for w in report.read_lint(p, {"L1": {"items": {"trade:star": "push"}}}))
+    assert report.read_lint(p, {"L1": {"items": {"trade:star": {"verdict": "push", "note": "Allen wins leagues"}}}}) == []
+    assert any("trade rows only" in w for w in report.read_lint(p, {"L1": {"items": {"lineup": {"verdict": "push", "note": "x"}}}}))
+
+
+def test_a_push_is_remembered_counted_and_closed_by_sending_or_skipping(tmp_path):
+    path = tmp_path / "pushed.json"
+    lg = league(trades=[{**big("Star", mine=1.0), "must_try": False}])
+    packet = {"leagues": [lg]}
+    reads = {"L1": {"items": {"trade:star": {"verdict": "push", "note": "Allen wins leagues"}}}}
+    assert rulings.record_pushes(packet, reads, path, today=date(2026, 9, 23)) == ["L1|Star: opened"]
+    pushes = rulings.load_pushes(path)
+    assert pushes["L1|Star"]["status"] == "open" and pushes["L1|Star"]["note"] == "Allen wins leagues"
+    # the next morning the scan produces it again: it comes back marked, day 2, with the reason
+    cands = rulings.mark_pushed([{"get": ["Star"], "give": ["A"]}, {"get": ["Other"]}], pushes, "L1", today=date(2026, 9, 24))
+    assert cands[0]["pushed"]["days"] == 2 and cands[0]["pushed"]["note"] == "Allen wins leagues" and "pushed" not in cands[1]
+    lg2 = league(trades=[{**big("Star", mine=1.0), "must_try": False, "pushed": cands[0]["pushed"]}])
+    assert "asked 2 mornings running" in by_id(lg2)["trade:star"]["text"] and "Allen wins leagues" in by_id(lg2)["trade:star"]["text"]
+    assert rulings.record_pushes({"leagues": [lg2]}, {}, path, today=date(2026, 9, 24)) == []  # still open, nothing new
+    # Dustin sent it: the package is among his pending offers
+    lg3 = {**lg2, "outgoing_trades": [{"rival": "Them", "give": ["A"], "get": ["Star"], "hours_left": 20}]}
+    assert rulings.record_pushes({"leagues": [lg3]}, {}, path, today=date(2026, 9, 25)) == ["L1|Star: sent"]
+    assert rulings.load_pushes(path)["L1|Star"]["status"] == "sent"
+    assert "pushed" not in rulings.mark_pushed([{"get": ["Star"]}], rulings.load_pushes(path), "L1")[0]
+    # a fresh push, then a skip with a reason closes it
+    assert rulings.record_pushes(packet, reads, path, today=date(2026, 9, 26)) == ["L1|Star: opened"]
+    ev = rulings.record_rulings(packet, {"L1": {"items": {"trade:star": {"verdict": "skip", "note": "not selling A"}}}},
+                                tmp_path / "skips.json", path, today=date(2026, 9, 27))
+    assert ev == ["skip L1|Star", "push L1|Star: skipped"]
+    assert rulings.load_pushes(path)["L1|Star"]["status"] == "skipped"
+
+
+def test_a_pushed_row_wears_the_badge_in_the_email(monkeypatch):
+    from ff.email_html import render_email
+    from tests.test_email_html import _packet
+    p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    assert lg["trades"], "fixture should offer a trade"
+    for t in lg["trades"]:
+        t["must_try"] = False
+    lg["trades"][0]["pushed"] = {"since": "2026-09-20", "days": 4, "note": "Allen wins leagues", "source": "claude"}
+    html = render_email(p, {})
+    assert "TRADE (DO IT)" in html and "asked 4 mornings running" in html and "Allen wins leagues" in html
+
+
+def test_only_one_package_is_pushed_at_a_time_and_alternatives_are_not_both_pushed():
+    trades = [big("Star", give=("A",), mine=2.5), big("Other", give=("A",), mine=2.2)]
+    rows = by_id(league(trades=trades))
+    assert rows["trade:star"]["push"] and not rows["trade:other"]["push"]

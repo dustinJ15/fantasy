@@ -121,9 +121,9 @@ def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JS
     for warn in report.voice_lint(r or {}):
         rprint(f"[yellow]voice: {warn}[/]")
     if r:
-        from .rulings import record_skips
-        for key in record_skips(p, r):
-            rprint(f"[dim]remembered skip: {key}[/]")
+        from .rulings import record_rulings
+        for line in record_rulings(p, r):
+            rprint(f"[dim]remembered: {line}[/]")
     for warn in report.read_lint(p, r):
         rprint(f"[yellow]reads: {warn}[/]")
     open(out, "w").write(render_email(p, r, only_incoming=only_incoming, full=full))

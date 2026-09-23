@@ -55,7 +55,8 @@ def test_card_lists_every_worth_sending_trade(monkeypatch):
     monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
     blk = analyze_league(make_snapshot(), FakeXW(), {}, {}, {}, {}, overrides=None, sims=200)
     rows = [t for t in report.todos(blk) if t["kind"] == "trade"]
-    worth = [t for t in blk["trades"] if t["their_delta_ppw"] >= 0][:3]
+    pushed = [t for t in blk["trades"] if t.get("must_try")][:1]  # the one big package goes first, however it was ranked
+    worth = pushed + [t for t in blk["trades"] if t["their_delta_ppw"] >= 0 and t not in pushed][:3 - len(pushed)]
     assert len(rows) <= 3
     if worth:
         assert len(rows) == len(worth) and all(r["worth"] for r in rows)

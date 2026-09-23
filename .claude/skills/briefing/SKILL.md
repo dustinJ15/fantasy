@@ -54,6 +54,10 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    - `skip` strikes the row out in the email and prints your note as the reason. Use it when the row is wrong.
    - `amend` keeps the row and attaches your correction (e.g. "add him, but that flex slot is locked, he starts next week").
    - `do` is confirmation, and is the only verdict that needs no note.
+   - `push` (trade rows only, note required) means "this one is too good to let slide": the row moves to the top of
+     the card every morning until Dustin sends it or you `skip` it. Use it rarely, for a package you would make today
+     without hesitation. A row the math already flags (label "Trade (do this one)") is pushed on its own; `do` there is
+     enough, and `skip` with a reason stops the asking.
    - A `skip` on a `trade:` row is remembered for two weeks (`ff render-email` writes it to `data/projlog/skipped_trades.json`,
      pushed with the projlog in step 9), so the same package stops coming back; say why in the note, it is shown next time.
    The card is the model's math and your read is judgment; they are allowed to disagree, but the email has to end with

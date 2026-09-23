@@ -55,6 +55,10 @@ MARKET_FLOOR = 0.8
 # his value discounted by availability so the scan neither refuses to propose the deal ("I give more") nor proposes
 # handing over a season-ender as if he were healthy. The raw figure still rides on the row as a caveat.
 MARKET_INJURY_FLOOR = 0.25
+# A package this good is worth nagging about: the card keeps it at the top every morning until Dustin sends it or
+# says no (rulings.record_pushes). Points per week over the rest-of-season lineup; the title-odds delta is not used
+# because at 1500 sims it is noise of the same size as any threshold.
+MUST_TRY_PPW = 2.0
 
 
 def market_value(players: list[PlayerProj], values: dict[str, dict], discount_injured: bool = False) -> float:
@@ -177,6 +181,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_ratio": round(ratio, 2) if ratio is not None else None,
                 # Worth actually sending: helps them (or is neutral) *and* I am not overpaying at market.
                 "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR),
+                "must_try": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR) and d_me >= MUST_TRY_PPW,
                 "why": why,
                 "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin), 2),
             })

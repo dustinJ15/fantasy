@@ -70,6 +70,10 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 - Skipped trade rows are remembered: `ff render-email --reads` writes each `skip` on a `trade:` row to
   `data/projlog/skipped_trades.json` (`src/ff/rulings.py`), the packet drops that package for 14 days, and the file rides
   the `projlog` branch (cloud_setup.sh restores it). A `do`/`amend` is not remembered.
+- Pushed trades: the one package the scan marks `must_try` (sendable and ≥ +2.0 ppw for me) or that Claude rules `push` on
+  (with a note) is recorded in `data/projlog/pushed_trades.json` by `ff render-email` and comes back at the top of the card
+  every morning ("asked N mornings running") until it shows up in my pending offers (sent), Claude rules `skip` on it, or
+  the scan stops producing it. One push per league at a time; the packet only reads the memory.
 - Checklist ledger: `report._Spots` hands out roster spots (open bench spot first, then the cheapest drop not already
   named), so an activation and a pickup never spend the same drop. Waiver rows say `claim` (still on waivers, with the
   priority) or `add` (free agent) from `waiver_status` in the snapshot.

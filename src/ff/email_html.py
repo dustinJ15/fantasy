@@ -165,6 +165,8 @@ def _todo_rows(lg: dict, r: dict) -> tuple[str, bool]:
         if t["kind"] == "trade":
             tone = "good" if t.get("worth") else "grey"
             label = "TRADE" if t.get("worth") else "TRADE (reach)"
+            if t.get("push"):
+                label, tone = "TRADE (DO IT)", "warn"
         if t["kind"] == "trade_in":
             tone = VERDICT_TONE[t["verdict"]]
             label = report.VERDICT_WORD[t["verdict"]] + " OFFER"

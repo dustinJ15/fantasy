@@ -111,6 +111,15 @@ def sendable(t: dict) -> bool:
     return bool(t.get("sendable", t["their_delta_ppw"] >= 0))
 
 
+def push_line(t: dict) -> str:
+    """Why this trade is at the top and how to make it stop: the day count and the reason (Claude's note or the math)."""
+    p = t.get("pushed") or {}
+    days = int(p.get("days") or 1)
+    why = p.get("note") or f"+{t['my_delta_ppw']:.1f} pts/wk is a big lineup gain by the math"
+    asked = f"asked {days} mornings running" if days > 1 else "first ask"
+    return f"— too good to let slide ({why}); {asked}. Send it, or skip it with a reason and it stops"
+
+
 def trade_tag(t: dict) -> str:
     return "worth sending" if sendable(t) else "a reach, send only if bored"
 
@@ -321,22 +330,36 @@ def todos(lg: dict) -> list[dict]:
                             f"waiting on {t['rival'] or 'them'}{left}"})
     # Every offer that helps both sides is a thing I could actually send today, so list them (capped at 3 so the card
     # stays a checklist). A "reach" only helps me, so at most one of those, and only when there is nothing better.
-    worth = [t for t in lg["trades"] if sendable(t)][:3]
+    # Pushed trades first (a package the math or Claude flagged as too good to let slide; it keeps coming back until
+    # Dustin sends it or skips it with a reason), then the rest, three rows in all unless the pushes need more.
+    # One push at a time: a remembered one first (Claude's, or the math's from an earlier morning), else the biggest
+    # gain the math flags today. Two pushes that ship the same player would be alternatives, not a to-do list.
+    remembered = [t for t in lg["trades"] if t.get("pushed")]
+    flagged = sorted([t for t in lg["trades"] if t.get("must_try")], key=lambda t: -t["my_delta_ppw"])
+    pushed = (remembered or flagged)[:1]
+    for t in lg["trades"]:
+        if t not in pushed:
+            t["must_try"] = False  # the card's word is final: rulings memory only records the row that was pushed
+    worth = pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(3 - len(pushed), 0)]
     for t in worth or lg["trades"][:1]:
         # Depth and market warnings ride along with the row: the card is the whole HTML email, so a caveat that only
         # reached the detail tables would never be seen on a phone.
         warn = [_to_dustin(w) for w in t["why"] if w.startswith("leaves me") or w.startswith("market says I")]
         them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
-        out.append({"kind": "trade", "id": f"trade:{slug('-'.join(t['get']))}", "label": f"Trade ({trade_tag(t)})",
-                    "worth": sendable(t), "rival": t.get("rival"), "give": list(t["give"]), "get": list(t["get"]), "warn": warn,
-                    "text": f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
-                            f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them})"})
+        push = bool(t.get("pushed") or t.get("must_try"))
+        text = (f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
+                f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them})")
+        if push:
+            text += " " + push_line(t)
+        out.append({"kind": "trade", "id": f"trade:{slug('-'.join(t['get']))}", "label": "Trade (do this one)" if push else f"Trade ({trade_tag(t)})",
+                    "worth": sendable(t), "push": push, "rival": t.get("rival"), "give": list(t["give"]), "get": list(t["get"]), "warn": warn,
+                    "text": text})
     out += [i for i in inj if i["verdict"] == "trade"]
     out += [i for i in inj if i["kind"] == "hold"]
     return out
 
 
-RULINGS = ("do", "skip", "amend")
+RULINGS = ("do", "skip", "amend", "push")  # push: do, and keep it at the top every morning until sent or skipped
 
 
 def apply_reads(items: list[dict], r: dict | None) -> list[dict]:
@@ -516,6 +539,8 @@ def read_lint(packet: dict, reads: dict | None) -> list[str]:
                 out.append(f"{name}.items['{key}']: verdict must be one of {', '.join(RULINGS)}, got '{verdict}'")
             elif verdict != "do" and not (isinstance(v, dict) and v.get("note")):
                 out.append(f"{name}.items['{key}']: '{verdict}' needs a note saying why")
+            elif verdict == "push" and known[key]["kind"] != "trade":
+                out.append(f"{name}.items['{key}']: 'push' is for trade rows only")
         for key, x in known.items():
             if x["kind"] == "trade" and key not in ruled:
                 out.append(f"{name}.items['{key}']: trade row has no ruling (do / skip / amend)")
