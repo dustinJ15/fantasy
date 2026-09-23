@@ -28,6 +28,7 @@ def test_render_email(monkeypatch):
     assert "Bill &amp; Ted&#x27;s League" in html and "O&#x27;Brien&#x27;s Boys" in html
     assert "Coin flip, lineup is fine." in html and "Want to swap RBs?" in html and "Paste to O&#x27;Brien" in html
     assert "limited Friday, expected to play" in html
+    assert "move him to IR" in html and ">IR<" in html  # the hurt-player row, with its verdict as the badge
     for todo in report.todos(p["leagues"][0]):
         if not todo.get("moves"):
             assert escape(todo["text"])[:30] in html
@@ -80,8 +81,11 @@ def test_voice_lint_flags_ai_tells():
 def test_depth_warning_reaches_both_renderers(monkeypatch):
     """A 'leaves me no backup QB' caveat is useless if it only lands in the detail tables the HTML no longer carries."""
     p = _packet(monkeypatch)
-    warns = [w for t in report.todos(p["leagues"][0]) for w in (t.get("warn") or [])]
-    assert warns, "the demo league's 2-for-1s ship a QB, so a depth warning is expected"
+    lg = p["leagues"][0]
+    assert lg["trades"], "the demo league should produce at least one candidate"
+    lg["trades"][0]["why"].append("leaves me no backup QB")  # the caveat the scan attaches when a package ships the spare QB
+    warns = [w for t in report.todos(lg) for w in (t.get("warn") or [])]
+    assert warns
     html, md = render_email(p), report.render(p)
     for w in warns:
         assert escape(w) in html, f"missing from the card: {w}"
