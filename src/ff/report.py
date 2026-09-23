@@ -144,7 +144,7 @@ def _cover_items(lg: dict) -> list[dict]:
     return out
 
 
-INJURY_LABEL = {"ir": "Hurt (IR)", "hold": "Hurt (hold)", "drop": "Hurt (drop)", "trade": "Hurt (trade)", "activate": "Back (activate)"}
+INJURY_LABEL = {"ir": "IR", "hold": "Holding", "drop": "Drop", "trade": "Hurt (trade)", "activate": "Activate"}
 # Verdicts that move a player off the roster or out the door: Claude has to rule on them, like trade rows.
 INJURY_NEEDS_RULING = ("drop", "trade")
 
@@ -156,41 +156,49 @@ def _weeks(r: dict) -> str:
 
 
 def _injury_items(lg: dict, drop: str | None) -> list[dict]:
-    """One row per hurt player, the verb decided by `model.injuries`; this only puts words on the numbers."""
+    """One row per hurt player, the verb decided by `model.injuries`; this only puts words on the numbers.
+
+    Rows lead with the click (move to IR, drop X and add Y) so the checklist reads as a sequence. A hold is not a
+    click, so it comes back as kind `hold` and the renderers print it below the list, not in it."""
     out = []
     for r in lg.get("injuries") or []:
         who, v = f"{r['name']} ({r['pos']})", r["verdict"]
         if v == "hold" and r["weeks_out"] < 2:
             continue  # out one game and worth keeping: the lineup row already handles him, this would be the injury report
-        back = f" (back wk {r['return_week']})" if r.get("return_week") else ""
+        back = f", back wk {r['return_week']}" if r.get("return_week") else ""
         add = r.get("add")
+        kind = "injury"
         if v == "ir":
-            text = f"{who} is out {_weeks(r)}{back}; move him to IR"
+            text = f"move {who} to IR (out {_weeks(r)}{back})"
             if r.get("ir_occupant"):
                 text += f" in place of {r['ir_occupant']}"
             elif add:
-                text += f", then add {add['name']} ({add['why']})"
+                text += f", then add {add['name']} ({add['pos']}, {add['why']})"
         elif v == "activate":
-            text = f"{who} is back; move him off IR" + (f" and drop {drop}" if drop and drop != r["name"] else "")
+            text = f"move {who} off IR, he is back" + (f", and drop {drop}" if drop and drop != r["name"] else "")
         elif v == "drop":
-            text = f"{who} is out {_weeks(r)}{back} and worth ~{r['hold_value']:.0f} pts the rest of the way; drop him"
+            text = f"drop {who}: out {_weeks(r)}{back}, worth ~{r['hold_value']:.0f} pts the rest of the way"
             if add:
-                text += f" for {add['name']} ({add['why']})"
+                text += f"; add {add['name']} ({add['pos']}, {add['why']})"
         elif v == "trade":
             t = r["trades"][0]
-            text = f"{who} is out {_weeks(r)}{back}; the offer to {t['rival']} for {', '.join(t['get'])} ships him, else hold"
+            text = f"the offer to {t['rival']} for {', '.join(t['get'])} ships {who} (out {_weeks(r)}{back}); else hold"
         else:
+            kind = "hold"
             games = f"{r['back_eff']:.0f} game{'s' if r['back_eff'] >= 1.5 else ''}"
-            text = f"{who} is out {_weeks(r)}{back} for {games} at ~{r['mu_ros_active']:.0f}/g"
-            text += f"; {r['why'][0]}, hold him" if r.get("why") else "; hold him"
-        out.append({"kind": "injury", "id": f"injury:{slug(r['name'])}", "label": INJURY_LABEL[v], "verdict": v, "text": text,
+            text = f"{who} out {_weeks(r)}{back}, {games} at ~{r['mu_ros_active']:.0f}/g on return"
+            if r.get("why"):
+                text += f"; {r['why'][0]}"
+        out.append({"kind": kind, "id": f"injury:{slug(r['name'])}", "label": INJURY_LABEL[v], "verdict": v, "text": text,
                     "trade_ids": [f"trade:{slug('-'.join(t['get']))}" for t in r.get("trades") or []]})
     return out
 
 
 def todos(lg: dict) -> list[dict]:
-    """The literal things to do today in one league. Each item: {id, kind, label, text, moves?}.
-    kind ∈ trade_in | sent | waiver | waiver_up | stream | cover | injury | lineup | trade. Shared by both renderers.
+    """The literal things to do today in one league, in the order Dustin clicks through ESPN: answer an offer, set
+    the lineup, IR moves, then drops paired with the pickup that takes the spot, then trades to go send. Each item:
+    {id, kind, label, text, moves?}. kind ∈ trade_in | lineup | injury | waiver | waiver_up | stream | cover | sent |
+    trade | hold. Holds come last and the renderers print them as a footnote, not a step. Shared by both renderers.
 
     `id` is stable for a given packet, so reads.json can rule on one row by name instead of arguing with the
     whole card in prose. Player names make the ids readable and are unique within a league.
@@ -200,30 +208,6 @@ def todos(lg: dict) -> list[dict]:
         out.append({"kind": "trade_in", "id": f"offer:{slug('-'.join(t['get']) or t['rival'] or 'offer')}",
                     "label": f"Incoming offer ({VERDICT_WORD[t['verdict']]})", "verdict": t["verdict"],
                     "text": incoming_line(t)})
-    # Offers I already sent are the reason half the "why didn't it know that" moments happen: without them the card
-    # re-proposes a deal that is sitting in the rival's inbox with a day left on it.
-    for t in lg.get("outgoing_trades") or []:
-        left = f", {t['hours_left']:.0f}h left" if t.get("hours_left") is not None else ""
-        out.append({"kind": "sent", "id": f"sent:{slug('-'.join(t['get']) or t['rival'] or 'sent')}", "label": "Already sent",
-                    "text": f"your {', '.join(t['give']) or 'nothing'} for {', '.join(t['get']) or 'nothing'} is still "
-                            f"waiting on {t['rival'] or 'them'}{left}"})
-    starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5]
-    ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts]
-    drop = _drop_candidate(lg)
-    for w in starts[:1]:
-        out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
-                    "text": f"add {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)" + (f"; drop {drop}" if drop else "")})
-    for w in ups[:1]:
-        out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
-                    "text": f"add {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}" + (f"; drop {drop}" if drop else "")})
-    for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]:
-        out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
-                    "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
-    out += _cover_items(lg)
-    out += _injury_items(lg, drop)
-    for a in lg.get("open_spot_adds") or []:
-        out.append({"kind": "waiver", "id": f"waiver:{slug(a['name'])}", "label": "Open spot",
-                    "text": f"you have an open bench spot: add {a['name']} ({a['pos']}, {a['why']})"})
     ph = (lg.get("week_state") or {}).get("phase", "pre")
     ch = _lineup_changes(lg) if ph != "final" else []
     if ph == "final":
@@ -235,6 +219,32 @@ def todos(lg: dict) -> list[dict]:
     else:
         out.append({"kind": "lineup", "id": "lineup", "label": "Lineup",
                     "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []})
+    drop = _drop_candidate(lg)
+    inj = _injury_items(lg, drop)
+    out += [i for i in inj if i["verdict"] in ("ir", "activate")]
+    starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5]
+    ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts]
+    for w in starts[:1]:
+        out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
+                    "text": f"add {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)" + (f"; drop {drop}" if drop else "")})
+    for w in ups[:1]:
+        out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
+                    "text": f"add {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}" + (f"; drop {drop}" if drop else "")})
+    for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]:
+        out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
+                    "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
+    out += _cover_items(lg)
+    out += [i for i in inj if i["verdict"] == "drop"]
+    for a in lg.get("open_spot_adds") or []:
+        out.append({"kind": "waiver", "id": f"waiver:{slug(a['name'])}", "label": "Open spot",
+                    "text": f"add {a['name']} ({a['pos']}, {a['why']}) to the open bench spot"})
+    # Offers I already sent are the reason half the "why didn't it know that" moments happen: without them the card
+    # re-proposes a deal that is sitting in the rival's inbox with a day left on it.
+    for t in lg.get("outgoing_trades") or []:
+        left = f", {t['hours_left']:.0f}h left" if t.get("hours_left") is not None else ""
+        out.append({"kind": "sent", "id": f"sent:{slug('-'.join(t['get']) or t['rival'] or 'sent')}", "label": "Already sent",
+                    "text": f"your {', '.join(t['give']) or 'nothing'} for {', '.join(t['get']) or 'nothing'} is still "
+                            f"waiting on {t['rival'] or 'them'}{left}"})
     # Every offer that helps both sides is a thing I could actually send today, so list them (capped at 3 so the card
     # stays a checklist). A "reach" only helps me, so at most one of those, and only when there is nothing better.
     worth = [t for t in lg["trades"] if sendable(t)][:3]
@@ -247,6 +257,8 @@ def todos(lg: dict) -> list[dict]:
                     "worth": sendable(t), "rival": t.get("rival"), "give": list(t["give"]), "warn": warn,
                     "text": f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
                             f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them})"})
+    out += [i for i in inj if i["verdict"] == "trade"]
+    out += [i for i in inj if i["kind"] == "hold"]
     return out
 
 
@@ -387,6 +399,16 @@ def voice_lint(reads: dict) -> list[str]:
     return out
 
 
+def hold_line(x: dict) -> str:
+    """A hurt player kept on the bench: not a step, a footnote under the list, with Claude's note if there is one."""
+    line = x["text"]
+    if x.get("ruling") == "skip":
+        line = f"~~{line}~~"
+    if x.get("ruling_note"):
+        line += f" ({x['ruling_note']})"
+    return line
+
+
 def item_line(x: dict) -> str:
     """One checklist row for the markdown body, with Claude's ruling folded into it rather than argued below it."""
     label, text = x["label"], x["text"]
@@ -450,8 +472,13 @@ def action_card(packet: dict, reads: dict | None = None, show_ids: bool | None =
             L.append(f"**{pl}**")
         L.append("")
         r = reads.get(lg["name"]) or {}
-        for x in apply_reads(todos(lg), r):
+        rows = apply_reads(todos(lg), r)
+        for x in (x for x in rows if x["kind"] != "hold"):
             L.append(f"- {item_line(x)}" + (f"  `[{x['id']}]`" if show_ids else ""))
+        holds = [x for x in rows if x["kind"] == "hold"]
+        if holds:
+            L.append("")
+            L.append("**Holding:** " + "; ".join(hold_line(x) + (f"  `[{x['id']}]`" if show_ids else "") for x in holds))
         L.append("")
         why = why_parts(lg)
         if why:

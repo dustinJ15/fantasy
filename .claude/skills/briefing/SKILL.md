@@ -54,8 +54,10 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    The card is the model's math and your read is judgment; they are allowed to disagree, but the email has to end with
    one answer per row, not a card saying do it and a paragraph underneath saying don't. Every `trade` row needs a
    verdict — the card lists up to three and Dustin cannot tell which one you meant otherwise. So does every
-   `injury:` row whose label is `Hurt (drop)` or `Hurt (trade)`: a drop is final, and its biggest input is your
-   `weeks_out`. `ff render-email` warns about a typo'd id, a missing reason and an unruled trade or drop; fix
+   `injury:` row whose label is `Drop` or `Hurt (trade)`: a drop is final, and its biggest input is your
+   `weeks_out`. The checklist runs in the order Dustin clicks through ESPN (lineup, IR, pickups with their drop,
+   trades); hurt players he is keeping print under **Holding:** below the list, and their `injury:` ids still take
+   a ruling if you want a note on one. `ff render-email` warns about a typo'd id, a missing reason and an unruled trade or drop; fix
    reads.json and re-run before sending.
    Leave `read` for what is genuinely new: the news, the practice report, the thing the model has no column for.
    If it only repeats a row's verdict, drop it.

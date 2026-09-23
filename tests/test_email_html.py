@@ -28,7 +28,7 @@ def test_render_email(monkeypatch):
     assert "Bill &amp; Ted&#x27;s League" in html and "O&#x27;Brien&#x27;s Boys" in html
     assert "Coin flip, lineup is fine." in html and "Want to swap RBs?" in html and "Paste to O&#x27;Brien" in html
     assert "limited Friday, expected to play" in html
-    assert "move him to IR" in html and ">IR<" in html  # the hurt-player row, with its verdict as the badge
+    assert " to IR (out " in html and ">IR<" in html  # the hurt-player row, with its verdict as the badge
     for todo in report.todos(p["leagues"][0]):
         if not todo.get("moves"):
             assert escape(todo["text"])[:30] in html

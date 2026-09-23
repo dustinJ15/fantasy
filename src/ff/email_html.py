@@ -29,7 +29,7 @@ FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-
 TEXT, MUTED, BORDER, PAGE, CARD, ZEBRA = "#1f2933", "#6b7280", "#e3e6ea", "#eef0f3", "#ffffff", "#f6f7f9"
 LABELS = {"waiver": ("WAIVER", "info"), "waiver_up": ("WAIVER", "info"), "stream": ("STREAM", "info"),
           "lineup": ("LINEUP", "move"), "trade": ("TRADE", "good"), "trade_in": ("OFFER", "warn"),
-          "sent": ("SENT", "grey"), "cover": ("COVER", "bad"), "injury": ("HURT", "warn")}
+          "sent": ("SENT", "grey"), "cover": ("COVER", "bad"), "injury": ("HURT", "warn"), "hold": ("HOLD", "warn")}
 INJURY_BADGE = {"ir": ("IR", "info"), "hold": ("HOLD", "warn"), "drop": ("DROP", "bad"), "trade": ("TRADE", "warn"), "activate": ("ACTIVATE", "info")}
 VERDICT_TONE = {"accept": "good", "decline": "bad", "counter": "warn"}
 
@@ -156,8 +156,11 @@ def _todo_rows(lg: dict, r: dict) -> tuple[str, bool]:
     so three trade ideas can never leave you guessing which one the message is for."""
     paste, paste_to = r.get("paste"), r.get("paste_to") or ""
     attached = False
-    rows = []
+    rows, holds = [], []
     for t in report.apply_reads(report.todos(lg), r):
+        if t["kind"] == "hold":
+            holds.append(t)
+            continue
         label, tone = LABELS[t["kind"]]
         if t["kind"] == "trade":
             tone = "good" if t.get("worth") else "grey"
@@ -185,9 +188,14 @@ def _todo_rows(lg: dict, r: dict) -> tuple[str, bool]:
         if t["kind"] == "trade" and not skip and paste and not attached and paste_to in (t.get("rival") or "", ""):
             body += _callout(f"Paste to {t.get('rival') or paste_to or 'the rival'}", paste, "good", quote=True)
             attached = True
-        rows.append(f'<tr><td valign="top" width="1" style="padding:6px 8px 6px 0">{_badge(label, tone)}</td>'
+        step = f'<span style="display:inline-block;min-width:14px;color:{MUTED};font-size:12px;font-weight:700">{len(rows) + 1}</span> '
+        rows.append(f'<tr><td valign="top" width="1" style="padding:6px 8px 6px 0;white-space:nowrap">{step}{_badge(label, tone)}</td>'
                     f'<td valign="top" style="padding:6px 0;font-size:14px;border-bottom:1px solid {BORDER}">{body}</td></tr>')
-    return f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>', attached
+    html = f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>'
+    if holds:
+        # Not steps: the hurt players staying put, one muted line under the list so the sequence above stays clean.
+        html += _muted("Holding: " + "; ".join(_e(report.hold_line(h)).replace("~~", "") for h in holds))
+    return html, attached
 
 
 def _phase(lg: dict) -> str:

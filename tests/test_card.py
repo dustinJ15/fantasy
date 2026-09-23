@@ -240,18 +240,28 @@ def test_each_verdict_is_a_row_with_the_numbers_in_words():
                           injury("Sell Guy", "trade", trades=[{"rival": "Them", "get": ["Star"]}]),
                           injury("Back Guy", "activate", weeks_out=1, return_week=4)])
     rows = by_id(lg)
-    assert rows["injury:ankle-guy"]["label"] == "Hurt (hold)" and "(back wk 7) for 10 games at ~14/g" in rows["injury:ankle-guy"]["text"]
-    assert rows["injury:ankle-guy"]["text"].endswith("hold him")
-    assert "out the season; move him to IR, then add Pickup (+1.2/wk)" in rows["injury:knee-guy"]["text"]
-    assert rows["injury:done-guy"]["label"] == "Hurt (drop)" and "drop him for Pickup (+1.2/wk)" in rows["injury:done-guy"]["text"]
-    assert "the offer to Them for Star ships him" in rows["injury:sell-guy"]["text"] and rows["injury:sell-guy"]["trade_ids"] == ["trade:star"]
-    assert rows["injury:back-guy"]["label"] == "Back (activate)"
+    assert rows["injury:ankle-guy"]["kind"] == "hold" and rows["injury:ankle-guy"]["label"] == "Holding"
+    assert rows["injury:ankle-guy"]["text"] == "Ankle Guy (RB) out ~4 wks, back wk 7, 10 games at ~14/g on return"
+    assert rows["injury:knee-guy"]["text"] == "move Knee Guy (RB) to IR (out the season), then add Pickup (RB, +1.2/wk)"
+    assert rows["injury:done-guy"]["label"] == "Drop"
+    assert rows["injury:done-guy"]["text"] == "drop Done Guy (RB): out the season, worth ~29 pts the rest of the way; add Pickup (RB, +1.2/wk)"
+    assert "the offer to Them for Star ships Sell Guy (RB)" in rows["injury:sell-guy"]["text"] and rows["injury:sell-guy"]["trade_ids"] == ["trade:star"]
+    assert rows["injury:back-guy"]["label"] == "Activate" and rows["injury:back-guy"]["text"].startswith("move Back Guy (RB) off IR")
+
+
+def test_the_checklist_runs_in_espn_click_order_with_holds_last():
+    """Offer, lineup, IR, pickups, drops with their add, trades, and the holds as a footnote at the very end."""
+    lg = league(injuries=[injury("Ankle Guy", "hold"), injury("Knee Guy", "ir", weeks_out=15, return_week=None, avail=0.0),
+                          injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0)],
+                trades=[{"rival": "Them", "give": ["A"], "get": ["Kai"], "my_delta_ppw": 1.0, "their_delta_ppw": 0.5, "why": [], "sendable": True}])
+    lg["open_spot_adds"] = [{"name": "Body", "pos": "WR", "kind": "depth", "why": "best body on the wire, depth only"}]
+    assert ids(lg) == ["lineup", "injury:knee-guy", "injury:done-guy", "waiver:body", "trade:kai", "injury:ankle-guy"]
 
 
 def test_a_one_game_hold_is_not_a_row():
     """Out this week and worth keeping is the lineup's business; a row saying "hold him" is just the injury report."""
     lg = league(injuries=[injury("Ankle Guy", "hold", weeks_out=1.0, return_week=4), injury("Knee Guy", "ir", weeks_out=1.0, return_week=4)])
-    assert ids(lg) == ["injury:knee-guy", "lineup"]
+    assert ids(lg) == ["lineup", "injury:knee-guy"]
 
 
 def test_ir_swap_names_the_occupant():
@@ -298,4 +308,4 @@ def test_an_open_bench_spot_is_a_row_naming_who_fills_it():
     lg["open_spots"] = 1
     lg["open_spot_adds"] = [{"name": "Seth McGowan", "pos": "RB", "kind": "handcuff", "why": "handcuff for Jonathan Taylor"}]
     row = by_id(lg)["waiver:seth-mcgowan"]
-    assert row["label"] == "Open spot" and row["text"] == "you have an open bench spot: add Seth McGowan (RB, handcuff for Jonathan Taylor)"
+    assert row["label"] == "Open spot" and row["text"] == "add Seth McGowan (RB, handcuff for Jonathan Taylor) to the open bench spot"
