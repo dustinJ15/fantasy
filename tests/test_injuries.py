@@ -28,11 +28,11 @@ def fa(delta, name="FA", pos="RB", slot="RB"):
     return [{"name": name, "pos": pos, "slot": slot, "delta_over_starter": delta, "streamer": False}]
 
 
-def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=None, repl=None):
+def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=None, repl=None, handcuffs=()):
     wr = 17 - week + 1
     starters = starters if starters is not None else {p.espn_id for p in mine if p.weeks_out < 1 and p.name not in ("RB4", "TE2")}
     return decide(mine, {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}, week, wr, REG, playoff_pct,
-                  ir_slots, list(waivers), list(trades), {}, starters, repl)
+                  ir_slots, list(waivers), list(trades), {}, starters, repl, list(handcuffs))
 
 
 def test_week_weights_count_playoff_weeks_by_my_odds():
@@ -167,3 +167,38 @@ def test_a_dead_spot_that_is_not_the_cheapest_cut_holds_and_names_the_cheaper_on
     starters = {p.espn_id for p in mine if p.name not in ("RB4", "TE2")}
     (row,) = run(mine, 3, 60, starters=starters, repl={"RB": 8.0})
     assert row["verdict"] == "hold" and "TE2 is the cheaper drop" in row["why"][0]
+
+
+# ---------- who fills the freed spot ----------
+
+def depth_fa(name, pos="RB", score=1.0):
+    return {"name": name, "pos": pos, "slot": pos, "delta_over_starter": -3.0, "vorp": -1.0, "score": score, "streamer": False}
+
+
+def test_a_freed_spot_names_a_pickup_even_when_nobody_on_the_wire_beats_replacement():
+    mine = roster(); hurt(mine[1], 15, 15, 3)  # RB1 done for the year, no IR slot: a drop
+    (row,) = run(mine, 3, 60, waivers=[depth_fa("Body A", score=2.0), depth_fa("Body B", score=5.0)])
+    assert row["verdict"] == "drop" and row["add"] == {"name": "Body B", "pos": "RB", "kind": "depth", "why": "best body on the wire, depth only"}
+
+
+def test_a_free_agent_handcuff_beats_a_depth_body_for_the_freed_spot():
+    mine = roster(); hurt(mine[1], 15, 15, 3)
+    cuffs = [{"starter": "RB2", "handcuff": "Backup", "owner_team_id": None, "est_value": 1.1},
+             {"starter": "RB1", "handcuff": "Owned Guy", "owner_team_id": 4, "est_value": 3.0}]
+    (row,) = run(mine, 3, 60, waivers=[depth_fa("Body B", score=5.0)], handcuffs=cuffs)
+    assert row["add"]["name"] == "Backup" and row["add"]["why"] == "handcuff for RB2"
+
+
+def test_a_real_upgrade_still_comes_first_and_two_spots_get_two_names():
+    mine = roster(); hurt(mine[1], 15, 15, 3); hurt(mine[2], 15, 15, 3)  # RB1 and RB2 done; one IR slot, one drop
+    cuffs = [{"starter": "RB3", "handcuff": "Backup", "owner_team_id": None, "est_value": 1.1}]
+    rows = {r["name"]: r for r in run(mine, 3, 60, ir_slots=1, waivers=fa(1.5, name="Starter FA") + [depth_fa("Body B")], handcuffs=cuffs)}
+    assert rows["RB1"]["verdict"] == "ir" and rows["RB1"]["add"]["name"] == "Starter FA" and rows["RB1"]["add"]["kind"] == "upgrade"
+    assert rows["RB2"]["verdict"] == "drop" and rows["RB2"]["add"]["name"] == "Backup"
+
+
+def test_an_ir_swap_frees_nothing_so_names_nobody():
+    mine = roster(); hurt(mine[1], 6, 15, 3)
+    hurt(mine[9], 15, 15, 3); mine[9].slot = "IR"
+    row = next(r for r in run(mine, 3, 60, ir_slots=1, waivers=[depth_fa("Body B")]) if r["name"] == "RB1")
+    assert row["verdict"] == "ir" and row["ir_occupant"] == "TE2" and row["add"] is None

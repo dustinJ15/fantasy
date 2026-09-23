@@ -163,19 +163,19 @@ def _injury_items(lg: dict, drop: str | None) -> list[dict]:
         if v == "hold" and r["weeks_out"] < 2:
             continue  # out one game and worth keeping: the lineup row already handles him, this would be the injury report
         back = f" (back wk {r['return_week']})" if r.get("return_week") else ""
-        fa = r.get("best_fa")
+        add = r.get("add")
         if v == "ir":
             text = f"{who} is out {_weeks(r)}{back}; move him to IR"
             if r.get("ir_occupant"):
                 text += f" in place of {r['ir_occupant']}"
-            elif fa and fa.get("ppw", fa["delta_over_starter"]) > 0:
-                text += f", then add {fa['name']} on the freed spot"
+            elif add:
+                text += f", then add {add['name']} ({add['why']})"
         elif v == "activate":
             text = f"{who} is back; move him off IR" + (f" and drop {drop}" if drop and drop != r["name"] else "")
         elif v == "drop":
             text = f"{who} is out {_weeks(r)}{back} and worth ~{r['hold_value']:.0f} pts the rest of the way; drop him"
-            if fa and fa.get("ppw", fa["delta_over_starter"]) > 0:
-                text += f" for {fa['name']} (~{r['drop_value']:.0f} pts)"
+            if add:
+                text += f" for {add['name']} ({add['why']})"
         elif v == "trade":
             t = r["trades"][0]
             text = f"{who} is out {_weeks(r)}{back}; the offer to {t['rival']} for {', '.join(t['get'])} ships him, else hold"

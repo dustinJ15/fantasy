@@ -63,13 +63,35 @@ def _best_fa(p: PlayerProj, waivers: list[dict]) -> dict | None:
     return max(pool, key=fa_ppw) if pool else None
 
 
+def fill_spot(p: PlayerProj, waivers: list[dict], handcuffs: list[dict], used: set[str]) -> dict | None:
+    """Who takes the bench spot an IR move or a drop frees. Being below the wire is the right bar for cutting him and
+    the wrong one for filling the spot: an empty slot is worth less than any body. Order: a pickup who would start or
+    beats replacement, else a free-agent handcuff for one of my RB1s, else the best body at his position by the
+    waiver score, else the best body on the wire. `used` keeps two freed spots from naming the same player."""
+    skill = [w for w in waivers if not w.get("streamer") and w["name"] not in used]
+    fit = [w for w in skill if w.get("slot") in p.eligible or w.get("pos") == p.pos]
+    best = max(fit or skill, key=fa_ppw) if (fit or skill) else None
+    if best and fa_ppw(best) > 0:
+        return {"name": best["name"], "pos": best["pos"], "kind": "upgrade", "why": f"+{fa_ppw(best):.1f}/wk"}
+    cuff = max((h for h in handcuffs if h.get("owner_team_id") is None and h["handcuff"] not in used),
+               key=lambda h: h.get("est_value", 0), default=None)
+    if cuff:
+        return {"name": cuff["handcuff"], "pos": "RB", "kind": "handcuff", "why": f"handcuff for {cuff['starter']}"}
+    body = max(fit, key=lambda w: w.get("score", 0), default=None) or max(skill, key=lambda w: w.get("score", 0), default=None)
+    if body:
+        return {"name": body["name"], "pos": body["pos"], "kind": "depth", "why": "best body on the wire, depth only"}
+    return None
+
+
 def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remaining: int, reg_season_weeks: int,
            playoff_pct: float | None, ir_slots: int, waivers: list[dict], trades: list[dict], values: dict[str, dict],
-           starters_week: set[int], repl: dict[str, float] | None = None) -> list[dict]:
+           starters_week: set[int], repl: dict[str, float] | None = None, handcuffs: list[dict] | None = None) -> list[dict]:
     """One entry per hurt player (weeks_out >= 1, or already in the IR slot), most valuable first.
 
-    `repl` is the league's replacement level per position (`vbd.replacement_levels`), the floor for depth value."""
+    `repl` is the league's replacement level per position (`vbd.replacement_levels`), the floor for depth value.
+    `handcuffs` is `waivers.handcuffs` output; a free-agent one is the first choice for a freed bench spot."""
     repl = repl or {}
+    handcuffs = handcuffs or []
     weights = week_weights(week, weeks_remaining, reg_season_weeks, playoff_pct)
     w_eff = sum(weights.values())
     hurt = [p for p in mine if p.weeks_out >= 1 or p.slot == "IR"]
@@ -77,8 +99,6 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
         return []
     on_ir = [p for p in mine if p.slot == "IR"]
     ir_open = max(ir_slots - len(on_ir), 0)
-    droppable = [p for p in mine if p.espn_id not in starters_week and p.pos not in NOT_DROPPABLE and p.slot != "IR"]
-    cheapest = min(droppable, key=lambda p: p.mu_ros) if droppable else None
 
     calc: dict[int, dict] = {}
     for p in hurt:
@@ -96,6 +116,10 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
     to_ir = {p.espn_id for p in stashable[:ir_open]}
     stash_ids = {p.espn_id for p in stashable}
     swappable = list(on_ir)  # occupants not yet promised to someone
+    # The cheapest cut, for the drop rows: not this week's starters, not K/DST, not anyone in or headed to the IR slot.
+    droppable = [p for p in mine if p.espn_id not in starters_week and p.pos not in NOT_DROPPABLE and p.slot != "IR"
+                 and p.espn_id not in to_ir]
+    cheapest = min(droppable, key=lambda p: p.mu_ros) if droppable else None
 
     out = []
     for p in sorted(hurt, key=lambda q: -(q.mu_ros_active or 0)):
@@ -156,4 +180,12 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
                 else:
                     why.append(f"worth {c['hold_value']:.0f} pts on return vs {c['drop_value']:.0f} from {c['fa']['name']}")
         out.append(row)
+    # Every freed spot gets a name. An IR swap frees nothing (the occupant comes back to the bench).
+    used: set[str] = set()
+    for row in out:
+        row["add"] = None
+        if row["verdict"] in ("ir", "drop") and not row.get("ir_occupant"):
+            row["add"] = fill_spot(next(p for p in hurt if p.espn_id == row["espn_id"]), waivers, handcuffs, used)
+            if row["add"]:
+                used.add(row["add"]["name"])
     return out

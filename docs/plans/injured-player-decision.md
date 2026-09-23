@@ -208,7 +208,10 @@ whether or not the wire has anyone, if he is the cheapest cut. The IR slot also 
 value instead of the longest absence, so a one-week Out could take it from a four-week IR player; stashes now need
 `IR_MIN_WEEKS` (2) and the open slots go to the highest `hold_value`. And `blend` was averaging the healthy per-game
 number with this week's ~0 projection for anyone listed Out, halving it; this week now only counts when he is
-expected to play it.
+expected to play it. Second revision: an IR move or a drop frees a bench spot, and the row now always names who
+fills it (`fill_spot`): a pickup who starts or beats replacement, else a free-agent handcuff for one of my RB1s,
+else the best body on the wire by the waiver score, labelled depth only. Below the wire is the bar for cutting a
+player, not for leaving a slot empty.
 
 ### Verdict
 
