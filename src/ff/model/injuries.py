@@ -152,9 +152,15 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
         dead = ("out for the season, dead roster spot" if p.avail_ros == 0
                 else "back only after my season is decided, dead roster spot" if c["back_eff"] <= 0
                 else "no better than the wire when he is back, dead roster spot" if c["hold_value"] <= 0 else None)
+        row["espn_status"] = p.sources.get("espn_status")
         if p.slot == "IR":
-            if p.return_week is not None and p.return_week <= week + 1:
-                row["verdict"] = "activate"; why.append("back this week, the IR slot has to be cleared")
+            # ESPN decides when a stash has to leave the slot: the moment his designation is no longer one the IR
+            # slot accepts, the roster is flagged and lineup moves are blocked until he is activated. A guessed
+            # return week is not that signal: an Out defaults to one week, which used to print "he is back" on
+            # every player still listed Out.
+            if not ir_eligible(p):
+                row["verdict"] = "activate"
+                why.append(f"ESPN lists him {(row['espn_status'] or 'active').replace('_', ' ').lower()}, the IR slot has to be cleared")
             else:
                 continue  # stashed and still out: nothing to do
         elif p.espn_id in to_ir:

@@ -91,6 +91,13 @@ class PlayerRow:
     bye: bool
     injured: bool = False           # ESPN's own flag on the player record
     ir_eligible_raw: bool = False   # ESPN listed the IR slot in eligibleSlots (evidence for whether that is a real signal)
+    waiver_status: str | None = None  # free agents only: "WAIVERS" (claim, processes on waiver day) or "FREEAGENT" (add now)
+
+
+def _status(p) -> str | None:
+    """espn-api's json_parsing returns [] for a missing key, which D/ST rows always hit; that is not a designation."""
+    st = getattr(p, "injuryStatus", None)
+    return st if isinstance(st, str) and st else None
 
 
 def _week_stat(p, week: int, key: str) -> float:
@@ -106,7 +113,7 @@ def roster_rows(league: League, week: int) -> list[PlayerRow]:
                 espn_id=p.playerId, name=p.name, pos=p.position, team=p.proTeam,
                 eligible=[s for s in p.eligibleSlots if s not in NON_STARTER],
                 slot=p.lineupSlot, fantasy_team_id=t.team_id,
-                injury_status=p.injuryStatus,
+                injury_status=_status(p),
                 proj_week=_week_stat(p, week, "projected_points"),
                 actual_week=_week_stat(p, week, "points"),
                 proj_season=p.projected_total_points,
@@ -117,13 +124,32 @@ def roster_rows(league: League, week: int) -> list[PlayerRow]:
     return rows
 
 
+def waiver_statuses(league: League, week: int, size: int = 300) -> dict[int, str]:
+    """player id -> "WAIVERS" | "FREEAGENT" for the same pool `League.free_agents` returns.
+
+    espn-api's Player drops the pool entry's `status`, and in a waiver-priority league that is the difference between
+    "click add" and "place a claim that processes Wednesday behind six other teams". Same filter as espn-api, so the
+    ids line up; a failure here just leaves the status unknown."""
+    import json as _json
+    filters = {"players": {"filterStatus": {"value": ["FREEAGENT", "WAIVERS"]}, "filterSlotIds": {"value": []}, "limit": size,
+                           "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+                           "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "STANDARD"}}}
+    try:
+        data = league.espn_request.league_get(params={"view": "kona_player_info", "scoringPeriodId": week},
+                                              headers={"x-fantasy-filter": _json.dumps(filters)})
+    except Exception:
+        return {}
+    return {int(e["id"]): e["status"] for e in data.get("players", []) if e.get("status") in ("WAIVERS", "FREEAGENT")}
+
+
 def free_agent_rows(league: League, week: int, size: int = 300) -> list[PlayerRow]:
     rows = []
+    wstat = waiver_statuses(league, week, size)
     for p in league.free_agents(week=week, size=size):
         rows.append(PlayerRow(
             espn_id=p.playerId, name=p.name, pos=p.position, team=p.proTeam,
             eligible=[s for s in p.eligibleSlots if s not in NON_STARTER],
-            slot="FA", fantasy_team_id=None, injury_status=p.injuryStatus,
+            slot="FA", fantasy_team_id=None, injury_status=_status(p), waiver_status=wstat.get(p.playerId),
             proj_week=_week_stat(p, week, "projected_points"),
             actual_week=_week_stat(p, week, "points"),
             proj_season=p.projected_total_points,

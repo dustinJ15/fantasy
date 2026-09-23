@@ -105,7 +105,7 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
         return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, None, [p for p in players_all if p not in pin_list])
     score, mu, var, combo = best
     assignment: dict[str, list[PlayerProj]] = {s_: list(ps) for s_, ps in pinned.items()}
-    for s, p in zip(slots, combo):
+    for s, p in _settle(slots, combo):
         assignment.setdefault(s, [])
         if p is not None:
             assignment[s].append(p)
@@ -113,6 +113,41 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     bench = [p for p in players_all if p.espn_id not in chosen]
     pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
     return Lineup(assignment, mu, var, pw, bench)
+
+
+def _settle(slots: list[str], combo: tuple) -> list[tuple[str, PlayerProj | None]]:
+    """Re-seat the chosen starters so as many as possible keep the ESPN slot they are already in.
+
+    The search returns the first combo with the best score, and slot order is QB, RB, WR, ... then flex, so the top
+    two RBs land in RB and the third in the flex regardless of where they sit today. Same starters, two clicks that
+    change nothing ("Henderson: FLEX -> RB, Tuten: RB -> FLEX"). Small exact search: at most a handful of starters."""
+    players = [p for p in combo if p is not None]
+    order = sorted(range(len(slots)), key=lambda i: -len([p for p in players if slots[i] in p.eligible]))  # tight slots first
+    best: tuple[int, list] | None = None
+
+    def rec(i: int, left: list[PlayerProj], acc: list[tuple[str, PlayerProj | None]], kept: int) -> None:
+        nonlocal best
+        if best is not None and kept + len(left) <= best[0]:
+            return  # cannot beat the best seating even if every remaining player stays put
+        if i == len(order):
+            if best is None or kept > best[0]:
+                best = (kept, list(acc))
+            return
+        s = slots[order[i]]
+        cands = [p for p in left if s in p.eligible]
+        # try the player already sitting in this slot first, then the rest; None if nobody fits (an empty slot)
+        cands.sort(key=lambda p: p.slot != s)
+        for p in cands or [None]:
+            rest = [q for q in left if q is not p] if p is not None else left
+            acc.append((s, p)); rec(i + 1, rest, acc, kept + (1 if p is not None and p.slot == s else 0)); acc.pop()
+            if p is None:
+                break
+
+    rec(0, players, [], 0)
+    if best is None or len([p for _, p in best[1] if p is not None]) != len(players):
+        return list(zip(slots, combo))  # a seating that drops someone is worse than the original; keep it
+    seated = dict(zip(order, best[1]))
+    return [seated[i] for i in range(len(slots))]
 
 
 def compare(ev_lineup: Lineup, win_lineup: Lineup) -> list[dict]:

@@ -46,17 +46,43 @@ def _lineup_changes(lg: dict) -> list[str]:
     return moves
 
 
-def _drop_candidate(lg: dict) -> str | None:
-    """Weakest bench player by rest-of-season value, skipping K/DST and the IR slot.
+def _drop_order(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
+    """Bench players cheapest first by rest-of-season value, skipping K/DST, the IR slot and `exclude`.
 
     `mu_ros` already nets out the games a hurt player will miss, so a season-ender is the cheapest cut and a
     four-week stash is not. The IR occupant is skipped because dropping him frees an IR slot, not a bench spot.
     """
     starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
-    bench = [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"]
-    if not bench:
-        return None
-    return min(bench, key=lambda p: p["mu_ros"])["name"]
+    bench = [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"
+             and p["name"] not in exclude]
+    return [p["name"] for p in sorted(bench, key=lambda p: p["mu_ros"])]
+
+
+def _drop_candidate(lg: dict) -> str | None:
+    order = _drop_order(lg)
+    return order[0] if order else None
+
+
+class _Spots:
+    """The roster-spot ledger for one league's checklist: every add needs a spot, every spot is spent once.
+
+    Open bench spots go first; after that each pickup or activation names the cheapest drop not already used. Before
+    this, the activate row and the waiver row each picked "the" drop on their own and the card spent Jaxson Dart
+    twice in one morning."""
+
+    def __init__(self, lg: dict, open_spots: int, reserved: set[str]):
+        self.lg, self.open, self.reserved, self.dropped = lg, max(int(open_spots or 0), 0), set(reserved), []
+
+    def take(self, for_whom: str | None = None) -> tuple[str | None, str]:
+        """(drop name or None, suffix for the row text). Uses an open spot before naming a drop."""
+        if self.open > 0:
+            self.open -= 1
+            return None, " (there is an open bench spot)"
+        order = _drop_order(self.lg, self.reserved | set(self.dropped) | ({for_whom} if for_whom else set()))
+        if not order:
+            return None, " (no obvious drop, your call who goes)"
+        self.dropped.append(order[0])
+        return order[0], f"; drop {order[0]}"
 
 
 # Below this many starters still to play, naming them is the point (Monday morning: two guys decide the week).
@@ -144,6 +170,20 @@ def _cover_items(lg: dict) -> list[dict]:
     return out
 
 
+def _add_verb(lg: dict, w: dict) -> str:
+    """"claim" for a player still on waivers (the click is a claim that processes on waiver day, and in a priority
+    league it goes to the highest priority), "add" for a free agent who is yours the moment you click."""
+    if w.get("on_waivers"):
+        pri = lg.get("waiver_rank")
+        faab = lg.get("faab_remaining") is not None
+        return "claim" + (f" (waivers, bid ${w['bid']})" if faab and w.get("bid") else (f" (waivers, you are priority #{pri})" if pri else " (waivers)"))
+    return "add"
+
+
+def _claim_note(lg: dict, w: dict) -> str:
+    return " (he is on waivers, so the claim lands on waiver day)" if w.get("on_waivers") else ""
+
+
 INJURY_LABEL = {"ir": "IR", "hold": "Holding", "drop": "Drop", "trade": "Hurt (trade)", "activate": "Activate"}
 # Verdicts that move a player off the roster or out the door: Claude has to rule on them, like trade rows.
 INJURY_NEEDS_RULING = ("drop", "trade")
@@ -155,13 +195,20 @@ def _weeks(r: dict) -> str:
     return f"~{r['weeks_out']:.0f} wk{'s' if r['weeks_out'] >= 1.5 else ''}"
 
 
-def _injury_items(lg: dict, drop: str | None) -> list[dict]:
+def _injury_items(lg: dict, spots: _Spots | None = None) -> list[dict]:
     """One row per hurt player, the verb decided by `model.injuries`; this only puts words on the numbers.
 
     Rows lead with the click (move to IR, drop X and add Y) so the checklist reads as a sequence. A hold is not a
-    click, so it comes back as kind `hold` and the renderers print it below the list, not in it."""
+    click, so it comes back as kind `hold` and the renderers print it below the list, not in it. An activation
+    needs a bench spot, so it draws on the ledger; when the drop it takes is a player who has his own Drop row, that
+    row folds into this one (one click, one drop)."""
+    spots = spots or _Spots(lg, lg.get("open_spots") or 0, set())
+    drop_rows = {r["name"]: r for r in lg.get("injuries") or [] if r["verdict"] == "drop"}
+    folded: set[str] = set()
     out = []
     for r in lg.get("injuries") or []:
+        if r["name"] in folded:
+            continue
         who, v = f"{r['name']} ({r['pos']})", r["verdict"]
         if v == "hold" and r["weeks_out"] < 2:
             continue  # out one game and worth keeping: the lineup row already handles him, this would be the injury report
@@ -175,7 +222,15 @@ def _injury_items(lg: dict, drop: str | None) -> list[dict]:
             elif add:
                 text += f", then add {add['name']} ({add['pos']}, {add['why']})"
         elif v == "activate":
-            text = f"move {who} off IR, he is back" + (f", and drop {drop}" if drop and drop != r["name"] else "")
+            st = (r.get("espn_status") or "active").replace("_", " ").lower()
+            text = f"move {who} off IR, ESPN lists him {st} so the slot has to be cleared"
+            drop, suffix = spots.take(for_whom=r["name"])
+            if drop in drop_rows:
+                d = drop_rows[drop]
+                folded.add(drop)
+                text += f"; drop {drop} ({d['pos']}, out {_weeks(d)}, worth ~{d['hold_value']:.0f} pts the rest of the way) to make room"
+            else:
+                text += suffix.replace("; drop ", "; drop ") + (" to make room" if drop else "")
         elif v == "drop":
             text = f"drop {who}: out {_weeks(r)}{back}, worth ~{r['hold_value']:.0f} pts the rest of the way"
             if add:
@@ -219,25 +274,44 @@ def todos(lg: dict) -> list[dict]:
     else:
         out.append({"kind": "lineup", "id": "lineup", "label": "Lineup",
                     "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []})
-    drop = _drop_candidate(lg)
-    inj = _injury_items(lg, drop)
+    # Players an injury row already moves (to IR, out in a trade) are not drop candidates for anyone else.
+    reserved = {r["name"] for r in lg.get("injuries") or [] if r["verdict"] in ("ir", "trade")}
+    n_open = lg["open_spots"] if lg.get("open_spots") is not None else len(lg.get("open_spot_adds") or [])
+    spots = _Spots(lg, n_open, reserved)
+    inj = _injury_items(lg, spots)
     out += [i for i in inj if i["verdict"] in ("ir", "activate")]
-    starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5]
-    ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts]
+    added = {r["add"]["name"] for r in lg.get("injuries") or [] if r.get("add")}
+    starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]
+    ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts and w["name"] not in added]
     for w in starts[:1]:
+        _, suffix = spots.take()
+        added.add(w["name"])
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
-                    "text": f"add {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)" + (f"; drop {drop}" if drop else "")})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week){suffix}"})
     for w in ups[:1]:
+        _, suffix = spots.take()
+        added.add(w["name"])
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
-                    "text": f"add {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}" + (f"; drop {drop}" if drop else "")})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}{suffix}"})
     for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]:
         out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
-                    "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
+                    "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)" + _claim_note(lg, w)})
     out += _cover_items(lg)
     out += [i for i in inj if i["verdict"] == "drop"]
+    # Bench spots still open after the rows above: name who fills each, never someone the card already adds.
     for a in lg.get("open_spot_adds") or []:
+        if spots.open <= 0:
+            break
+        if a["name"] in added:
+            continue
+        spots.open -= 1
+        added.add(a["name"])
+        w = next((w for w in lg["waivers"] if w["name"] == a["name"]), None)
         out.append({"kind": "waiver", "id": f"waiver:{slug(a['name'])}", "label": "Open spot",
-                    "text": f"add {a['name']} ({a['pos']}, {a['why']}) to the open bench spot"})
+                    "text": f"{_add_verb(lg, w) if w else 'add'} {a['name']} ({a['pos']}, {a['why']}) to the open bench spot"})
+    if lg.get("trades_closed"):
+        out.append({"kind": "sent", "id": "deadline", "label": "Trades",
+                    "text": f"the trade deadline passed ({(lg.get('trade_deadline_iso') or '')[:10]}); the rest of the way is waivers only"})
     # Offers I already sent are the reason half the "why didn't it know that" moments happen: without them the card
     # re-proposes a deal that is sitting in the rival's inbox with a day left on it.
     for t in lg.get("outgoing_trades") or []:
@@ -254,7 +328,7 @@ def todos(lg: dict) -> list[dict]:
         warn = [_to_dustin(w) for w in t["why"] if w.startswith("leaves me") or w.startswith("market says I")]
         them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
         out.append({"kind": "trade", "id": f"trade:{slug('-'.join(t['get']))}", "label": f"Trade ({trade_tag(t)})",
-                    "worth": sendable(t), "rival": t.get("rival"), "give": list(t["give"]), "warn": warn,
+                    "worth": sendable(t), "rival": t.get("rival"), "give": list(t["give"]), "get": list(t["get"]), "warn": warn,
                     "text": f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
                             f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them})"})
     out += [i for i in inj if i["verdict"] == "trade"]

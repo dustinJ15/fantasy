@@ -26,4 +26,9 @@ if [ ! -f leagues.toml ]; then
   echo "leagues.toml missing: set the LEAGUES_TOML environment variable (contents of the file) or copy leagues.example.toml" >&2
   exit 2
 fi
+# Memory that lives on the projlog branch (projection logs, skipped trade rulings): restore it so the packet can read
+# it. Best-effort; a fresh repo with no projlog branch is fine.
+if [ ! -d data/projlog ]; then
+  (git fetch --quiet origin projlog && git checkout --quiet origin/projlog -- data/projlog && git reset --quiet -- data/projlog) || true
+fi
 uv run ff doctor

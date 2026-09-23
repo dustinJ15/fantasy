@@ -58,7 +58,9 @@ def sync(force: bool = typer.Option(False, "--force", help="Ignore cache TTLs"))
     """Refresh all sources."""
     from .sources import fantasycalc, fantasypros, sleeper, vegas
     fantasypros.weekly_ecr(force); fantasypros.player_ids(force); rprint("fantasypros mirror ok")
-    sleeper.players(force); sleeper.trending("add", 24, 100, force); rprint("sleeper ok")
+    # The player dump carries the injury designations and Sleeper is often a day ahead of ESPN on an IR or
+    # season-ending tag, so it is refreshed every run (one download) rather than on its daily TTL.
+    sleeper.players(True); sleeper.trending("add", 24, 100, force); rprint("sleeper ok")
     vegas.implied_totals(force=force); rprint("odds ok")
     fantasycalc.values(force=force); rprint("fantasycalc ok")
     for ref in leagues():
@@ -118,6 +120,10 @@ def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JS
     r = _load_json(reads)
     for warn in report.voice_lint(r or {}):
         rprint(f"[yellow]voice: {warn}[/]")
+    if r:
+        from .rulings import record_skips
+        for key in record_skips(p, r):
+            rprint(f"[dim]remembered skip: {key}[/]")
     for warn in report.read_lint(p, r):
         rprint(f"[yellow]reads: {warn}[/]")
     open(out, "w").write(render_email(p, r, only_incoming=only_incoming, full=full))

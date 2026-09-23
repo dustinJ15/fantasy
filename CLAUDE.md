@@ -67,6 +67,14 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 - Code changes take effect on the next cloud run only after `git push` to main (the VM clones fresh each time).
 - Projection logs: the routine pushes `data/projlog/` to the `projlog` branch, never main. To run `ff accuracy` locally:
   `git fetch origin projlog && git checkout origin/projlog -- data/projlog`.
+- Skipped trade rows are remembered: `ff render-email --reads` writes each `skip` on a `trade:` row to
+  `data/projlog/skipped_trades.json` (`src/ff/rulings.py`), the packet drops that package for 14 days, and the file rides
+  the `projlog` branch (cloud_setup.sh restores it). A `do`/`amend` is not remembered.
+- Checklist ledger: `report._Spots` hands out roster spots (open bench spot first, then the cheapest drop not already
+  named), so an activation and a pickup never spend the same drop. Waiver rows say `claim` (still on waivers, with the
+  priority) or `add` (free agent) from `waiver_status` in the snapshot.
+- Questionable sit-risk is day-aware (`QUESTIONABLE_BY_WEEKDAY`: 15% Mon–Wed, 20% Thu, 30% from Fri); a `p_zero` override wins.
+  An IR stash is activated only when ESPN's designation leaves the IR-eligible set, never from the guessed return week.
 - Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, reads.json, data/cache, data/packets, leagues.toml, ops.local.md.
 
 ## Known failure modes
@@ -80,6 +88,8 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Monday email suggests moving players who played Sunday | `model/clock.py` locks players by kickoff/points; check `lines` (vegas scoreboard cache) has kickoffs and `actual_week` is populated | `ff sync --force`; look at `week_state` in the packet |
 | Sleeper projections missing for many players | crosswalk join | `Crosswalk.sleeper_id()`; check `shared.unmatched_ids` in the packet |
 | Agent sent >1 email or investigated git/Gmail history | skill scope drift | SKILL.md step 10 forbids it; tighten wording if it recurs |
+| Card says "activate" on a stash still listed Out, or names one drop on two rows | old checklist logic (fixed 2026-09-23) | activation keys off `ir_eligible`; drops come from `report._Spots` |
+| Same trade package returns the morning after a `skip` | `data/projlog/skipped_trades.json` missing (projlog branch not restored) | check cloud_setup.sh fetched `origin/projlog`; the key is `<league>|<get names>` |
 | Email card says do it and Claude's read says don't | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
 | Email says hold a player who is done for the year, or trade/drop one who is back Sunday | `weeks_out` still at its designation default (IR = 4, Out = 1) | the player is in `shared.injured`; write `weeks_out` (or `"season"`) in overrides.json and re-run step 5 |

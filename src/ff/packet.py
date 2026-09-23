@@ -17,10 +17,13 @@ from .model.sim import simulate
 from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
+from .rulings import drop_recently_skipped, load_skips
 from .sources import espn, fantasycalc, sleeper, vegas, weather
 
-PACKET_VERSION = 5
-AMBIGUOUS = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE"}
+PACKET_VERSION = 6
+AMBIGUOUS = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE", "DAY_TO_DAY"}
+# ESPN and Sleeper spell one team differently; Sleeper's DEF projections are keyed by its own abbreviation.
+SLEEPER_TEAM = {"WSH": "WAS"}
 
 
 def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
@@ -32,7 +35,8 @@ def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
 
 
 def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining: int, overrides: dict | None,
-           sl_proj: dict | None = None, lines: dict | None = None, week: int | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
+           sl_proj: dict | None = None, lines: dict | None = None, week: int | None = None,
+           weekday: int | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
     ppr = snap["settings"].get("ppr", 1.0)
     key = "pts_ppr" if ppr >= 0.75 else ("pts_half_ppr" if ppr > 0 else "pts_std")
     sl_proj, lines = sl_proj or {}, lines or {}
@@ -42,14 +46,14 @@ def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining
         for r in rows:
             fp = xw.fp_row(fp_index, r["espn_id"], r["name"], r["pos"])
             if r["pos"] == "D/ST":
-                sp = sl_proj.get(f"DEF:{r['team']}")
+                sp = sl_proj.get(f"DEF:{SLEEPER_TEAM.get(r['team'], r['team'])}")
             else:
                 sid = xw.sleeper_id(r["espn_id"], r["name"], r["pos"])
                 sp = sl_proj.get(sid) if sid else None
             spts = float(sp[key]) if sp and sp.get(key) is not None else None
             ln = lines.get(r["team"]) or {}
             out.append(blend(r, fp, inj.get(str(r["espn_id"])), weeks_remaining, overrides,
-                             sleeper_pts=spts, implied_total=ln.get("implied"), week=week))
+                             sleeper_pts=spts, implied_total=ln.get("implied"), week=week, weekday=weekday))
         return out
     return mk(snap["roster"]), mk(snap["free_agents"])
 
@@ -79,14 +83,18 @@ def _hours_left(ms, now=None) -> float | None:
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
                    overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None,
-                   now=None) -> dict:
+                   now=None, skips: dict | None = None) -> dict:
     s = snap["settings"]
     week = snap["week"]
     slots = s["lineup_slots"]
     total_weeks = len(s["matchup_periods"])
     weeks_remaining = max(total_weeks - week + 1, 1)
     my_id = snap["my_team_id"]
-    rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines, week=week)
+    # `now` is only ever passed by the real build (and by tests that want a specific day); without it the
+    # projections use the Friday sit-risk numbers, so fixtures and the demo do not change with the calendar.
+    now_dt = now if (now is not None and getattr(now, "tzinfo", None) is not None) else datetime.now(UTC)
+    rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines, week=week,
+                           weekday=now_dt.weekday() if now is not None else None)
     apply_clock(rostered, snap["roster"], lines or {}, now)
     apply_clock(fas, snap["free_agents"], lines or {}, now, free_agents=True)
     pool = rostered + fas
@@ -157,8 +165,12 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     values = fantasycalc.by_espn_id(num_teams=s["team_count"], ppr=s["ppr"])
     team_meta = {tid: {"name": t["name"], "wins": t["wins"], "losses": t["losses"]} for tid, t in teams.items()}
     by_id = {p.espn_id: p for ps in by_team.values() for p in ps}
-    trades = scan(my_id, by_team, slots, repl, team_meta, values) if my_id else []
+    # The trade deadline closes the scan: the offers Dustin could still send are none.
+    deadline_ms = int(s.get("trade_deadline_ms") or 0)
+    trades_closed = bool(deadline_ms) and now_dt.timestamp() * 1000 > deadline_ms
+    trades = scan(my_id, by_team, slots, repl, team_meta, values) if (my_id and not trades_closed) else []
     trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
+    trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     # attach title-odds delta for the top few (re-sim is expensive; do 3)
     for c in trades[:3]:
         rid = c["rival_team_id"]
@@ -227,7 +239,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     return {
         "name": snap["ref"]["name"], "league_name": s["name"], "week": week, "weeks_remaining": weeks_remaining,
         "settings": {k: s.get(k) for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr",
-                                           "reg_season_weeks", "ir_slots", "bench_slots")},
+                                           "reg_season_weeks", "ir_slots", "bench_slots", "trade_deadline_ms")},
+        "trade_deadline_iso": _ms_iso(deadline_ms), "trades_closed": trades_closed,
         "my_team_id": my_id, "my_record": f"{teams[my_id]['wins']}-{teams[my_id]['losses']}" if my_id in teams else None,
         "week_state": wstate,
         "faab_remaining": budget if s["faab"] else None,
@@ -277,6 +290,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     except Exception:
         sl_proj = {}
 
+    skips = load_skips()
     league_blocks, watch, injured, exposure = [], [], [], defaultdict(list)
     for ref in leagues(only):
         snap = league_snapshot(ref, force)
@@ -284,7 +298,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
         if wk not in lines_by_week:
             lines_by_week[wk] = vegas.implied_totals(wk or None)
         lines = lines_by_week[wk]
-        blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines)
+        blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines,
+                             now=datetime.now(UTC), skips=skips)
         for p in blk["roster"]:
             exposure[p["name"]].append(ref.name)
             st = (p["sources"].get("espn_status") or p["sources"].get("sleeper_status") or "").upper()

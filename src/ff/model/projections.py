@@ -17,10 +17,14 @@ CV_FLOOR = {"QB": 0.30, "RB": 0.45, "WR": 0.50, "TE": 0.55, "K": 0.45, "D/ST": 0
 
 # Injury designation -> probability of a zero (inactive). LLM may override via packet.
 P_ZERO = {
-    None: 0.02, "ACTIVE": 0.02, "NORMAL": 0.02, "PROBABLE": 0.08, "QUESTIONABLE": 0.30,
+    None: 0.02, "ACTIVE": 0.02, "NORMAL": 0.02, "PROBABLE": 0.08, "QUESTIONABLE": 0.30, "DAY_TO_DAY": 0.15,
     "DOUBTFUL": 0.80, "OUT": 1.0, "INJURY_RESERVE": 1.0, "IR": 1.0, "PUP": 1.0, "SUSPENSION": 1.0,
     "SUS": 1.0, "NA": 1.0, "DNR": 1.0, "COV": 1.0,
 }
+# A Questionable tag early in the week is last week's, carried until Wednesday's first practice report. Benching a
+# starter on Tuesday for a 30% that is really a 15% churns the lineup; the Friday number is the 30%. Keyed by
+# weekday (Monday = 0); days not listed use P_ZERO. Claude's `p_zero` override still wins.
+QUESTIONABLE_BY_WEEKDAY = {0: 0.15, 1: 0.15, 2: 0.15, 3: 0.20}
 
 # Designations that mean more than this week. NFL injured reserve and reserve/PUP are a four-game minimum, so 4 is a
 # floor rather than an estimate; a suspension's length is public, so Claude sets it in overrides. Single-week
@@ -100,11 +104,13 @@ LEAGUE_AVG_IMPLIED = 23.0
 
 
 def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None,
-          sleeper_pts: float | None = None, implied_total: float | None = None, week: int | None = None) -> PlayerProj:
+          sleeper_pts: float | None = None, implied_total: float | None = None, week: int | None = None,
+          weekday: int | None = None) -> PlayerProj:
     """
     row: PlayerRow dict from sources.espn. fp: matched fp_latest_weekly row. sleeper: injury_table row.
     sleeper_pts: Sleeper/Rotowire stat projection in this league's scoring. implied_total: Vegas implied team total.
-    week: the current matchup week, used only to date `return_week`.
+    week: the current matchup week, used only to date `return_week`. weekday: today (Monday = 0), which scales a
+    Questionable early in the week; None means the Friday number.
 
     Overrides (Claude's parameters, never decisions): `p_zero` and `mu_mult` are this week only; `weeks_out` (a number,
     or "season") and `ros_mult` are the rest of the season. Code owns the arithmetic between them.
@@ -134,7 +140,11 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     status = (row.get("injury_status") or "").upper() or None
     sl_status = ((sleeper or {}).get("status") or "").upper() or None
     # Sleeper tends to be fresher on designations; take the more severe of the two.
-    p0 = max(P_ZERO.get(status, 0.05), P_ZERO.get(sl_status, 0.02))
+    p_q = QUESTIONABLE_BY_WEEKDAY.get(weekday, P_ZERO["QUESTIONABLE"]) if weekday is not None else P_ZERO["QUESTIONABLE"]
+    p_zero = {**P_ZERO, "QUESTIONABLE": p_q}
+    p0 = max(p_zero.get(status, 0.05), p_zero.get(sl_status, 0.02))
+    ov = (overrides or {}).get(str(row["espn_id"]), {})
+    inj_p0 = float(ov["p_zero"]) if "p_zero" in ov else p0  # sit risk from the injury alone, before the bye
     flags = []
     if row.get("bye"):
         mu, p0 = 0.0, 1.0
@@ -146,11 +156,9 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     if fp and fp.get("start_sit_grade"):
         flags.append(f"fp:{fp['start_sit_grade']}")
 
-    ov = (overrides or {}).get(str(row["espn_id"]), {})
     sl_roster = (sleeper or {}).get("roster_status") or ""
     designated = (status not in ACTIVE_STATUSES or sl_status not in ACTIVE_STATUSES or sl_roster in SLEEPER_ROSTER_MULTI_WEEK
                   or "p_zero" in ov)
-    inj_p0 = float(ov["p_zero"]) if "p_zero" in ov else p0  # sit risk from the injury alone, before the bye
 
     # Rest-of-season per-game expectation: ESPN season projection spread over remaining games, shrunk toward this
     # week's blended number. This is the healthy, when-he-plays number, so this week only counts when he is expected
@@ -158,7 +166,7 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     season_left = float(row.get("proj_season") or 0)
     ros_pg = season_left / max(weeks_remaining, 1) if season_left else mu
     mu_ros_active = 0.5 * ros_pg + 0.5 * mu if (mu and inj_p0 < 0.5) else ros_pg
-    if "p_zero" in ov:
+    if "p_zero" in ov and not row.get("bye"):
         p0 = float(ov["p_zero"]); flags.append("llm:p_zero")
     if "mu_mult" in ov:
         mu *= float(ov["mu_mult"]); flags.append("llm:mu")   # this week only, by design (see docs/plans)
@@ -189,6 +197,7 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                  "grade": fp.get("start_sit_grade") if fp else None, "espn_status": status, "sleeper_status": sl_status,
                  "sleeper_notes": (sleeper or {}).get("notes"), "sleeper_roster_status": sl_roster or None,
                  "body_part": (sleeper or {}).get("body_part"), "percent_owned": row.get("percent_owned"),
+                 "waiver_status": row.get("waiver_status"),
                  "override_note": ov.get("note"), "weeks_out_source": "override" if "weeks_out" in ov else "default"},
         flags=flags,
     )

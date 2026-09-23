@@ -87,8 +87,18 @@ def test_ir_slot_taken_by_a_lesser_stash_is_a_swap():
     assert not any(r["name"] == "TE2" for r in rows)     # stashed and still out: no row of his own
 
 
-def test_a_stash_who_is_back_next_week_must_be_activated():
+def test_a_stash_still_listed_out_stays_on_ir_whatever_the_guessed_return():
+    """An Out defaults to one week; that guess used to print "he is back" on every stash still listed Out."""
     mine = roster(); hurt(mine[1], 1, 15, 3); mine[1].slot = "IR"
+    assert run(mine, 3, 60, ir_slots=1) == []
+
+
+def test_a_stash_espn_no_longer_calls_ir_eligible_must_be_activated():
+    """ESPN flags the roster the moment the designation leaves the IR set; that, not a date, is the trigger."""
+    mine = roster(); hurt(mine[1], 0.3, 15, 3, status="QUESTIONABLE"); mine[1].slot = "IR"
+    (row,) = run(mine, 3, 60, ir_slots=1)
+    assert row["verdict"] == "activate" and row["espn_status"] == "QUESTIONABLE" and "questionable" in row["why"][0]
+    mine = roster(); hurt(mine[1], 0, 15, 3, status="ACTIVE"); mine[1].slot = "IR"
     (row,) = run(mine, 3, 60, ir_slots=1)
     assert row["verdict"] == "activate"
 

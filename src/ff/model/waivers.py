@@ -93,7 +93,8 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
         out.append({"espn_id": p.espn_id, "name": p.name, "pos": p.pos, "team": p.team, "mu_week": p.mu, "mu_ros": p.mu_ros,
                     "delta_over_starter": d_start, "slot": slot, "delta_week": d_week, "week_slot": week_slot,
                     "vorp": round(vorp, 2), "bid": bid, "score": round(score, 2),
-                    "streamer": streamer, "why": why, "percent_owned": p.sources.get("percent_owned")})
+                    "streamer": streamer, "why": why, "percent_owned": p.sources.get("percent_owned"),
+                    "on_waivers": p.sources.get("waiver_status") == "WAIVERS"})
     out.sort(key=lambda x: -x["score"])
     skill = [o for o in out if not o["streamer"]][:top]
     streamers = [o for o in out if o["streamer"]][:3]

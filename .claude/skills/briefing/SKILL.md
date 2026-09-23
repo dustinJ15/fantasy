@@ -29,6 +29,9 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    `p_zero` and `mu_mult` are this week only. `weeks_out` and `ros_mult` are the rest of the season and drive the
    hold / IR / drop / trade row for a hurt player; write `weeks_out` for every `shared.injured` entry you researched.
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
+   (Without an override the packet already uses 15% for a Questionable on Mon–Wed and 30% from Friday; write one only
+   when the report says more than the tag does.) An "Activate" row means ESPN no longer lists him as IR-eligible and
+   the roster is flagged until he moves; do not skip it.
    weeks_out guide: IR 4 unless the report says longer; `"season"` for an ACL, Achilles or season-ending surgery;
    suspension = games announced; count from this week (an Out this week with a return next week is 1).
    ros_mult only for a changed role or a diminished return (hamstring at 85%), not for this week's snap count. One more
@@ -51,6 +54,8 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    - `skip` strikes the row out in the email and prints your note as the reason. Use it when the row is wrong.
    - `amend` keeps the row and attaches your correction (e.g. "add him, but that flex slot is locked, he starts next week").
    - `do` is confirmation, and is the only verdict that needs no note.
+   - A `skip` on a `trade:` row is remembered for two weeks (`ff render-email` writes it to `data/projlog/skipped_trades.json`,
+     pushed with the projlog in step 9), so the same package stops coming back; say why in the note, it is shown next time.
    The card is the model's math and your read is judgment; they are allowed to disagree, but the email has to end with
    one answer per row, not a card saying do it and a paragraph underneath saying don't. Every `trade` row needs a
    verdict — the card lists up to three and Dustin cannot tell which one you meant otherwise. So does every
