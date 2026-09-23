@@ -221,6 +221,9 @@ def todos(lg: dict) -> list[dict]:
                     "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)"})
     out += _cover_items(lg)
     out += _injury_items(lg, drop)
+    for a in lg.get("open_spot_adds") or []:
+        out.append({"kind": "waiver", "id": f"waiver:{slug(a['name'])}", "label": "Open spot",
+                    "text": f"you have an open bench spot: add {a['name']} ({a['pos']}, {a['why']})"})
     ph = (lg.get("week_state") or {}).get("phase", "pre")
     ch = _lineup_changes(lg) if ph != "final" else []
     if ph == "final":

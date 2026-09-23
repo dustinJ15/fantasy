@@ -63,13 +63,14 @@ def _best_fa(p: PlayerProj, waivers: list[dict]) -> dict | None:
     return max(pool, key=fa_ppw) if pool else None
 
 
-def fill_spot(p: PlayerProj, waivers: list[dict], handcuffs: list[dict], used: set[str]) -> dict | None:
-    """Who takes the bench spot an IR move or a drop frees. Being below the wire is the right bar for cutting him and
-    the wrong one for filling the spot: an empty slot is worth less than any body. Order: a pickup who would start or
-    beats replacement, else a free-agent handcuff for one of my RB1s, else the best body at his position by the
-    waiver score, else the best body on the wire. `used` keeps two freed spots from naming the same player."""
+def fill_spot(p: PlayerProj | None, waivers: list[dict], handcuffs: list[dict], used: set[str]) -> dict | None:
+    """Who takes the bench spot an IR move or a drop frees (`p` is the player leaving), or an already open one
+    (`p` is None). Being below the wire is the right bar for cutting him and the wrong one for filling the spot: an
+    empty slot is worth less than any body. Order: a pickup who would start or beats replacement, else a free-agent
+    handcuff for one of my RB1s, else the best body at his position by the waiver score, else the best body on the
+    wire. `used` keeps two spots from naming the same player."""
     skill = [w for w in waivers if not w.get("streamer") and w["name"] not in used]
-    fit = [w for w in skill if w.get("slot") in p.eligible or w.get("pos") == p.pos]
+    fit = [w for w in skill if p is not None and (w.get("slot") in p.eligible or w.get("pos") == p.pos)]
     best = max(fit or skill, key=fa_ppw) if (fit or skill) else None
     if best and fa_ppw(best) > 0:
         return {"name": best["name"], "pos": best["pos"], "kind": "upgrade", "why": f"+{fa_ppw(best):.1f}/wk"}

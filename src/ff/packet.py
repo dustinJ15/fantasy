@@ -10,7 +10,7 @@ from .config import PACKET_DIR, LeagueRef, env, leagues
 from .ids import Crosswalk
 from .model import usage as usage_mod
 from .model.clock import apply_clock, week_state
-from .model.injuries import decide as decide_injuries
+from .model.injuries import decide as decide_injuries, fill_spot
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
@@ -177,6 +177,17 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
                                s.get("ir_slots", 0), waivers, trades, values,
                                {p.espn_id for ps in win_lu.assignment.values() for p in ps}, repl, cuffs) if my_id else []
 
+    # bench spots already open (a drop made, nobody added): name who fills each one, after the hurt-player rows
+    roster_max = sum(slots.values()) + int(s.get("bench_slots") or 0)
+    open_spots = max(roster_max - len([p for p in mine if p.slot != "IR"]), 0) if my_id and s.get("bench_slots") else 0
+    used = {r["add"]["name"] for r in injuries if r.get("add")}
+    open_adds = []
+    for _ in range(open_spots):
+        a = fill_spot(None, waivers, cuffs, used)
+        if not a:
+            break
+        open_adds.append(a); used.add(a["name"])
+
     # offers other managers sent me (and mine still open), from ESPN's pending transactions
     incoming, outgoing = [], []
     for tx in snap.get("pending_trades") or []:
@@ -228,6 +239,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "lineup_ev": ev_lu.to_dict(), "lineup_win": win_lu.to_dict(), "lineup_diff": compare(ev_lu, win_lu),
         "replacement": repl,
         "waivers": waivers, "handcuffs": cuffs, "trades": trades, "injuries": injuries,
+        "open_spots": open_spots, "open_spot_adds": open_adds,
         "incoming_trades": incoming, "outgoing_trades": outgoing,
         "pending_trades_error": snap.get("pending_trades_error"),
         "odds": {str(tid): {**o, "name": teams[tid]["name"], "record": f"{teams[tid]['wins']}-{teams[tid]['losses']}", "is_me": tid == my_id} for tid, o in odds.items()},

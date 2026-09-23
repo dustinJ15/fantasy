@@ -291,3 +291,11 @@ def test_out_line_merges_leagues_and_carries_the_note():
     assert len(rows) == 1 and rows[0]["leagues"] == ["L1", "L3"] and rows[0]["weeks_out"] == 6
     line = report.injured_line(rows[0])
     assert "Olave out ~6 wks, back wk 9 (L1, L3)" in line and "Schefter" in line
+
+
+def test_an_open_bench_spot_is_a_row_naming_who_fills_it():
+    lg = league()
+    lg["open_spots"] = 1
+    lg["open_spot_adds"] = [{"name": "Seth McGowan", "pos": "RB", "kind": "handcuff", "why": "handcuff for Jonathan Taylor"}]
+    row = by_id(lg)["waiver:seth-mcgowan"]
+    assert row["label"] == "Open spot" and row["text"] == "you have an open bench spot: add Seth McGowan (RB, handcuff for Jonathan Taylor)"

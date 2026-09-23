@@ -202,3 +202,11 @@ def test_an_ir_swap_frees_nothing_so_names_nobody():
     hurt(mine[9], 15, 15, 3); mine[9].slot = "IR"
     row = next(r for r in run(mine, 3, 60, ir_slots=1, waivers=[depth_fa("Body B")]) if r["name"] == "RB1")
     assert row["verdict"] == "ir" and row["ir_occupant"] == "TE2" and row["add"] is None
+
+
+def test_an_open_spot_with_no_player_leaving_still_gets_a_name():
+    from ff.model.injuries import fill_spot
+    cuffs = [{"starter": "RB1", "handcuff": "Backup", "owner_team_id": None, "est_value": 1.1}]
+    assert fill_spot(None, [depth_fa("Body B")], cuffs, set())["name"] == "Backup"
+    assert fill_spot(None, [depth_fa("Body B")], cuffs, {"Backup"})["name"] == "Body B"
+    assert fill_spot(None, [], [], set()) is None
