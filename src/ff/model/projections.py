@@ -146,17 +146,18 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     if fp and fp.get("start_sit_grade"):
         flags.append(f"fp:{fp['start_sit_grade']}")
 
-    # Rest-of-season per-game expectation: ESPN season projection spread over remaining games,
-    # shrunk toward this week's blended number. This is the healthy, when-he-plays number.
-    season_left = float(row.get("proj_season") or 0)
-    ros_pg = season_left / max(weeks_remaining, 1) if season_left else mu
-    mu_ros_active = 0.5 * ros_pg + 0.5 * mu if mu else ros_pg
-
     ov = (overrides or {}).get(str(row["espn_id"]), {})
     sl_roster = (sleeper or {}).get("roster_status") or ""
     designated = (status not in ACTIVE_STATUSES or sl_status not in ACTIVE_STATUSES or sl_roster in SLEEPER_ROSTER_MULTI_WEEK
                   or "p_zero" in ov)
     inj_p0 = float(ov["p_zero"]) if "p_zero" in ov else p0  # sit risk from the injury alone, before the bye
+
+    # Rest-of-season per-game expectation: ESPN season projection spread over remaining games, shrunk toward this
+    # week's blended number. This is the healthy, when-he-plays number, so this week only counts when he is expected
+    # to play it: a player listed Out has a weekly projection of ~0 that says nothing about his healthy level.
+    season_left = float(row.get("proj_season") or 0)
+    ros_pg = season_left / max(weeks_remaining, 1) if season_left else mu
+    mu_ros_active = 0.5 * ros_pg + 0.5 * mu if (mu and inj_p0 < 0.5) else ros_pg
     if "p_zero" in ov:
         p0 = float(ov["p_zero"]); flags.append("llm:p_zero")
     if "mu_mult" in ov:

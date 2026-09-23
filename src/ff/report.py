@@ -168,14 +168,14 @@ def _injury_items(lg: dict, drop: str | None) -> list[dict]:
             text = f"{who} is out {_weeks(r)}{back}; move him to IR"
             if r.get("ir_occupant"):
                 text += f" in place of {r['ir_occupant']}"
-            elif fa and fa["delta_over_starter"] > 0:
+            elif fa and fa.get("ppw", fa["delta_over_starter"]) > 0:
                 text += f", then add {fa['name']} on the freed spot"
         elif v == "activate":
             text = f"{who} is back; move him off IR" + (f" and drop {drop}" if drop and drop != r["name"] else "")
         elif v == "drop":
-            text = f"{who} is out {_weeks(r)} and worth ~{r['hold_value']:.0f} pts the rest of the way; drop him"
-            if fa and fa["delta_over_starter"] > 0:
-                text += f" for {fa['name']} (+{fa['delta_over_starter']:.1f}/wk)"
+            text = f"{who} is out {_weeks(r)}{back} and worth ~{r['hold_value']:.0f} pts the rest of the way; drop him"
+            if fa and fa.get("ppw", fa["delta_over_starter"]) > 0:
+                text += f" for {fa['name']} (~{r['drop_value']:.0f} pts)"
         elif v == "trade":
             t = r["trades"][0]
             text = f"{who} is out {_weeks(r)}{back}; the offer to {t['rival']} for {', '.join(t['get'])} ships him, else hold"

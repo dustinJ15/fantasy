@@ -61,6 +61,7 @@ def injured_entry(p: dict, league: str) -> dict:
             "espn_status": src.get("espn_status"), "sleeper_status": src.get("sleeper_status"),
             "sleeper_roster_status": src.get("sleeper_roster_status"), "body_part": src.get("body_part"), "notes": src.get("sleeper_notes"),
             "weeks_out": p["weeks_out"], "weeks_out_source": src.get("weeks_out_source"), "return_week": p.get("return_week"),
+            "mu_ros_active": p.get("mu_ros_active"),
             "slot": p.get("slot"), "override_note": src.get("override_note")}
 
 
@@ -174,7 +175,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     me_odds = odds.get(my_id) or {}
     injuries = decide_injuries(mine, slots, week, weeks_remaining, s["reg_season_weeks"], me_odds.get("playoff_pct"),
                                s.get("ir_slots", 0), waivers, trades, values,
-                               {p.espn_id for ps in win_lu.assignment.values() for p in ps}) if my_id else []
+                               {p.espn_id for ps in win_lu.assignment.values() for p in ps}, repl) if my_id else []
 
     # offers other managers sent me (and mine still open), from ESPN's pending transactions
     incoming, outgoing = [], []

@@ -1,9 +1,10 @@
 """What to do with a hurt player: IR-stash, trade, drop, or hold.
 
 One verdict per rostered player with an injury horizon, from numbers the packet already has: his per-game value on
-return against the lineup I would field without him, the best free agent's value over the same lineup, whether an IR
-slot makes the stash free, and remaining weeks weighted by my playoff odds (a week-15 return is worth almost nothing
-to a team at 20% and almost a full week to a team at 90%). Claude supplies `weeks_out`; nothing here reads prose.
+return against the lineup I would field without him plus what he is worth as depth, the best free agent's value on the
+same scale, whether an IR slot makes the stash free, and remaining weeks weighted by my playoff odds (a week-15 return
+is worth almost nothing to a team at 20% and almost a full week to a team at 90%). Claude supplies `weeks_out`; nothing
+here reads prose.
 """
 from __future__ import annotations
 
@@ -21,6 +22,12 @@ IR_ELIGIBLE = {"INJURY_RESERVE", "IR", "OUT"}
 DROP_MARGIN = 3.0
 DROP_RATIO = 0.25
 NOT_DROPPABLE = ("K", "D/ST")
+# A bench player is mostly insurance: he starts in the weeks a starter is hurt or on bye. Count a quarter of his margin
+# over the wire (the position's replacement level) for that, on top of any lineup spot he wins outright. Without this
+# term a hurt backup and the best pickup both score 0 against the starting lineup and the rule can never drop anyone.
+DEPTH_WEIGHT = 0.25
+# The IR slot is for a real absence. Stashing a one-week Out means activating him next week and dropping someone then.
+IR_MIN_WEEKS = 2
 
 
 def week_weights(week: int, weeks_remaining: int, reg_season_weeks: int, playoff_pct: float | None) -> dict[int, float]:
@@ -34,12 +41,18 @@ def ir_eligible(p: PlayerProj) -> bool:
     return st in IR_ELIGIBLE or (p.sources.get("sleeper_roster_status") or "") in SLEEPER_ROSTER_MULTI_WEEK
 
 
-def _hold_ppw(p: PlayerProj, roster: list[PlayerProj], slots: dict[str, int]) -> float:
-    """His per-game value on return over the weakest starter in the rest-of-season lineup I field without him."""
+def _hold_ppw(p: PlayerProj, roster: list[PlayerProj], slots: dict[str, int], repl: dict[str, float]) -> float:
+    """His per-game value on return: over the weakest starter in the rest-of-season lineup I field without him, plus
+    his depth value over the wire."""
     without = optimize([q.ros() for q in roster if q.espn_id != p.espn_id], slots, objective="ev").assignment
     healthy = replace(p, mu_ros=p.mu_ros_active)
     d, _ = own_starter_value(healthy, without)
-    return max(d, 0.0)
+    return max(d, 0.0) + DEPTH_WEIGHT * max((p.mu_ros_active or 0.0) - repl.get(p.pos, 0.0), 0.0)
+
+
+def fa_ppw(w: dict) -> float:
+    """A free agent's per-week value on the same scale as `_hold_ppw`: lineup upgrade plus depth over replacement."""
+    return max(w.get("delta_over_starter") or 0.0, 0.0) + DEPTH_WEIGHT * max(w.get("vorp") or 0.0, 0.0)
 
 
 def _best_fa(p: PlayerProj, waivers: list[dict]) -> dict | None:
@@ -47,13 +60,16 @@ def _best_fa(p: PlayerProj, waivers: list[dict]) -> dict | None:
     skill = [w for w in waivers if not w.get("streamer")]
     fit = [w for w in skill if w.get("slot") in p.eligible or w.get("pos") == p.pos]
     pool = fit or skill
-    return max(pool, key=lambda w: w.get("delta_over_starter", 0)) if pool else None
+    return max(pool, key=fa_ppw) if pool else None
 
 
 def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remaining: int, reg_season_weeks: int,
            playoff_pct: float | None, ir_slots: int, waivers: list[dict], trades: list[dict], values: dict[str, dict],
-           starters_week: set[int]) -> list[dict]:
-    """One entry per hurt player (weeks_out >= 1, or already in the IR slot), most valuable first."""
+           starters_week: set[int], repl: dict[str, float] | None = None) -> list[dict]:
+    """One entry per hurt player (weeks_out >= 1, or already in the IR slot), most valuable first.
+
+    `repl` is the league's replacement level per position (`vbd.replacement_levels`), the floor for depth value."""
+    repl = repl or {}
     weights = week_weights(week, weeks_remaining, reg_season_weeks, playoff_pct)
     w_eff = sum(weights.values())
     hurt = [p for p in mine if p.weeks_out >= 1 or p.slot == "IR"]
@@ -67,11 +83,19 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
     calc: dict[int, dict] = {}
     for p in hurt:
         back_eff = sum(v for t, v in weights.items() if p.return_week is not None and t >= p.return_week)
-        hold_ppw = _hold_ppw(p, mine, slots)
+        hold_ppw = _hold_ppw(p, mine, slots, repl)
         fa = _best_fa(p, waivers)
-        drop_ppw = max(fa["delta_over_starter"], 0.0) if fa else 0.0
+        drop_ppw = fa_ppw(fa) if fa else 0.0
         calc[p.espn_id] = {"back_eff": back_eff, "hold_ppw": hold_ppw, "hold_value": hold_ppw * back_eff,
                            "fa": fa, "drop_value": drop_ppw * w_eff}
+
+    # The open IR slots go to the stashes worth the most, not to whoever is listed first: a one-week Out never takes
+    # the slot from a four-week IR player. Ties (two dead spots) go to the better player when healthy.
+    stashable = [p for p in hurt if p.slot != "IR" and ir_eligible(p) and p.weeks_out >= IR_MIN_WEEKS]
+    stashable.sort(key=lambda q: (-calc[q.espn_id]["hold_value"], -(q.mu_ros_active or 0)))
+    to_ir = {p.espn_id for p in stashable[:ir_open]}
+    stash_ids = {p.espn_id for p in stashable}
+    swappable = list(on_ir)  # occupants not yet promised to someone
 
     out = []
     for p in sorted(hurt, key=lambda q: -(q.mu_ros_active or 0)):
@@ -84,8 +108,8 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
             "hold_ppw": round(c["hold_ppw"], 2), "hold_value": round(c["hold_value"], 1), "drop_value": round(c["drop_value"], 1),
             "back_eff": round(c["back_eff"], 1), "w_eff": round(w_eff, 1),
             "ir_eligible": ir_eligible(p), "ir_open": ir_open, "ir_occupant": None,
-            "best_fa": ({"name": c["fa"]["name"], "pos": c["fa"]["pos"], "delta_over_starter": c["fa"]["delta_over_starter"]}
-                        if c["fa"] else None),
+            "best_fa": ({"name": c["fa"]["name"], "pos": c["fa"]["pos"], "delta_over_starter": c["fa"]["delta_over_starter"],
+                         "ppw": round(fa_ppw(c["fa"]), 2)} if c["fa"] else None),
             "trades": [{"rival": t.get("rival"), "get": list(t.get("get") or [])} for t in sends],
             "market": ({"redraft_value": v.get("redraft_value"), "trend_30d": v.get("trend_30d")} if v else None),
             "why": [],
@@ -93,34 +117,43 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
         why = row["why"]
         gap = c["drop_value"] - c["hold_value"]
         margin = max(DROP_MARGIN, DROP_RATIO * c["hold_value"])
+        # A dead roster spot needs no pickup to justify the drop: out for the season, back only after my season is
+        # over, or below the wire when he is back (he would not start and a free agent as good is always there).
+        dead = ("out for the season, dead roster spot" if p.avail_ros == 0
+                else "back only after my season is decided, dead roster spot" if c["back_eff"] <= 0
+                else "no better than the wire when he is back, dead roster spot" if c["hold_value"] <= 0 else None)
         if p.slot == "IR":
             if p.return_week is not None and p.return_week <= week + 1:
                 row["verdict"] = "activate"; why.append("back this week, the IR slot has to be cleared")
             else:
                 continue  # stashed and still out: nothing to do
-        elif row["ir_eligible"] and ir_open > 0:
+        elif p.espn_id in to_ir:
             row["verdict"] = "ir"; why.append("IR slot open, the stash is free")
-            ir_open -= 1  # the next hurt player down the list does not get the same slot
-        elif row["ir_eligible"] and on_ir:
+        elif p.espn_id in stash_ids and swappable:
             # Swap with the occupant when he is worth less the rest of the way.
-            occ = min(on_ir, key=lambda q: calc.get(q.espn_id, {}).get("hold_value", q.mu_ros * w_eff))
+            occ = min(swappable, key=lambda q: calc.get(q.espn_id, {}).get("hold_value", q.mu_ros * w_eff))
             occ_val = calc.get(occ.espn_id, {}).get("hold_value", occ.mu_ros * w_eff)
             if occ_val < c["hold_value"]:
                 row["verdict"] = "ir"; row["ir_occupant"] = occ.name
+                swappable.remove(occ)
                 why.append(f"{occ.name} is worth less the rest of the way ({occ_val:.0f} vs {c['hold_value']:.0f} pts)")
         if "verdict" not in row:
             if sends:
                 row["verdict"] = "trade"; why.append("a rival takes him in a package that helps me")
-            elif p.avail_ros == 0 and (cheapest is None or cheapest.espn_id == p.espn_id or p.espn_id not in {q.espn_id for q in droppable}):
-                row["verdict"] = "drop"; why.append("out for the season, dead roster spot")
             elif c["fa"] and gap >= margin and cheapest is not None and cheapest.espn_id == p.espn_id:
                 row["verdict"] = "drop"
                 why.append(f"{c['fa']['name']} adds {c['drop_value']:.0f} pts the rest of the way vs {c['hold_value']:.0f} for him")
+            elif dead and (cheapest is None or cheapest.espn_id == p.espn_id or p.espn_id not in {q.espn_id for q in droppable}):
+                row["verdict"] = "drop"; why.append(dead)
             else:
                 row["verdict"] = "hold"
-                if c["fa"] and gap >= margin:
+                if dead:
+                    why.append(f"{dead}, but {cheapest.name} is the cheaper drop")
+                elif c["fa"] and gap >= margin:
                     why.append(f"{cheapest.name} is the cheaper drop" if cheapest else "nobody else to drop")
+                elif not c["fa"]:
+                    why.append(f"worth {c['hold_value']:.0f} pts on return and nothing on the wire to add")
                 else:
-                    why.append(f"worth {c['hold_value']:.0f} pts on return vs {c['drop_value']:.0f} from the best pickup")
+                    why.append(f"worth {c['hold_value']:.0f} pts on return vs {c['drop_value']:.0f} from {c['fa']['name']}")
         out.append(row)
     return out

@@ -83,6 +83,7 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Email card says do it and Claude's read says don't | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
 | Email says hold a player who is done for the year, or trade/drop one who is back Sunday | `weeks_out` still at its designation default (IR = 4, Out = 1) | the player is in `shared.injured`; write `weeks_out` (or `"season"`) in overrides.json and re-run step 5 |
+| Card says drop a hurt starter (or hold a backup who is plainly dead weight) | `mu_ros_active` is off: ESPN docked his season total for the injury, or his healthy level is not what ESPN thinks | `shared.injured` shows `mu_ros_active`; write `ros_mult` in overrides.json; the drop rule fires when he is below replacement on return |
 | Card says move a player to IR and the app refuses | league's IR eligibility is stricter than `IR_ELIGIBLE` in `model/injuries.py` | `scripts/probe_injuries.py` shows what ESPN says; narrow the constant |
 | Briefing says "could not read pending trades" | ESPN changed `mPendingTransactions` or cookies half-dead | check `pending_trades_error` in the packet; `ff incoming --force` locally |
 | trade-poll workflow red | cookies dead in GitHub secrets, or fire token revoked | update repo secrets; `gh workflow run trade-poll.yml -f window=48h` to test |

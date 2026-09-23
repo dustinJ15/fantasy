@@ -229,7 +229,7 @@ def injury(name, verdict, pos="RB", weeks_out=4.0, return_week=7, avail=0.6, fa=
     return {"espn_id": 1, "name": name, "pos": pos, "slot": "BE", "weeks_out": weeks_out, "return_week": return_week,
             "avail_ros": avail, "mu_ros_active": 14.0, "hold_ppw": 3.0, "hold_value": 29.4, "drop_value": 13.8,
             "back_eff": 9.8, "w_eff": 13.8, "ir_eligible": True, "ir_open": 1, "ir_occupant": occupant,
-            "best_fa": {"name": fa[0], "pos": pos, "delta_over_starter": fa[1]} if fa else None,
+            "best_fa": {"name": fa[0], "pos": pos, "delta_over_starter": fa[1], "ppw": fa[1]} if fa else None,
             "trades": list(trades), "market": None, "verdict": verdict, "why": []}
 
 
@@ -242,7 +242,7 @@ def test_each_verdict_is_a_row_with_the_numbers_in_words():
     assert rows["injury:ankle-guy"]["label"] == "Hurt (hold)" and "(back wk 7) for 10 games at ~14/g" in rows["injury:ankle-guy"]["text"]
     assert rows["injury:ankle-guy"]["text"].endswith("hold him")
     assert "out the season; move him to IR, then add Pickup" in rows["injury:knee-guy"]["text"]
-    assert rows["injury:done-guy"]["label"] == "Hurt (drop)" and "drop him for Pickup (+1.2/wk)" in rows["injury:done-guy"]["text"]
+    assert rows["injury:done-guy"]["label"] == "Hurt (drop)" and "drop him for Pickup (~14 pts)" in rows["injury:done-guy"]["text"]
     assert "the offer to Them for Star ships him" in rows["injury:sell-guy"]["text"] and rows["injury:sell-guy"]["trade_ids"] == ["trade:star"]
     assert rows["injury:back-guy"]["label"] == "Back (activate)"
 

@@ -189,14 +189,26 @@ four-week injury in week 3 different from the same injury in week 11, and differ
 ### Values
 
 ```
-hold_ppw   = own_starter_value(p at mu_ros_active, ros_lineup_of_roster_without_p)   floored at 0
+hold_ppw   = own_starter_value(p at mu_ros_active, ros_lineup_of_roster_without_p) floored at 0
+             + DEPTH_WEIGHT * max(mu_ros_active - replacement[pos], 0)
 hold_value = hold_ppw * back_eff
-fa         = best non-streamer in lg["waivers"] eligible for a slot p could fill (else best overall)
-drop_value = max(fa.delta_over_starter, 0) * W_eff
+fa         = best non-streamer in lg["waivers"] eligible for a slot p could fill (else best overall), by the same value
+drop_value = (max(fa.delta_over_starter, 0) + DEPTH_WEIGHT * max(fa.vorp, 0)) * W_eff
 ```
 
-Both are marginal points over the lineup I would field without him, over the same weighted weeks, so they are
-comparable. `own_starter_value` and `rank_free_agents` already exist and are reused unchanged.
+Both are marginal points over the lineup I would field without him plus depth value over the wire, over the same
+weighted weeks, so they are comparable. `own_starter_value` and `rank_free_agents` already exist and are reused.
+
+*Revision (first live run).* The first cut measured both sides against the starting lineup only. On a full roster
+neither a hurt backup nor the best free agent starts, so every row read "0 vs 0, hold" and the drop verdict was
+unreachable short of a season-ender. Two fixes: the `DEPTH_WEIGHT` term above (a quarter of the margin over
+replacement level, the same idea `rank_free_agents` uses for bench value), and a dead-roster-spot rule: a player who
+is out for the season, back only for weeks that no longer count, or below replacement when he is back is a drop
+whether or not the wire has anyone, if he is the cheapest cut. The IR slot also went to the first hurt player by
+value instead of the longest absence, so a one-week Out could take it from a four-week IR player; stashes now need
+`IR_MIN_WEEKS` (2) and the open slots go to the highest `hold_value`. And `blend` was averaging the healthy per-game
+number with this week's ~0 projection for anyone listed Out, halving it; this week now only counts when he is
+expected to play it.
 
 ### Verdict
 

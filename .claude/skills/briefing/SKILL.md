@@ -31,7 +31,11 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
    weeks_out guide: IR 4 unless the report says longer; `"season"` for an ACL, Achilles or season-ending surgery;
    suspension = games announced; count from this week (an Out this week with a return next week is 1).
-   ros_mult only for a changed role or a diminished return (hamstring at 85%), not for this week's snap count.
+   ros_mult only for a changed role or a diminished return (hamstring at 85%), not for this week's snap count. One more
+   case: `mu_ros_active` in `shared.injured` is ESPN's remaining-season total per week, and ESPN sometimes docks that
+   total for the injury already. `weeks_out` counts the missed games, so when a hurt starter shows a per-game number
+   well under his healthy level (a top-10 QB at 12/g), write `ros_mult` to restore it or the row will call him a
+   dead roster spot.
    If nothing changed, write `{}`.
 5. `uv run ff briefing --overrides overrides.json --sims 2000 --out briefing.md` (also 3-5 minutes; timeout 600000).
    Read briefing.md and note the packet path printed on the last line (`packet data/packets/<date>.json`).

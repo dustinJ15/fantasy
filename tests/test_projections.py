@@ -71,3 +71,15 @@ def test_packet_carries_the_horizon():
               {"9": {"weeks_out": 6, "note": "MRI Monday"}}, week=3).to_dict()
     assert d["weeks_out"] == 6 and d["return_week"] == 9 and d["sources"]["weeks_out_source"] == "override"
     assert d["sources"]["body_part"] == "Knee" and d["sources"]["sleeper_roster_status"] == "Injured Reserve"
+
+
+def test_a_player_listed_out_keeps_his_healthy_per_game_number():
+    """This week's ~0 projection must not drag the rest-of-season per-game number down: he is not playing this week,
+    and `weeks_out` already charges for that."""
+    row = {"espn_id": 1, "name": "QB", "pos": "QB", "team": "X", "eligible": ["QB"], "proj_week": 0.4, "proj_season": 300.0,
+           "injury_status": "OUT"}
+    out = blend(row, None, None, 15, week=3)
+    healthy = dict(row, injury_status="ACTIVE", proj_week=20.0)
+    ok = blend(healthy, None, None, 15, week=3)
+    assert out.mu_ros_active == pytest.approx(20.0) and ok.mu_ros_active == pytest.approx(20.0)
+    assert out.mu_ros == pytest.approx(20.0 * 14 / 15, abs=0.05) and out.return_week == 4
