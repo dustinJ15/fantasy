@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 
 def slug(text: str) -> str:
@@ -72,9 +73,22 @@ class _Spots:
 
     def __init__(self, lg: dict, open_spots: int, reserved: set[str]):
         self.lg, self.open, self.reserved, self.dropped = lg, max(int(open_spots or 0), 0), set(reserved), []
+        # Bodies per position as the rows above leave them, against ESPN's caps (the IR occupant counts).
+        self.pos_of = {p["name"]: p["pos"] for p in lg["roster"]}
+        self.counts = Counter(self.pos_of.values())
+        self.caps = (lg.get("settings") or {}).get("position_limits") or {}
 
-    def take(self, for_whom: str | None = None) -> tuple[str | None, str]:
-        """(drop name or None, suffix for the row text). Uses an open spot before naming a drop."""
+    def note(self, add_pos: str | None = None, drop: str | None = None) -> None:
+        """A row moved a body on or off the roster; keep the position counts honest for `cut`."""
+        if add_pos:
+            self.counts[add_pos] += 1
+        if drop and drop in self.pos_of:
+            self.counts[self.pos_of[drop]] -= 1
+
+    def take(self, for_whom: str | None = None, adding: str | None = None) -> tuple[str | None, str]:
+        """(drop name or None, suffix for the row text). Uses an open spot before naming a drop. `adding` is the
+        position of the player the spot is for."""
+        self.note(add_pos=adding)
         if self.open > 0:
             self.open -= 1
             return None, " (there is an open bench spot)"
@@ -82,7 +96,39 @@ class _Spots:
         if not order:
             return None, " (no obvious drop, your call who goes)"
         self.dropped.append(order[0])
+        self.note(drop=order[0])
         return order[0], f"; drop {order[0]}"
+
+    def cut(self, t: dict) -> tuple[list[str], str]:
+        """(drops, suffix): the cuts ESPN demands inside the trade screen for a position the trade pushes over its
+        cap ("Too many players with default position WR (maximum 6)").
+
+        `model.trades` named them on the untouched roster (`drops`); this re-checks against what the rows above
+        already moved, because a waiver row that dropped the sixth WR has cleared the cap and a pickup that added
+        one has made it worse. Trade rows are alternatives, so these cuts are not spent on the ledger."""
+        named = t.get("drops") or []
+        if "get_pos" in t:
+            after = Counter(self.counts)
+            after.update(t["get_pos"])
+            after.subtract(self.pos_of.get(n) for n in t.get("give") or [] if n in self.pos_of)
+            excess = {pos: after[pos] - cap for pos, cap in self.caps.items() if after[pos] > cap}
+        else:
+            excess = dict(Counter(d["pos"] for d in named))
+        drops, stuck = [], []
+        for pos, n in excess.items():
+            excl = self.reserved | set(self.dropped) | set(drops) | set(t.get("give") or [])
+            pool = list(dict.fromkeys([d["name"] for d in named if d["pos"] == pos and d["name"] not in excl]
+                                      + [p for p in _drop_order(self.lg, excl) if self.pos_of.get(p) == pos]))
+            drops += pool[:n]
+            if len(pool) < n:
+                stuck.append(pos)
+        cap = lambda pos: f"ESPN caps {pos} at {self.caps.get(pos)}"  # noqa: E731
+        parts = []
+        if drops:
+            parts.append(f"drop {', '.join(drops)} in the trade screen ({'; '.join(cap(p) for p in excess if p not in stuck)})")
+        for pos in stuck:
+            parts.append(f"{cap(pos)} and there is no obvious {pos} to drop, your call")
+        return drops, ("; " + "; ".join(parts)) if parts else ""
 
 
 # Below this many starters still to play, naming them is the point (Monday morning: two guys decide the week).
@@ -131,8 +177,11 @@ def incoming_line(t: dict) -> str:
     """One sentence on an offer someone sent me: what moves, what it does for each side, when it expires."""
     td = f", title odds {t['my_title_delta']:+.1f}" if t.get("my_title_delta") is not None else ""
     left = f"; expires in {t['hours_left']:.0f}h" if t.get("hours_left") is not None else ""
+    cut = ""
+    if t.get("drops"):
+        cut = "; accepting means dropping " + ", ".join(f"{d['name']} ({d['cap']}-{d['pos']} cap)" for d in t["drops"])
     return (f"{t['rival']} offers {', '.join(t['get']) or 'nothing'} for your {', '.join(t['give']) or 'nothing'}: "
-            f"{t['my_delta_ppw']:+.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them{td}{left}")
+            f"{t['my_delta_ppw']:+.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them{td}{left}{cut}")
 
 
 # Slots the flex cannot cover, so the last healthy body at the position is the whole slot.
@@ -287,18 +336,23 @@ def todos(lg: dict) -> list[dict]:
     reserved = {r["name"] for r in lg.get("injuries") or [] if r["verdict"] in ("ir", "trade")}
     n_open = lg["open_spots"] if lg.get("open_spots") is not None else len(lg.get("open_spot_adds") or [])
     spots = _Spots(lg, n_open, reserved)
+    for r in lg.get("injuries") or []:
+        if r["verdict"] == "drop":
+            spots.note(drop=r["name"])
+        if r.get("add") and r["verdict"] in ("ir", "drop"):
+            spots.note(add_pos=r["add"]["pos"])
     inj = _injury_items(lg, spots)
     out += [i for i in inj if i["verdict"] in ("ir", "activate")]
     added = {r["add"]["name"] for r in lg.get("injuries") or [] if r.get("add")}
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]
     ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts and w["name"] not in added]
     for w in starts[:1]:
-        _, suffix = spots.take()
+        _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week){suffix}"})
     for w in ups[:1]:
-        _, suffix = spots.take()
+        _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}{suffix}"})
@@ -314,6 +368,7 @@ def todos(lg: dict) -> list[dict]:
         if a["name"] in added:
             continue
         spots.open -= 1
+        spots.note(add_pos=a["pos"])
         added.add(a["name"])
         w = next((w for w in lg["waivers"] if w["name"] == a["name"]), None)
         out.append({"kind": "waiver", "id": f"waiver:{slug(a['name'])}", "label": "Open spot",
@@ -347,13 +402,16 @@ def todos(lg: dict) -> list[dict]:
         warn = [_to_dustin(w) for w in t["why"] if w.startswith("leaves me") or w.startswith("market says I")]
         them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
         push = bool(t.get("pushed") or t.get("must_try"))
+        # The cut ESPN's position cap forces rides in the row text: without it the paste goes out and the trade
+        # screen answers "Too many players with default position WR".
+        drops, cut = spots.cut(t)
         text = (f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
-                f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them})")
+                f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them}){cut}")
         if push:
             text += " " + push_line(t)
         out.append({"kind": "trade", "id": f"trade:{slug('-'.join(t['get']))}", "label": "Trade (do this one)" if push else f"Trade ({trade_tag(t)})",
                     "worth": sendable(t), "push": push, "rival": t.get("rival"), "give": list(t["give"]), "get": list(t["get"]), "warn": warn,
-                    "text": text})
+                    "drops": drops, "text": text})
     out += [i for i in inj if i["verdict"] == "trade"]
     out += [i for i in inj if i["kind"] == "hold"]
     return out

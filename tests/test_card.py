@@ -309,3 +309,55 @@ def test_an_open_bench_spot_is_a_row_naming_who_fills_it():
     lg["open_spot_adds"] = [{"name": "Seth McGowan", "pos": "RB", "kind": "handcuff", "why": "handcuff for Jonathan Taylor"}]
     row = by_id(lg)["waiver:seth-mcgowan"]
     assert row["label"] == "Open spot" and row["text"] == "add Seth McGowan (RB, handcuff for Jonathan Taylor) to the open bench spot"
+
+
+# ---------- ESPN's position cap on trade rows ----------
+
+def capped_league(**kw):
+    """Six WRs rostered against a cap of six; a WR-for-RB trade has to drop one in the trade screen."""
+    roster = [player("Starter WR", slot="WR"), player("WR Two", slot="WR"), player("WR Three", ros=8.0), player("WR Four", ros=6.0),
+              player("WR Five", ros=4.0), player("WR Six", ros=1.0), player("RB One", pos="RB", slot="RB"), player("RB Two", pos="RB", ros=5.0)]
+    lg = league(roster=roster, lineup_win={"slots": {"WR": ["Starter WR", "WR Two"], "RB": ["RB One"]}, "p_win": 0.6, "mu": 100.0, "sd": 20.0, "bench": []},
+                settings={"lineup_slots": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}, "position_limits": {"WR": 6, "RB": 6}})
+    lg.update(kw)
+    return lg
+
+
+def capped_trade(**kw):
+    t = trade(["Garrett Wilson"], ["RB Two"], **kw)
+    t.update({"drops": [{"name": "WR Six", "pos": "WR", "cap": 6}], "get_pos": ["WR"]})
+    return t
+
+
+def test_trade_row_names_the_drop_the_cap_forces():
+    row = by_id(capped_league(trades=[capped_trade()]))["trade:garrett-wilson"]
+    assert row["drops"] == ["WR Six"]
+    assert "drop WR Six in the trade screen (ESPN caps WR at 6)" in row["text"]
+
+
+def test_a_waiver_drop_that_clears_the_cap_spares_the_trade_a_second_cut():
+    """The pickup takes the cheapest body (the sixth WR); after that the WR-for-RB trade fits without a drop."""
+    w = {"name": "Pickup RB", "pos": "RB", "streamer": False, "delta_week": 2.0, "delta_over_starter": 2.0, "week_slot": "RB", "slot": "RB"}
+    rows = by_id(capped_league(trades=[capped_trade()], waivers=[w]))
+    assert "drop WR Six" in rows["waiver:pickup-rb"]["text"]
+    assert rows["trade:garrett-wilson"]["drops"] == [] and "trade screen" not in rows["trade:garrett-wilson"]["text"]
+
+
+def test_a_waiver_pickup_at_the_capped_position_moves_the_cut_to_the_next_body():
+    """Adding a WR and dropping the sixth keeps the count at six, so the trade still needs a cut, and not the same player."""
+    w = {"name": "Pickup WR", "pos": "WR", "streamer": False, "delta_week": 2.0, "delta_over_starter": 2.0, "week_slot": "WR", "slot": "WR"}
+    rows = by_id(capped_league(trades=[capped_trade()], waivers=[w]))
+    assert "drop WR Six" in rows["waiver:pickup-wr"]["text"]
+    assert rows["trade:garrett-wilson"]["drops"] == ["WR Five"]
+
+
+def test_a_trade_row_without_cap_data_is_unchanged():
+    row = by_id(league(trades=[trade(["Kai"], ["Maye"])]))["trade:kai"]
+    assert row["drops"] == [] and "trade screen" not in row["text"]
+
+
+def test_incoming_offer_says_what_accepting_would_cut():
+    t = {"rival": "Rival", "give": ["RB Two"], "get": ["Garrett Wilson"], "my_delta_ppw": 1.2, "their_delta_ppw": 0.3, "verdict": "accept",
+         "why": [], "drops": [{"name": "WR Six", "pos": "WR", "cap": 6}]}
+    row = by_id(capped_league(incoming_trades=[t]))["offer:garrett-wilson"]
+    assert "accepting means dropping WR Six (6-WR cap)" in row["text"]

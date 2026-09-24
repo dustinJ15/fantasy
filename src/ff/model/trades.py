@@ -107,16 +107,51 @@ def _swap(roster: list[PlayerProj], out_ids: set[int], incoming: list[PlayerProj
     return [p for p in roster if p.espn_id not in out_ids] + list(incoming)
 
 
+def over_cap(roster: list[PlayerProj], limits: dict[str, int]) -> dict[str, int]:
+    """Positions where the roster holds more than ESPN's cap, and by how many. The IR occupant counts: the cap is
+    on default position across the whole roster, not on the bench."""
+    counts = Counter(p.pos for p in roster)
+    return {pos: counts[pos] - cap for pos, cap in (limits or {}).items() if counts[pos] > cap}
+
+
+def cap_drops(roster: list[PlayerProj], limits: dict[str, int], keep: set[int] = frozenset()) -> list[PlayerProj] | None:
+    """The cuts ESPN demands before it accepts this roster: at each position over its cap, the cheapest bodies.
+
+    This is what the trade screen means by "You must drop a player with default position WR to clear your roster":
+    a WR-for-RB swap at six WRs is legal only with a WR drop in the same transaction, so the scan has to name one
+    and price the roster without him. `keep` is the players the trade just brought in (cutting them is not a
+    trade); the IR occupant stays too, since freeing his slot is the injury rule's call, not this one's.
+    Returns [] when nothing is over, None when the excess cannot be cut legally."""
+    drops: list[PlayerProj] = []
+    for pos, n in over_cap(roster, limits).items():
+        cands = sorted([p for p in roster if p.pos == pos and p.espn_id not in keep and p.slot != "IR"],
+                       key=lambda p: (p.mu_ros, p.mu))
+        if len(cands) < n:
+            return None
+        drops += cands[:n]
+    return drops
+
+
+def _drop_rows(drops: list[PlayerProj], limits: dict[str, int]) -> list[dict]:
+    return [{"name": p.name, "pos": p.pos, "cap": limits[p.pos]} for p in drops]
+
+
 def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int], repl: dict[str, float],
-         team_meta: dict[int, dict], values: dict[str, dict], max_per_rival: int = 3, top: int = 10) -> list[dict]:
+         team_meta: dict[int, dict], values: dict[str, dict], max_per_rival: int = 3, top: int = 10,
+         limits: dict[str, int] | None = None) -> list[dict]:
     """
     For each rival: try 1-for-1 and 2-for-1 packages where my surplus meets their hole.
+
+    `limits` are ESPN's per-position roster caps. A package that puts me over one is priced with the cheapest body
+    at that position gone and carries him as `drops`, because that is the only form ESPN will accept it in; one
+    that leaves me no legal cut is not proposed at all. The same cut on the rival's side is a caveat, not a veto.
 
     Ranking is acceptance-first: a trade only has value if the rival says yes, and rivals (a) overvalue what they
     own, (b) infer that an offer favors the offerer, and (c) remember lowballs in a repeated game with coworkers.
     So among trades that help me by >= 0.75 ppw, sort by the rival's gain, cap the market-value ask at ~1.2x, and
     only favor 2-for-1s when the one player they get is the best piece in the deal (consolidation, which people accept).
     """
+    limits = limits or {}
     mine = rosters[my_id]
     my_mu0, _ = lineup_strength(mine, slots)
     my_needs = needs(mine, slots, repl)
@@ -141,6 +176,12 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 continue
             new_mine = _swap(mine, {p.espn_id for p in give}, get)
             new_theirs = _swap(theirs, {p.espn_id for p in get}, give)
+            drops = cap_drops(new_mine, limits, keep={p.espn_id for p in get})
+            their_drops = cap_drops(new_theirs, limits, keep={p.espn_id for p in give})
+            if drops is None or their_drops is None:
+                continue
+            new_mine = _swap(new_mine, {p.espn_id for p in drops}, [])
+            new_theirs = _swap(new_theirs, {p.espn_id for p in their_drops}, [])
             can_field, thin = depth(new_mine, slots)
             if not can_field:
                 continue
@@ -159,6 +200,8 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 if their_needs.get(p.pos, {}).get("hole") and f"fills their {p.pos} hole" not in why: why.append(f"fills their {p.pos} hole")
             for pos in new_thin:
                 why.append(f"leaves me no backup {pos}")
+            for p in their_drops:
+                why.append(f"they have to cut a {p.pos} to take it ({limits[p.pos]} max)")
             # Same lowball check `evaluate` applies to offers people send me, applied to the ones I would send.
             # Without it the only market guard is the 2.2x prefilter above, so the scan happily proposes handing
             # over twice the market value for a fraction of a point per week.
@@ -178,6 +221,9 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
+                # Cuts ESPN demands in the trade screen (position cap), priced into the deltas above.
+                "drops": _drop_rows(drops, limits), "their_drops": [p.name for p in their_drops],
+                "get_pos": [p.pos for p in get],
                 "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_ratio": round(ratio, 2) if ratio is not None else None,
                 # Worth actually sending: helps them (or is neutral) *and* I am not overpaying at market.
                 "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR),
@@ -200,7 +246,8 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
 
 
 def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[PlayerProj], rosters: dict[int, list[PlayerProj]],
-             slots: dict[str, int], repl: dict[str, float], values: dict[str, dict]) -> dict:
+             slots: dict[str, int], repl: dict[str, float], values: dict[str, dict],
+             limits: dict[str, int] | None = None) -> dict:
     """
     Score an offer someone sent me: `give` leaves my roster, `get` joins it. Any size, K/DST allowed.
 
@@ -208,11 +255,15 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     accept when it clearly helps my starting lineup and the market side isn't a fleece; decline when it hurts or the
     market gap is large; everything else is a counter (close enough that the right tweak makes it a yes).
     """
+    limits = limits or {}
     mine, theirs = rosters.get(my_id, []), rosters.get(rival_id, [])
     my_mu0, _ = lineup_strength(mine, slots)
     their_mu0, _ = lineup_strength(theirs, slots)
     new_mine = _swap(mine, {p.espn_id for p in give}, get)
     new_theirs = _swap(theirs, {p.espn_id for p in get}, give)
+    # Accepting can force a cut (position cap); price the roster ESPN would actually leave me with.
+    drops = cap_drops(new_mine, limits, keep={p.espn_id for p in get})
+    new_mine = _swap(new_mine, {p.espn_id for p in drops or []}, [])
     my_mu1, _ = lineup_strength(new_mine, slots)
     their_mu1, _ = lineup_strength(new_theirs, slots)
     d_me, d_them = my_mu1 - my_mu0, their_mu1 - their_mu0
@@ -240,13 +291,17 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
         why.append("2-for-1: I consolidate, they get depth")
     elif len(get) > len(give):
         why.append("1-for-2: I take on depth and need a roster spot")
+    for p in drops or []:
+        why.append(f"accepting means cutting {p.name} ({limits[p.pos]}-{p.pos} cap)")
+    if drops is None:
+        why.append("over a position cap with no legal cut: ESPN would not process it")
     if market_ratio is not None:
         if market_ratio < MARKET_FLOOR: why.append(f"market says I give more ({rv} vs {gv})")
         elif market_ratio > 1.2: why.append(f"market says I get more ({rv} vs {gv})")
     why += injury_caveats(give, values)
     why = list(dict.fromkeys(why))
 
-    if not can_field:
+    if not can_field or drops is None:
         verdict = "decline"
     elif d_me <= -0.5 or (market_ratio is not None and market_ratio < 0.65):
         verdict = "decline"
@@ -258,6 +313,7 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
         "give": [p.name for p in give], "get": [p.name for p in get],
         "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
         "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "why": why, "verdict": verdict,
+        "drops": _drop_rows(drops or [], limits),
     }
 
 
