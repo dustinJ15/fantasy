@@ -106,7 +106,8 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
         "ref": {"name": "demo", "espn_id": 1}, "week": 5, "my_team_id": 1, "teams": team_rows, "matchups": matchups,
         "settings": {"name": "Demo League", "team_count": teams, "scoring": {"REC": 1.0}, "lineup_slots": slots, "bench_slots": 6, "ir_slots": 1,
                      "reg_season_weeks": 14, "playoff_team_count": 4, "playoff_weeks": [15, 16], "matchup_periods": {i: [i] for i in range(1, 17)},
-                     "faab": True, "faab_budget": 100, "trade_deadline_ms": 0, "ppr": 1.0},
+                     "faab": True, "faab_budget": 100, "trade_deadline_ms": 0, "ppr": 1.0,
+                     "position_limits": {"QB": 4, "RB": 8, "WR": 8, "TE": 3, "K": 3, "D/ST": 3}},
         "roster": roster, "free_agents": fas, "faab_bids": [],
         # one incoming 2-for-1 from team 2 (their best RB for my RB2 + WR2), one offer I sent to team 3
         "pending_trades": [

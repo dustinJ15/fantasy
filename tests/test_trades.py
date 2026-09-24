@@ -260,3 +260,64 @@ def test_evaluate_discounts_my_hurt_player_too(slots):
                    values={"2": {"redraft_value": 4000}, "18": {"redraft_value": 3000}})
     assert out["market_give"] == 4000 and out["market_give_eff"] < 3000 and out["verdict"] == "accept"
     assert any("market still prices RB1 healthy" in w for w in out["why"])
+
+
+# ---------- ESPN's per-position roster cap ----------
+
+def _capped_rosters():
+    """I hold six WRs (the cap) and a spare RB; the rival has a good WR and a hole at RB."""
+    mine = [P(1, "QB", "QB", 20, tid=1), P(2, "RB1", "RB", 16, tid=1), P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1),
+            P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1), P(23, "WR4", "WR", 7, tid=1),
+            P(24, "WR5", "WR", 5, tid=1), P(25, "WR6", "WR", 2, tid=1),
+            P(7, "TE", "TE", 8, tid=1), P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    # Their WRstar is their sixth-best asset so no 2-for-1 targets him (those only go after a rival's top five), which
+    # keeps the 1-for-1 from being deduped away behind a consolidation package for the same player.
+    theirs = [P(11, "QB", "QB", 20, tid=2), P(12, "RB1", "RB", 4, tid=2), P(13, "RB2", "RB", 2, tid=2),
+              P(15, "WRstar", "WR", 15, tid=2), P(16, "WRA", "WR", 16, tid=2), P(17, "WRB", "WR", 16, tid=2), P(26, "WRC", "WR", 16, tid=2),
+              P(18, "TE", "TE", 16, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    return mine, theirs
+
+
+def test_scan_names_the_drop_espn_demands_at_the_position_cap(slots):
+    """RB for WR at six WRs: legal only with a WR drop in the same transaction, so the row has to say who."""
+    mine, theirs = _capped_rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={},
+               limits={"WR": 6, "RB": 6}, max_per_rival=10)
+    wr_in = [c for c in out if "WRstar" in c["get"] and all(g.startswith("RB") for g in c["give"])]
+    assert wr_in, "the WR-for-RB package is still worth proposing, just with a drop attached"
+    for c in wr_in:
+        assert [d["name"] for d in c["drops"]] == ["WR6"], c
+        assert c["drops"][0] == {"name": "WR6", "pos": "WR", "cap": 6}
+        assert c["get_pos"] == ["WR"]
+    # a WR-for-WR swap keeps the count at six: nothing to drop
+    assert all(c["drops"] == [] for c in out if any(g.startswith("WR") for g in c["give"]) and len(c["give"]) == 1)
+
+
+def test_scan_without_limits_is_unchanged(slots):
+    mine, theirs = _capped_rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={})
+    assert out and all(c["drops"] == [] for c in out)
+
+
+def test_cap_drops_keeps_the_incoming_player_and_the_ir_stash():
+    from ff.model.trades import cap_drops
+    stash = P(30, "Stash", "WR", 0, tid=1, ros=0.0)
+    stash.slot = "IR"
+    new = P(31, "New", "WR", 15, tid=1)
+    roster = [P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), stash, new]
+    drops = cap_drops(roster, {"WR": 3}, keep={31})
+    assert [p.name for p in drops] == ["WR2"]  # the cheapest cut that is neither the stash nor the arrival
+    assert cap_drops(roster, {"WR": 4}) == []
+    assert cap_drops([stash, new], {"WR": 1}, keep={31}) is None  # nothing legal to cut
+
+
+def test_evaluate_prices_the_forced_cut_and_says_so(slots):
+    mine, theirs = _capped_rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    by_id = {p.espn_id: p for p in mine + theirs}
+    out = evaluate(1, 2, [by_id[4]], [by_id[15]], {1: mine, 2: theirs}, slots, repl, values={}, limits={"WR": 6})
+    assert out["drops"] == [{"name": "WR6", "pos": "WR", "cap": 6}]
+    assert any(w.startswith("accepting means cutting WR6") for w in out["why"])
+    assert out["verdict"] == "accept"

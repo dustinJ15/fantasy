@@ -48,3 +48,10 @@ def test_empty_and_unknown_team():
                 return {"status": {}}
     assert pending_trades(Empty(), 16) == []
     assert pending_trades(FakeLeague(), None) == []
+
+
+def test_position_limits_come_from_default_position_ids_and_skip_unlimited():
+    from ff.sources.espn import position_limits
+    raw = {"positionLimits": {"0": 0, "1": 4, "2": 6, "3": 6, "4": 3, "5": 3, "6": -1, "16": 3, "17": -1}}
+    assert position_limits(raw) == {"QB": 4, "RB": 6, "WR": 6, "TE": 3, "K": 3, "D/ST": 3}
+    assert position_limits({}) == {}

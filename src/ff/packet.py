@@ -168,7 +168,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     # The trade deadline closes the scan: the offers Dustin could still send are none.
     deadline_ms = int(s.get("trade_deadline_ms") or 0)
     trades_closed = bool(deadline_ms) and now_dt.timestamp() * 1000 > deadline_ms
-    trades = scan(my_id, by_team, slots, repl, team_meta, values) if (my_id and not trades_closed) else []
+    limits = s.get("position_limits") or {}
+    trades = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits) if (my_id and not trades_closed) else []
     trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
     trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     trades = mark_pushed(trades, pushes or {}, snap["ref"]["name"], now_dt.date())
@@ -177,7 +178,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         rid = c["rival_team_id"]
         give = {p.espn_id for p in mine if p.name in c["give"]}
         get = [p for p in by_team[rid] if p.name in c["get"]]
-        new_mine = [p for p in mine if p.espn_id not in give] + get
+        cut = {d["name"] for d in c.get("drops") or []}
+        new_mine = [p for p in mine if p.espn_id not in give and p.name not in cut] + get
         new_theirs = [p for p in by_team[rid] if p.name not in c["get"]] + [p for p in mine if p.espn_id in give]
         st2 = dict(strength); st2[my_id] = lineup_strength(new_mine, slots); st2[rid] = lineup_strength(new_theirs, slots)
         o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=1500, seed=11)
@@ -215,8 +217,9 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         if tx.get("direction") != "incoming" or rid is None:
             outgoing.append({**base, "give": [p.name for p in give], "get": [p.name for p in get]})
             continue
-        ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values)
-        new_mine = [p for p in mine if p.espn_id not in {g.espn_id for g in give}] + get
+        ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values, limits=limits)
+        cut = {d["name"] for d in ev.get("drops") or []}
+        new_mine = [p for p in mine if p.espn_id not in {g.espn_id for g in give} and p.name not in cut] + get
         new_theirs = [p for p in by_team.get(rid, []) if p.espn_id not in {g.espn_id for g in get}] + give
         st2 = dict(strength); st2[my_id] = lineup_strength(new_mine, slots); st2[rid] = lineup_strength(new_theirs, slots)
         o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=min(sims, 1500), seed=11)
@@ -240,7 +243,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     return {
         "name": snap["ref"]["name"], "league_name": s["name"], "week": week, "weeks_remaining": weeks_remaining,
         "settings": {k: s.get(k) for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr",
-                                           "reg_season_weeks", "ir_slots", "bench_slots", "trade_deadline_ms")},
+                                           "reg_season_weeks", "ir_slots", "bench_slots", "trade_deadline_ms", "position_limits")},
         "trade_deadline_iso": _ms_iso(deadline_ms), "trades_closed": trades_closed,
         "my_team_id": my_id, "my_record": f"{teams[my_id]['wins']}-{teams[my_id]['losses']}" if my_id in teams else None,
         "week_state": wstate,

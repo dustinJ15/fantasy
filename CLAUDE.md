@@ -75,7 +75,9 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   every morning ("asked N mornings running") until it shows up in my pending offers (sent), Claude rules `skip` on it, or
   the scan stops producing it. One push per league at a time; the packet only reads the memory.
 - Checklist ledger: `report._Spots` hands out roster spots (open bench spot first, then the cheapest drop not already
-  named), so an activation and a pickup never spend the same drop. Waiver rows say `claim` (still on waivers, with the
+  named), so an activation and a pickup never spend the same drop. It also counts bodies per position against ESPN's
+  caps (`settings.position_limits`): a trade row that brings in a WR at the cap says which WR to drop in the trade
+  screen, and skips that when a pickup above it already dropped one. Waiver rows say `claim` (still on waivers, with the
   priority) or `add` (free agent) from `waiver_status` in the snapshot.
 - Questionable sit-risk is day-aware (`QUESTIONABLE_BY_WEEKDAY`: 15% Mon–Wed, 20% Thu, 30% from Fri); a `p_zero` override wins.
   An IR stash is activated only when ESPN's designation leaves the IR-eligible set, never from the guessed return week.
@@ -104,4 +106,5 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | "Summary of failures for Google Apps Script" naming one or two runs | transient Google backend fault | ignore; the doorbell retries in-run and re-runs the next minute. Apps Script only reports it after 5 consecutive failed runs |
 | Email "FF trade doorbell — cannot reach the trade routine" | 3 fires in a row rejected: token rotated (401/403) or routine id wrong (404) | fix the Script Property; `fireTestOffer` in the Apps Script editor re-checks the path |
 | Trade offer email never arrives but the offer is in ESPN | doorbell silent (Apps Script trigger gone, Script Properties cleared, token rotated) and poller missed it or routine disabled | Apps Script Executions log; confirm Script Properties `FF_TRADE_ROUTINE_ID` + `FF_ROUTINE_FIRE_TOKEN` are still set and the 1-minute trigger exists; `RemoteTrigger get` on the trade routine; it still appears in the next morning briefing |
+| Trade screen says "Too many players with default position WR (maximum 6)" on a trade the card proposed | the league caps rostered players per position (`position_limits` in the settings, from ESPN's `positionLimits`); the scan used to ignore it | fixed 2026-09-24: the trade row now names the drop ESPN wants in the trade screen (`drops` on the candidate, cheapest body at that position, IR stash never). If ESPN does not actually demand the drop the card names, the IR occupant should stop counting: see `over_cap` in `model/trades.py` |
 | ESPN proposal email has no `ff-alerted` label an hour later | doorbell never ran or the fire returned non-2xx | same as above; remove the label (if any) to make the script retry |

@@ -16,6 +16,9 @@ COOKIE_HELP = (
 
 # Slots that hold starters. Everything else (BE, IR, '' ) is not a lineup slot.
 NON_STARTER = {"BE", "IR", ""}
+# `rosterSettings.positionLimits` is keyed by defaultPositionId, a different id space from the lineup slots in
+# POSITION_MAP (WR is slot 4 but default position 3). Only the fantasy positions; IDP ids are ignored.
+DEFAULT_POSITION = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "D/ST"}
 
 
 class CookieError(RuntimeError):
@@ -47,6 +50,19 @@ def my_team(league: League, team_id: int | None = None):
     return None
 
 
+def position_limits(roster_settings: dict) -> dict[str, int]:
+    """pos -> the most players ESPN lets one team roster there. -1 means unlimited and is left out.
+
+    This is the cap behind "Too many players with default position WR (maximum 6)" on the trade screen: a trade
+    that brings in a WR when six are rostered has to name a WR to drop, and the scan needs to know that."""
+    out = {}
+    for k, v in (roster_settings.get("positionLimits") or {}).items():
+        pos = DEFAULT_POSITION.get(int(k))
+        if pos and v is not None and int(v) >= 0:
+            out[pos] = int(v)
+    return out
+
+
 def settings(ref: LeagueRef, league: League) -> LeagueSettings:
     s = league.settings
     raw = league.espn_request.league_get(params={"view": "mSettings"})["settings"]
@@ -70,6 +86,7 @@ def settings(ref: LeagueRef, league: League) -> LeagueSettings:
         faab_budget=int(s.acquisition_budget or 0),
         trade_deadline_ms=int(s.trade_deadline or 0),
         ppr=ppr,
+        position_limits=position_limits(raw["rosterSettings"]),
     )
 
 

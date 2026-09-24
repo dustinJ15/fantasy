@@ -80,3 +80,6 @@ class LeagueSettings:
     faab_budget: int
     trade_deadline_ms: int
     ppr: float = field(default=0.0)
+    # ESPN's per-position roster caps ("Too many players with default position WR (maximum 6)"): pos -> max rostered,
+    # IR included. Positions ESPN leaves unlimited are absent.
+    position_limits: dict[str, int] = field(default_factory=dict)
