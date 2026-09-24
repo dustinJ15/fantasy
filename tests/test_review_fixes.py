@@ -1,16 +1,11 @@
 """The 2026-09-23 review: wrong instructions the live card produced that morning, each pinned here."""
-import json
 from datetime import UTC, date, datetime
 
-import pytest
-
 from ff import report, rulings
-from ff.model.injuries import decide
 from ff.model.lineup import optimize
 from ff.model.projections import blend
 from tests.conftest import P
 from tests.test_card import by_id, ids, injury, league, player
-
 
 # ---------- lineup: no-op swaps ----------
 

@@ -10,7 +10,8 @@ from .config import PACKET_DIR, LeagueRef, env, leagues
 from .ids import Crosswalk
 from .model import usage as usage_mod
 from .model.clock import apply_clock, week_state
-from .model.injuries import decide as decide_injuries, fill_spot
+from .model.injuries import decide as decide_injuries
+from .model.injuries import fill_spot
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
 from .model.sim import simulate
