@@ -62,5 +62,44 @@
    "Josh Allen"
   ],
   "note": "same Judkins as the Mahomes deal, pick Mahomes"
+ },
+ "L1|DeVonta Smith": {
+  "date": "2026-09-24",
+  "league": "L1",
+  "rival": "Touchin on dis TDS",
+  "give": [
+   "Jalen Coker",
+   "Bhayshul Tuten"
+  ],
+  "get": [
+   "DeVonta Smith"
+  ],
+  "note": "they lose half a point a week on it and you've already got the Henry offer out. no need to be the guy sending two lopsided asks in one day"
+ },
+ "L2|Puka Nacua": {
+  "date": "2026-09-24",
+  "league": "L2",
+  "rival": "Punts and Pints",
+  "give": [
+   "Trey McBride",
+   "Tetairoa McMillan"
+  ],
+  "get": [
+   "Puka Nacua"
+  ],
+  "note": "McBride is already in the Chase offer that's still pending. one ask per player at a time"
+ },
+ "L2|Amon-Ra St. Brown": {
+  "date": "2026-09-24",
+  "league": "L2",
+  "rival": "Big Dak Energy",
+  "give": [
+   "Trey McBride",
+   "Parker Washington"
+  ],
+  "get": [
+   "Amon-Ra St. Brown"
+  ],
+  "note": "same thing, McBride is spoken for until Let me see your TDs answers"
  }
 }
