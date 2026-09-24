@@ -1,6 +1,6 @@
 {
  "L3|Patrick Mahomes": {
-  "status": "open",
+  "status": "sent",
   "since": "2026-09-23",
   "last": "2026-09-23",
   "league": "L3",
@@ -13,6 +13,7 @@
    "Patrick Mahomes"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-09-24"
  }
 }
