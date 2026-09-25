@@ -1,0 +1,36 @@
+name: MLB pregame alerts
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # GitHub may delay runs a few minutes; the 5-40 min window absorbs it
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print qualifying games without firing"
+        type: boolean
+        default: true
+permissions:
+  contents: write
+concurrency:
+  group: mlb-pregame
+  cancel-in-progress: false
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check schedule and fire alerts
+        env:
+          # Same routine fire token the trade-offer poller (trade-poll.yml) uses.
+          FF_ROUTINE_FIRE_TOKEN: ${{ secrets.FF_ROUTINE_FIRE_TOKEN }}
+        run: python scripts/mlb_pregame.py ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: Save alerted-games state
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "mlb-pregame-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/pregame_state.json
+          git diff --cached --quiet || (git commit -m "pregame: update alerted games" && git pull --rebase --quiet && git push)
