@@ -24,8 +24,9 @@ jobs:
           python-version: "3.12"
       - name: Check schedule and fire alerts
         env:
-          # Same routine fire token the trade-offer poller (trade-poll.yml) uses.
-          FF_ROUTINE_FIRE_TOKEN: ${{ secrets.FF_ROUTINE_FIRE_TOKEN }}
+          # The pregame routine's own API fire token (tokens are per routine; the trade-offer
+          # poller's FF_ROUTINE_FIRE_TOKEN is rejected with "not authorized for this routine").
+          MLB_ROUTINE_FIRE_TOKEN: ${{ secrets.MLB_ROUTINE_FIRE_TOKEN }}
         run: python scripts/mlb_pregame.py ${{ inputs.dry_run && '--dry-run' || '' }}
       - name: Save alerted-games state
         if: ${{ !inputs.dry_run }}

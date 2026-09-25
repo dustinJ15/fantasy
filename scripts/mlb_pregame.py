@@ -34,8 +34,10 @@ def get_json(url):
 # Same fire path as the trade-offer poller (.github/workflows/trade-poll.yml) and the Gmail
 # doorbell (scripts/gmail_trade_doorbell.gs): POST to the routine's /fire endpoint with the
 # routine's API fire token as a Bearer token; `text` is appended to the task's prompt.
+# Fire tokens are per routine ("Token is not authorized for this routine" otherwise), so this
+# is the pregame routine's own token, not the trade-offer one.
 FIRE_URL = "https://api.anthropic.com/v1/claude_code/routines/{}/fire"
-TOKEN_ENV = "FF_ROUTINE_FIRE_TOKEN"
+TOKEN_ENV = "MLB_ROUTINE_FIRE_TOKEN"
 RETRY_ATTEMPTS, RETRY_BASE_S = 3, 2
 
 
@@ -43,7 +45,7 @@ def fire_trigger(trigger_id, text):
     """Fire the Claude scheduled task with `text` appended as an extra message.
 
     Transport errors and 5xx are retried with backoff; a 4xx (rotated token, wrong trigger
-    id) is a real answer and raises at once. The token comes from the FF_ROUTINE_FIRE_TOKEN
+    id) is a real answer and raises at once. The token comes from the MLB_ROUTINE_FIRE_TOKEN
     environment variable (a GitHub Actions secret); it is never written anywhere.
     """
     token = os.environ.get(TOKEN_ENV)
