@@ -83,3 +83,23 @@ def test_a_player_listed_out_keeps_his_healthy_per_game_number():
     ok = blend(healthy, None, None, 15, week=3)
     assert out.mu_ros_active == pytest.approx(20.0) and ok.mu_ros_active == pytest.approx(20.0)
     assert out.mu_ros == pytest.approx(20.0 * 14 / 15, abs=0.05) and out.return_week == 4
+
+
+def test_blend_treats_a_non_numeric_fantasypros_value_as_missing():
+    """The dynastyprocess mirror writes NA for a missing r2p_pts; one NA makes the column text and used to crash."""
+    from ff.model.projections import blend
+    row = {"espn_id": 1, "name": "X", "pos": "WR", "team": "GB", "eligible": ["WR"], "slot": "BE", "fantasy_team_id": 1,
+           "injury_status": None, "proj_week": 10.0, "actual_week": 0.0, "proj_season": 100.0, "percent_owned": 50.0,
+           "pos_rank": 30, "bye": False}
+    p = blend(row, {"r2p_pts": "NA", "sd": "NA"}, None, 15, None)
+    assert p.mu > 0 and p.sigma > 0
+
+
+def test_fantasypros_reader_parses_na_as_null(tmp_path):
+    import polars as pl
+
+    from ff.sources.fantasypros import NULLS
+    f = tmp_path / "fp.csv"
+    f.write_text("fantasypros_id,player_name,pos,ecr,sd,r2p_pts\n1,A,WR,1.0,0.5,12.3\n2,B,WR,2.0,NA,NA\n")
+    df = pl.read_csv(f, infer_schema_length=10000, ignore_errors=True, null_values=NULLS)
+    assert df["r2p_pts"].dtype == pl.Float64 and df["r2p_pts"].null_count() == 1 and df["sd"].dtype == pl.Float64

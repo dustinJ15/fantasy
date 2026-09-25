@@ -103,6 +103,17 @@ VEGAS_K = {"QB": 0.35, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}
 LEAGUE_AVG_IMPLIED = 23.0
 
 
+def _num(x) -> float | None:
+    """A number from a source column, or None: the FantasyPros mirror writes NA for a missing value and a column with
+    one NA in it arrives as text, so a missing consensus must read as missing, not crash the packet."""
+    if x is None:
+        return None
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
 def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None,
           sleeper_pts: float | None = None, implied_total: float | None = None, week: int | None = None,
           weekday: int | None = None) -> PlayerProj:
@@ -122,8 +133,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     """
     pos = row["pos"]
     espn_pts = float(row.get("proj_week") or 0)
-    fp_pts = float(fp["r2p_pts"]) if fp and fp.get("r2p_pts") is not None else None
-    fp_sd = float(fp["sd"]) if fp and fp.get("sd") is not None else None
+    fp_pts = _num(fp.get("r2p_pts")) if fp else None
+    fp_sd = _num(fp.get("sd")) if fp else None
 
     stat_srcs = [x for x in (espn_pts, sleeper_pts) if x is not None and x > 0]
     if stat_srcs:
