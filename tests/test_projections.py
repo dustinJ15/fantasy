@@ -83,3 +83,20 @@ def test_a_player_listed_out_keeps_his_healthy_per_game_number():
     ok = blend(healthy, None, None, 15, week=3)
     assert out.mu_ros_active == pytest.approx(20.0) and ok.mu_ros_active == pytest.approx(20.0)
     assert out.mu_ros == pytest.approx(20.0 * 14 / 15, abs=0.05) and out.return_week == 4
+
+
+def test_a_non_numeric_fantasypros_cell_reads_as_missing():
+    """The dynastyprocess mirror writes R's `NA` into `r2p_pts`/`sd` for a player it ranks but has no projection
+    for, which turns the whole CSV column to strings. That must not take down the packet build."""
+    na = blend(row(), {"r2p_pts": "NA", "sd": "NA", "ecr": 30.0}, None, W, None, week=3)
+    missing = blend(row(), {"ecr": 30.0}, None, W, None, week=3)
+    assert na.mu == pytest.approx(missing.mu) and na.sigma == pytest.approx(missing.sigma)
+    assert na.mu == pytest.approx(12.0)  # the ESPN number, unblended
+
+
+def test_fantasypros_numbers_still_arrive_as_strings():
+    """Same column, ordinary values: one `NA` anywhere makes polars read every cell as a string, so the numeric
+    ones have to keep working."""
+    s = blend(row(proj_week=0.0), {"r2p_pts": "9.5", "sd": "3.0"}, None, W, None, week=3)
+    f = blend(row(proj_week=0.0), {"r2p_pts": 9.5, "sd": 3.0}, None, W, None, week=3)
+    assert s.mu == pytest.approx(f.mu) == pytest.approx(9.5) and s.sigma == pytest.approx(f.sigma)
