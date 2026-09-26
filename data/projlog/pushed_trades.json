@@ -15,5 +15,21 @@
   "source": "math",
   "note": null,
   "closed": "2026-09-24"
+ },
+ "L2|Drake London": {
+  "status": "open",
+  "since": "2026-09-26",
+  "last": "2026-09-26",
+  "league": "L2",
+  "rival": "Mikiko Squad",
+  "give": [
+   "Kyren Williams",
+   "Mike Evans"
+  ],
+  "get": [
+   "Drake London"
+  ],
+  "source": "math",
+  "note": null
  }
 }
