@@ -204,5 +204,31 @@
    "Chase Brown"
   ],
   "note": "Rice is your flex and Montgomery your RB2, that's two starters out the door for one. One ask at a time, Mahomes first."
+ },
+ "L2|Brock Purdy": {
+  "date": "2026-10-02",
+  "league": "L2",
+  "rival": "Punts and Pints",
+  "give": [
+   "Drake Maye",
+   "Jalen Coker"
+  ],
+  "get": [
+   "Brock Purdy"
+  ],
+  "note": "not paying a starting WR to turn Maye into Purdy. Murray is already the QB1 and Coker just got healthy."
+ },
+ "L3|Trevor Lawrence": {
+  "date": "2026-10-02",
+  "league": "L3",
+  "rival": "Jeantly Cookd",
+  "give": [
+   "Kyler Murray",
+   "Luther Burden III"
+  ],
+  "get": [
+   "Trevor Lawrence"
+  ],
+  "note": "same two players out the door as the Mahomes ask and less coming back. no reason to send this version."
  }
 }
