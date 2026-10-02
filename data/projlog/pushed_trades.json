@@ -31,5 +31,21 @@
   ],
   "source": "math",
   "note": null
+ },
+ "L1|Jaylen Warren": {
+  "status": "open",
+  "since": "2026-10-02",
+  "last": "2026-10-02",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Jalen Coker",
+   "TreVeyon Henderson"
+  ],
+  "get": [
+   "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
  }
 }

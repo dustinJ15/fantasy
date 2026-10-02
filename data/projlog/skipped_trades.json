@@ -126,5 +126,83 @@
    "Cam Skattebo"
   ],
   "note": "same Montgomery as the Wilson row and Wilson is the better return. No reason to hand a piece to the guy you're playing this week either."
+ },
+ "L1|Derrick Henry": {
+  "date": "2026-10-02",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Chris Olave",
+   "TreVeyon Henderson"
+  ],
+  "get": [
+   "Derrick Henry"
+  ],
+  "note": "Olave's your WR2 and an A+ grade. The Warren deal gets the same bump for Coker and Henderson, ask that one."
+ },
+ "L2|Jahmyr Gibbs": {
+  "date": "2026-10-02",
+  "league": "L2",
+  "rival": "Mikiko Squad",
+  "give": [
+   "Jonathan Taylor",
+   "Chuba Hubbard"
+  ],
+  "get": [
+   "Jahmyr Gibbs"
+  ],
+  "note": "Two starting RBs for one while Jacobs is shelved until wk 7 leaves you one injury from Hampton at RB2. Not for +0.8."
+ },
+ "L2|Chase Brown": {
+  "date": "2026-10-02",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Parker Washington",
+   "Sam LaPorta"
+  ],
+  "get": [
+   "Chase Brown"
+  ],
+  "note": "Washington's your top WR by grade and LaPorta covers McBride's bye. Too much for +1.0."
+ },
+ "L2|Javonte Williams": {
+  "date": "2026-10-02",
+  "league": "L2",
+  "rival": "SpangeBob",
+  "give": [
+   "Tetairoa McMillan",
+   "Sam LaPorta"
+  ],
+  "get": [
+   "Javonte Williams"
+  ],
+  "note": "McMillan is an A grade WR and Javonte is a timeshare. No."
+ },
+ "L3|Jaxon Smith-Njigba": {
+  "date": "2026-10-02",
+  "league": "L3",
+  "rival": "Blastin' Darts",
+  "give": [
+   "Amon-Ra St. Brown",
+   "Luther Burden III"
+  ],
+  "get": [
+   "Jaxon Smith-Njigba"
+  ],
+  "note": "St. Brown for JSN is a lateral move at WR1 and it costs Burden too. Burden goes in the Mahomes ask instead."
+ },
+ "L3|Chase Brown": {
+  "date": "2026-10-02",
+  "league": "L3",
+  "rival": "Blastin' Darts",
+  "give": [
+   "Rashee Rice",
+   "David Montgomery"
+  ],
+  "get": [
+   "Chase Brown"
+  ],
+  "note": "Rice is your flex and Montgomery your RB2, that's two starters out the door for one. One ask at a time, Mahomes first."
  }
 }
