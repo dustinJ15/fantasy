@@ -59,6 +59,37 @@ MARKET_INJURY_FLOOR = 0.25
 # says no (rulings.record_pushes). Points per week over the rest-of-season lineup; the title-odds delta is not used
 # because at 1500 sims it is noise of the same size as any threshold.
 MUST_TRY_PPW = 2.0
+# A rival reads an offer by what the pieces are worth to him, not by my lineup math. A piece worth under this share of
+# what he gives up, that would also ride his bench, is a throw-in: it carries no weight in the market check, and a
+# 2-for-1 built on one is the 1-for-1 it really is, which the scan proposes on its own anyway. The lesson of the Purdy
+# ask (2026-10-06): Kyler Murray at QB21 money rode in on David Montgomery's value, the lineup math priced the rival's
+# backup QB at zero, and the card called QB3-for-a-spare "neutral for them". He laughed.
+THROW_IN_FRAC = 0.25
+# ESPN lineup slots that mean the manager is starting him today (PlayerProj.slot is ESPN's current slot).
+_BENCH_SLOTS = ("BE", "IR", "")
+
+
+def _value(p: PlayerProj, values: dict[str, dict]) -> float:
+    return values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0
+
+
+def throw_ins(pieces: list[PlayerProj], other_side: float, starters: set[int], values: dict[str, dict]) -> list[PlayerProj]:
+    """The pieces of a package the receiver would neither start nor price: outside his optimal lineup once the deal
+    is done and under THROW_IN_FRAC of the market value he gives up. Nothing is a throw-in when the market has no
+    price for his side, since then there is nothing to measure against."""
+    if not other_side:
+        return []
+    return [p for p in pieces if p.espn_id not in starters and _value(p, values) < THROW_IN_FRAC * other_side]
+
+
+def _lineup(roster: list[PlayerProj], slots: dict[str, int]):
+    """(mu, starter ids) of the rest-of-season optimal lineup; `lineup_strength` for callers who also need who starts."""
+    L = optimize([p.ros() for p in roster], slots, objective="ev")
+    return L.mu, {p.espn_id for ps in L.assignment.values() for p in ps}
+
+
+def starts_today(p: PlayerProj) -> bool:
+    return p.slot not in _BENCH_SLOTS
 
 
 def market_value(players: list[PlayerProj], values: dict[str, dict], discount_injured: bool = False) -> float:
@@ -138,18 +169,26 @@ def _drop_rows(drops: list[PlayerProj], limits: dict[str, int]) -> list[dict]:
 
 def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int], repl: dict[str, float],
          team_meta: dict[int, dict], values: dict[str, dict], max_per_rival: int = 3, top: int = 10,
-         limits: dict[str, int] | None = None) -> list[dict]:
+         limits: dict[str, int] | None = None, roster_max: int | None = None) -> list[dict]:
     """
     For each rival: try 1-for-1 and 2-for-1 packages where my surplus meets their hole.
 
     `limits` are ESPN's per-position roster caps. A package that puts me over one is priced with the cheapest body
     at that position gone and carries him as `drops`, because that is the only form ESPN will accept it in; one
     that leaves me no legal cut is not proposed at all. The same cut on the rival's side is a caveat, not a veto.
+    `roster_max` is the roster size (starters + bench): a 2-for-1 to a full roster makes the rival cut someone to
+    take it, which the row says, because people decline exactly that.
 
     Ranking is acceptance-first: a trade only has value if the rival says yes, and rivals (a) overvalue what they
     own, (b) infer that an offer favors the offerer, and (c) remember lowballs in a repeated game with coworkers.
     So among trades that help me by >= 0.75 ppw, sort by the rival's gain, cap the market-value ask at ~1.2x, and
     only favor 2-for-1s when the one player they get is the best piece in the deal (consolidation, which people accept).
+
+    The lineup delta is blind to two things a rival sees at once, so the market check covers them: his bench is not
+    free (the lineup math prices a backup QB at zero however the market prices him), and a piece he would neither
+    start nor price is a throw-in that must not carry the package through the market check (`throw_ins`). A package
+    with one is dropped; the 1-for-1 it hides is in the loop on its own merits. The row also says when I am asking
+    for a player he is starting today while my math has him on the bench: he does not share my view of his roster.
     """
     limits = limits or {}
     mine = rosters[my_id]
@@ -162,7 +201,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
     for rid, theirs in rosters.items():
         if rid == my_id:
             continue
-        their_mu0, _ = lineup_strength(theirs, slots)
+        their_mu0, their_starters0 = _lineup(theirs, slots)
         their_needs = needs(theirs, slots, repl)
         their_assets = sorted([p for p in theirs if p.pos not in ("K", "D/ST") and p.mu_ros > 0], key=lambda p: -p.mu_ros)[:10]
         rival_cands = []
@@ -187,13 +226,25 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 continue
             new_thin = [pos for pos in thin if pos not in thin0]
             my_mu1, _ = lineup_strength(new_mine, slots)
-            their_mu1, _ = lineup_strength(new_theirs, slots)
+            their_mu1, their_starters = _lineup(new_theirs, slots)
             d_me, d_them = my_mu1 - my_mu0, their_mu1 - their_mu0
             # Must help me and be at least roughly neutral for them (win-win or need-matching),
             # otherwise it's a dump nobody accepts.
             if d_me < 0.75 or d_them < -0.75:
                 continue
+            # A piece they would neither start nor price is a throw-in; the package is the smaller deal in disguise.
+            if throw_ins(give, rv, their_starters, values):
+                continue
             why = []
+            # ESPN says he is in their lineup today while my rest-of-season math benches him: they value him more
+            # than I do, and an ask for a man's starter is a harder sell than the delta reads.
+            asks_starter = [p for p in get if starts_today(p) and p.espn_id not in their_starters0]
+            for p in asks_starter:
+                why.append(f"they start {p.name} today; the math has him on their bench")
+            # A 2-for-1 into a full roster makes them cut someone to take it.
+            squeeze = roster_max and len(give) > len(get) and len([p for p in new_theirs if p.slot != "IR"]) > roster_max
+            if squeeze:
+                why.append("they have to cut a body to take two")
             for p in get:
                 if my_needs.get(p.pos, {}).get("hole") and f"fills my {p.pos} hole" not in why: why.append(f"fills my {p.pos} hole")
             for p in give:
@@ -229,7 +280,8 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR),
                 "must_try": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR) and d_me >= MUST_TRY_PPW,
                 "why": why,
-                "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin), 2),
+                "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin)
+                               - 0.5 * len(asks_starter) - (0.25 if squeeze else 0.0), 2),
             })
         rival_cands.sort(key=lambda c: -c["score"])
         seen_get, kept = set(), []
@@ -264,12 +316,15 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     # Accepting can force a cut (position cap); price the roster ESPN would actually leave me with.
     drops = cap_drops(new_mine, limits, keep={p.espn_id for p in get})
     new_mine = _swap(new_mine, {p.espn_id for p in drops or []}, [])
-    my_mu1, _ = lineup_strength(new_mine, slots)
+    my_mu1, my_starters = _lineup(new_mine, slots)
     their_mu1, _ = lineup_strength(new_theirs, slots)
     d_me, d_them = my_mu1 - my_mu0, their_mu1 - their_mu0
     gv, gv_raw = market_value(give, values, discount_injured=True), market_value(give, values)
     rv = market_value(get, values)
-    market_ratio = (rv / gv) if gv and rv else None
+    # Same rule the scan applies to my offers: a body I would neither start nor price does not pad their side.
+    filler = throw_ins(get, gv, my_starters, values)
+    rv_eff = market_value([p for p in get if p not in filler], values)
+    market_ratio = (rv_eff / gv) if gv and rv_eff else None
 
     can_field, thin = depth(new_mine, slots)
     _, thin0 = depth(mine, slots)
@@ -295,9 +350,11 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
         why.append(f"accepting means cutting {p.name} ({limits[p.pos]}-{p.pos} cap)")
     if drops is None:
         why.append("over a position cap with no legal cut: ESPN would not process it")
+    for p in filler:
+        why.append(f"{p.name} is a throw-in (market {_value(p, values):.0f}, rides the bench)")
     if market_ratio is not None:
-        if market_ratio < MARKET_FLOOR: why.append(f"market says I give more ({rv} vs {gv})")
-        elif market_ratio > 1.2: why.append(f"market says I get more ({rv} vs {gv})")
+        if market_ratio < MARKET_FLOOR: why.append(f"market says I give more ({rv_eff} vs {gv})")
+        elif market_ratio > 1.2: why.append(f"market says I get more ({rv_eff} vs {gv})")
     why += injury_caveats(give, values)
     why = list(dict.fromkeys(why))
 
@@ -312,7 +369,7 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     return {
         "give": [p.name for p in give], "get": [p.name for p in get],
         "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
-        "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "why": why, "verdict": verdict,
+        "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_get_eff": rv_eff, "why": why, "verdict": verdict,
         "drops": _drop_rows(drops or [], limits),
     }
 

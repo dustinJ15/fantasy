@@ -170,7 +170,9 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     deadline_ms = int(s.get("trade_deadline_ms") or 0)
     trades_closed = bool(deadline_ms) and now_dt.timestamp() * 1000 > deadline_ms
     limits = s.get("position_limits") or {}
-    trades = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits) if (my_id and not trades_closed) else []
+    roster_max = sum(slots.values()) + int(s.get("bench_slots") or 0)
+    trades = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits,
+                  roster_max=roster_max if s.get("bench_slots") else None) if (my_id and not trades_closed) else []
     trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
     trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     trades = mark_pushed(trades, pushes or {}, snap["ref"]["name"], now_dt.date())
@@ -194,7 +196,6 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
                                {p.espn_id for ps in win_lu.assignment.values() for p in ps}, repl, cuffs) if my_id else []
 
     # bench spots already open (a drop made, nobody added): name who fills each one, after the hurt-player rows
-    roster_max = sum(slots.values()) + int(s.get("bench_slots") or 0)
     open_spots = max(roster_max - len([p for p in mine if p.slot != "IR"]), 0) if my_id and s.get("bench_slots") else 0
     used = {r["add"]["name"] for r in injuries if r.get("add")}
     open_adds = []

@@ -399,7 +399,8 @@ def todos(lg: dict) -> list[dict]:
     for t in worth or lg["trades"][:1]:
         # Depth and market warnings ride along with the row: the card is the whole HTML email, so a caveat that only
         # reached the detail tables would never be seen on a phone.
-        warn = [_to_dustin(w) for w in t["why"] if w.startswith("leaves me") or w.startswith("market says I")]
+        warn = [_to_dustin(w) for w in t["why"]
+                if w.startswith(("leaves me", "market says I", "they start", "they have to cut a body"))]
         them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
         push = bool(t.get("pushed") or t.get("must_try"))
         # The cut ESPN's position cap forces rides in the row text: without it the paste goes out and the trade

@@ -321,3 +321,77 @@ def test_evaluate_prices_the_forced_cut_and_says_so(slots):
     assert out["drops"] == [{"name": "WR6", "pos": "WR", "cap": 6}]
     assert any(w.startswith("accepting means cutting WR6") for w in out["why"])
     assert out["verdict"] == "accept"
+
+
+def _two_qb_rival():
+    """The Purdy ask, in miniature: the rival starts one of two good QBs; I have a QB nobody wants and a mid RB."""
+    mine = [P(1, "KylerLike", "QB", 16, tid=1), P(2, "RB1", "RB", 18, tid=1), P(3, "RB2", "RB", 13, tid=1), P(4, "MontyLike", "RB", 12, tid=1),
+            P(5, "WR1", "WR", 20, tid=1), P(6, "WR2", "WR", 16, tid=1), P(21, "WR3", "WR", 14, tid=1), P(7, "TE", "TE", 15, tid=1),
+            P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "Burrow", "QB", 19.6, tid=2), P(10, "Purdy", "QB", 18.7, tid=2), P(12, "RB1", "RB", 22, tid=2), P(13, "RB2", "RB", 14, tid=2),
+              P(14, "RB3", "RB", 12.5, tid=2), P(15, "WR1", "WR", 16, tid=2), P(16, "WR2", "WR", 16, tid=2), P(17, "WR3", "WR", 13, tid=2),
+              P(18, "TE", "TE", 11, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    repl = {"QB": 18.3, "RB": 11.8, "WR": 12.6, "TE": 10, "K": 6, "D/ST": 5}
+    values = {"10": {"redraft_value": 2626}, "11": {"redraft_value": 2392}, "1": {"redraft_value": 284}, "4": {"redraft_value": 1942},
+              "3": {"redraft_value": 2400}, "2": {"redraft_value": 8000}}
+    return mine, theirs, repl, values
+
+
+def test_scan_drops_a_two_for_one_built_on_a_throw_in(slots):
+    """QB21 money plus a mid RB for the market's QB3 passed the market check only because the RB carried the package,
+    and read 'neutral for them' because their spare QB rides the bench. The rival laughed. Now the package is gone and
+    the 1-for-1 it hid stands on its own, where the market floor judges it."""
+    mine, theirs, repl, values = _two_qb_rival()
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 2, "losses": 2}}, values)
+    purdy = [c for c in out if "Purdy" in c["get"]]
+    assert not any(set(c["give"]) == {"KylerLike", "MontyLike"} for c in purdy)
+    assert not any("KylerLike" in c["give"] for c in purdy), "the QB nobody prices is a throw-in in every package"
+    # One row per target survives, and it is the fair 1-for-1 (my second RB at even market value), not the 2-for-1
+    # that used to outscore it on the consolidation bonus: the rule removes the lowball, not the ask.
+    assert purdy and all(c["give"] == ["RB2"] and c["sendable"] and c["market_ratio"] >= 0.8 for c in purdy), purdy
+
+
+def test_a_cheap_piece_they_would_start_is_not_a_throw_in(slots):
+    from ff.model.trades import throw_ins
+    mine, theirs, repl, values = _two_qb_rival()
+    kyler = mine[0]
+    # Not a throw-in once he is in their lineup, however little the market pays for him.
+    assert throw_ins([kyler], 2626, {kyler.espn_id}, values) == []
+    assert throw_ins([kyler], 2626, set(), values) == [kyler]
+    # No price on their side means nothing to measure against.
+    assert throw_ins([kyler], 0, set(), values) == []
+
+
+def test_scan_says_when_i_ask_for_a_player_they_start_today(slots):
+    mine, theirs, repl, values = _two_qb_rival()
+    purdy = next(p for p in theirs if p.name == "Purdy")
+    purdy.slot = "QB"  # ESPN: he is their starter this week, whatever the rest-of-season math says
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 2, "losses": 2}}, values)
+    rows = [c for c in out if "Purdy" in c["get"]]
+    assert rows and all(any(w.startswith("they start Purdy today") for w in c["why"]) for c in rows)
+    purdy.slot = "BE"
+    quiet = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 2, "losses": 2}}, values)
+    assert not any(w.startswith("they start") for c in quiet for w in c["why"])
+
+
+def test_scan_notes_the_cut_a_full_roster_forces(slots):
+    mine, theirs = _rosters()
+    meta = {2: {"name": "Rival", "wins": 0, "losses": 2}}
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    full = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values={}, roster_max=len(theirs))
+    twos = [c for c in full if len(c["give"]) == 2]
+    assert twos and all("they have to cut a body to take two" in c["why"] for c in twos)
+    assert not any("cut a body" in w for c in full if len(c["give"]) == 1 for w in c["why"])
+    roomy = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values={}, roster_max=len(theirs) + 1)
+    assert not any("cut a body" in w for c in roomy for w in c["why"])
+
+
+def test_evaluate_ignores_a_throw_in_in_what_i_get(slots):
+    mine, theirs = _rosters()
+    by_id = {p.espn_id: p for p in mine + theirs}
+    # They send their good TE plus a backup TE I would never start, for my spare RB. The spare TE pads their side.
+    values = {"4": {"redraft_value": 2000}, "18": {"redraft_value": 2100}, "22": {"redraft_value": 100}}
+    out = evaluate(1, 2, [by_id[4]], [by_id[18], by_id[22]], {1: mine, 2: theirs}, slots, repl={"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}, values=values)
+    assert out["market_get"] == 2200 and out["market_get_eff"] == 2100
+    assert any(w.startswith("TE2 is a throw-in") for w in out["why"])
+    assert out["verdict"] == "accept"  # the real piece still fixes my TE hole at a fair price
