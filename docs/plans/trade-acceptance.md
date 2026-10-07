@@ -1,6 +1,8 @@
 # Plan: trades a rival would actually accept
 
-Status: proposal, nothing implemented. Written 2026-10-07 against `main` at 24ae9a8 (164 tests passing). The container
+Status: implemented 2026-10-07 in three PRs (#10 stop the bleeding, #11 the model, #12 learning), 188 tests passing;
+see **Deviations** at the end for what moved during the build. Written the same morning against `main` at 24ae9a8
+(164 tests passing). The container
 had no ESPN cookies, so the two rows from this morning's email were reconstructed from the projlog branch
 (`pushed_trades.json`, `skipped_trades.json`, the week 5 projection log) and live FantasyCalc values pulled today.
 Anything that needs a live ESPN pull is marked **needs live pull**.

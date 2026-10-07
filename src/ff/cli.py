@@ -177,10 +177,19 @@ def waivers(league: str | None = LeagueOpt):
 
 
 @app.command()
-def trades(league: str | None = LeagueOpt):
+def trades(league: str | None = LeagueOpt,
+           explain: bool = typer.Option(False, "--explain", help="Print the acceptance scorecard behind each row (p(accept), its factors, what he is left with, the fallback)")):
     for lg in _section(league, "trades"):
         for c in lg["trades"]:
-            rprint(f"- give {c['give']} → get {c['get']} ({c['rival']}): me {c['my_delta_ppw']:+.1f}, them {c['their_delta_ppw']:+.1f}  {c['why']}")
+            word = f" · {c['accept_word']}" if c.get("accept_word") else ""
+            rprint(f"- give {c['give']} → get {c['get']} ({c['rival']}): me {c['my_delta_ppw']:+.1f}, them {c['their_delta_ppw']:+.1f}{word}  {c['why']}")
+            if explain:
+                rprint(f"    p(accept) {c.get('p_accept')}: {'; '.join(c.get('accept_why') or []) or 'no factor moved it'}")
+                rprint(f"    chart from his side {c.get('fair_his')}, best player {c.get('best_side') or 'unpriced'}, sendable {c.get('sendable')}, must_try {c.get('must_try')}")
+                if c.get("after_line"):
+                    rprint(f"    {c['after_line']}")
+                if c.get("fallback"):
+                    rprint(f"    {c['fallback']['text']}")
 
 
 def _parse_since(txt: str) -> float:

@@ -72,6 +72,12 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 - Skipped trade rows are remembered: `ff render-email --reads` writes each `skip` on a `trade:` row to
   `data/projlog/skipped_trades.json` (`src/ff/rulings.py`), the packet drops that package for 14 days, and the file rides
   the `projlog` branch (cloud_setup.sh restores it). A `do`/`amend` is not remembered.
+- Offer outcomes: every offer of mine in `outgoing_trades` is opened in `data/projlog/offer_outcomes.json` the morning it
+  shows and closed the morning it is gone (`src/ff/rulings.py` `record_outcomes`, run by `ff packet`): accepted when the
+  players I asked for are on my roster, expired when its expiry passed, declined otherwise. The scan reads it per rival
+  (`history`): a no in the last 7 days is a factor on every package to him, and after two answers his rate is a prior.
+  Rides the `projlog` branch. `ff trades --explain` prints the scorecard behind each row (p(accept), its factors, what he
+  is left with, the fallback package for when he says no).
 - Pushed trades: the one package the scan marks `must_try` (sendable and ≥ +2.0 ppw for me) or that Claude rules `push` on
   (with a note) is recorded in `data/projlog/pushed_trades.json` by `ff render-email` and comes back at the top of the card
   every morning ("asked N mornings running") until it shows up in my pending offers (sent), Claude rules `skip` on it, or

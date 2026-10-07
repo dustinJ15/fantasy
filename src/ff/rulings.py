@@ -142,3 +142,77 @@ def record_rulings(packet: dict, reads: dict, skips_path: Path = SKIPS_PATH, pus
     """Everything `ff render-email` remembers from one morning's reads."""
     return [f"skip {k}" for k in record_skips(packet, reads, skips_path, today)] + \
            [f"push {e}" for e in record_pushes(packet, reads, pushes_path, today)]
+
+
+# ---------- outcomes: what ESPN did with the offers I actually sent ----------
+# The first real acceptance data this repo has. Every offer of mine that shows in `outgoing_trades` is opened here the
+# morning it is seen and closed the morning it is gone: accepted when the players I asked for are on my roster,
+# expired when its expiry passed, declined otherwise. The scan reads it for a per-rival prior and a recency factor.
+
+OUTCOMES_PATH = DATA_DIR / "projlog" / "offer_outcomes.json"
+RECENT_DAYS = 7
+CLOSED = ("accepted", "declined", "expired")
+
+
+def load_outcomes(path: Path = OUTCOMES_PATH) -> dict[str, dict]:
+    return _load(path)
+
+
+def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None = None) -> list[str]:
+    """Open an entry for every offer of mine pending on ESPN; close the ones that are not pending any more.
+    A league whose pending list could not be read closes nothing (an empty list there means nothing)."""
+    today = today or date.today()
+    outs = load_outcomes(path)
+    events = []
+    for lg in packet.get("leagues") or []:
+        league = lg["name"]
+        pending = {str(t["id"]): t for t in lg.get("outgoing_trades") or [] if t.get("id") is not None}
+        for oid, t in pending.items():
+            key = f"{league}|{oid}"
+            if key not in outs:
+                outs[key] = {"status": "open", "league": league, "rival": t.get("rival"), "rival_team_id": t.get("rival_team_id"),
+                             "give": list(t.get("give") or []), "get": list(t.get("get") or []),
+                             "opened": today.isoformat(), "expires": t.get("expires_iso")}
+                events.append(f"{key}: opened")
+        if lg.get("pending_trades_error"):
+            continue
+        roster_names = {p["name"] for p in lg.get("roster") or []}
+        for key, o in outs.items():
+            if o.get("league") != league or o.get("status") != "open" or key.split("|", 1)[1] in pending:
+                continue
+            got = [n for n in o.get("get") or [] if n in roster_names]
+            gave = [n for n in o.get("give") or [] if n in roster_names]
+            if got and not gave:
+                status = "accepted"
+            elif (o.get("expires") or "")[:10] and o["expires"][:10] < today.isoformat():
+                status = "expired"
+            else:
+                status = "declined"
+            o["status"], o["closed"] = status, today.isoformat()
+            events.append(f"{key}: {status}")
+    if events:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(outs, indent=1))
+    return events
+
+
+def history(outs: dict[str, dict], league: str, today: date | None = None) -> dict[int, dict]:
+    """Per rival team id, what his answers so far say: `recent_decline` (a no or an expiry in the last RECENT_DAYS)
+    and `prior`, his acceptance rate with a half-count of smoothing, only once he has answered twice."""
+    today = today or date.today()
+    tally: dict[int, dict] = {}
+    for o in outs.values():
+        if o.get("league") != league or o.get("status") not in CLOSED or o.get("rival_team_id") is None:
+            continue
+        rid = int(o["rival_team_id"])
+        t = tally.setdefault(rid, {"n": 0, "accepted": 0, "recent_decline": False})
+        t["n"] += 1
+        t["accepted"] += o["status"] == "accepted"
+        try:
+            closed = date.fromisoformat(o.get("closed", ""))
+        except ValueError:
+            closed = today
+        if o["status"] != "accepted" and today - closed <= timedelta(days=RECENT_DAYS):
+            t["recent_decline"] = True
+    return {rid: {"n": t["n"], "recent_decline": t["recent_decline"],
+                  "prior": round((t["accepted"] + 0.5) / (t["n"] + 1), 3) if t["n"] >= 2 else None} for rid, t in tally.items()}
