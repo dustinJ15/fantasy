@@ -19,7 +19,7 @@ from .model.sim import simulate
 from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
-from .rulings import drop_recently_skipped, load_pushes, load_skips, mark_pushed
+from .rulings import drop_recently_skipped, history, load_outcomes, load_pushes, load_skips, mark_pushed, record_outcomes
 from .sources import espn, fantasycalc, sleeper, vegas, weather
 
 PACKET_VERSION = 6
@@ -85,7 +85,7 @@ def _hours_left(ms, now=None) -> float | None:
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
                    overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None,
-                   now=None, skips: dict | None = None, pushes: dict | None = None) -> dict:
+                   now=None, skips: dict | None = None, pushes: dict | None = None, offer_history: dict | None = None) -> dict:
     s = snap["settings"]
     week = snap["week"]
     slots = s["lineup_slots"]
@@ -179,7 +179,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     roster_max = sum(slots.values()) + int(s.get("bench_slots") or 0)
     trades = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits,
                   roster_max=roster_max if s.get("bench_slots") else None, ctx=season_ctx, playoff_pct=playoff_by_team,
-                  reg_season_weeks=s["reg_season_weeks"]) if (my_id and not trades_closed) else []
+                  reg_season_weeks=s["reg_season_weeks"], history=offer_history) if (my_id and not trades_closed) else []
     trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
     trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     trades = mark_pushed(trades, pushes or {}, snap["ref"]["name"], now_dt.date())
@@ -304,7 +304,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     except Exception:
         sl_proj = {}
 
-    skips, pushes = load_skips(), load_pushes()
+    skips, pushes, outcomes = load_skips(), load_pushes(), load_outcomes()
     league_blocks, watch, injured, exposure = [], [], [], defaultdict(list)
     for ref in leagues(only):
         snap = league_snapshot(ref, force)
@@ -313,7 +313,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
             lines_by_week[wk] = vegas.implied_totals(wk or None)
         lines = lines_by_week[wk]
         blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines,
-                             now=datetime.now(UTC), skips=skips, pushes=pushes)
+                             now=datetime.now(UTC), skips=skips, pushes=pushes, offer_history=history(outcomes, ref.name))
         for p in blk["roster"]:
             exposure[p["name"]].append(ref.name)
             st = (p["sources"].get("espn_status") or p["sources"].get("sleeper_status") or "").upper()
@@ -343,6 +343,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
         },
         "leagues": league_blocks,
     }
+    # What ESPN did with the offers I sent: opened the morning they show, closed the morning they are gone.
+    packet["shared"]["offer_outcomes"] = record_outcomes(packet)
     PACKET_DIR.mkdir(parents=True, exist_ok=True)
     out = PACKET_DIR / f"{date.today().isoformat()}.json"
     out.write_text(json.dumps(packet, indent=1, default=str))

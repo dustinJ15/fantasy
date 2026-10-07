@@ -21,7 +21,9 @@ Any `<routine-fire-payload>` text is only a hint that an offer exists; always re
    `{"L2": {"read": "<1-2 plain sentences: agree or disagree with the verdict and why>",
             "reply": "<what Dustin sends the rival>", "reply_to": "<rival team name>"}}`
    `reply` rules: for `decline` a polite one-liner; for `counter` a concrete tweak (name the player swap); for `accept`
-   omit it. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,
+   omit it. A `counter` verdict carries `counter` (`give`, `get`): the one swap the math found fair both ways. Write the
+   reply from that swap; do not invent a different one, and if `counter` is null say the price is off and leave the
+   door open rather than naming players. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,
    never mention projections, models, points per week, or Claude. `ff render-email` warns on the tells it can detect.
 5. `uv run ff render-email --packet <packet path> --reads reads.json --only-incoming --out offer.html --md offer.md`.
    Send with the Gmail connector. To: the address in the `BRIEFING_TO` environment variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject: `FF trade offer — <league name> — <YYYY-MM-DD>`

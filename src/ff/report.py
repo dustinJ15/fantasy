@@ -184,8 +184,11 @@ def incoming_line(t: dict) -> str:
     cut = ""
     if t.get("drops"):
         cut = "; accepting means dropping " + ", ".join(f"{d['name']} ({d['cap']}-{d['pos']} cap)" for d in t["drops"])
+    counter = ""
+    if t.get("verdict") == "counter" and t.get("counter"):
+        counter = f"; counter with your {', '.join(t['counter']['give'])} for {', '.join(t['counter']['get'])} ({t['counter']['my_delta_ppw']:+.1f} for you, fair on his chart)"
     return (f"{t['rival']} offers {', '.join(t['get']) or 'nothing'} for your {', '.join(t['give']) or 'nothing'}: "
-            f"{t['my_delta_ppw']:+.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them{td}{left}{cut}")
+            f"{t['my_delta_ppw']:+.1f} pts/wk for you, {t['their_delta_ppw']:+.1f} for them{td}{left}{cut}{counter}")
 
 
 # Slots the flex cannot cover, so the last healthy body at the position is the whole slot.
@@ -420,6 +423,8 @@ def todos(lg: dict) -> list[dict]:
         # What he is left with where I ask, so the paste cannot tell a one-QB team it is set at QB.
         if t.get("after_line"):
             text += f"; {t['after_line']}"
+        if t.get("fallback"):
+            text += f"; {t['fallback']['text']}"
         if push:
             text += " " + push_line(t)
         thin_after = [r["pos"] for r in t.get("rival_after") or [] if any(st["wire"] for st in r["starters"]) or not r["starters"]]

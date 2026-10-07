@@ -447,6 +447,13 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             if k in seen_get:
                 continue
             seen_get.add(k); kept.append(c)
+            # The sweetener, ready: the same ask with a different package of mine that he is likelier to take. The
+            # row leads with the version that gains me more (anchoring), and names this one for when he says no.
+            alts = [a for a in rival_cands if a["get"] == c["get"] and a["give"] != c["give"] and a["p_accept"] > c["p_accept"] + 0.05]
+            if alts:
+                alt = max(alts, key=lambda a: a["p_accept"])
+                c["fallback"] = {"give": alt["give"], "p_accept": alt["p_accept"], "my_delta_ppw": alt["my_delta_ppw"],
+                                 "text": f"if he says no, offer {', '.join(alt['give'])} instead ({alt['accept_word'] or 'likelier'})"}
             if len(kept) >= max_per_rival:
                 break
         cands += kept
@@ -457,7 +464,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
 def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[PlayerProj], rosters: dict[int, list[PlayerProj]],
              slots: dict[str, int], repl: dict[str, float], values: dict[str, dict],
              limits: dict[str, int] | None = None, ctx: SeasonCtx | None = None, playoff_pct: dict[int, float] | None = None,
-             reg_season_weeks: int | None = None) -> dict:
+             reg_season_weeks: int | None = None, _counter_search: bool = True) -> dict:
     """
     Score an offer someone sent me: `give` leaves my roster, `get` joins it. Any size, K/DST allowed.
 
@@ -530,13 +537,53 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     else:
         verdict = "counter"
     after = rival_after(new_mine, list(give), slots, my_ctx)  # what I am left with where he asks
+    counter = (_counter(my_id, rival_id, give, get, rosters, slots, repl, values, limits, ctx, playoff_pct, reg_season_weeks)
+               if verdict == "counter" and _counter_search else None)
     return {
+        "counter": counter,
         "give": [p.name for p in give], "get": [p.name for p in get],
         "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
         "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_get_eff": rv_eff, "market_ratio": market_ratio,
         "why": why, "verdict": verdict,
         "drops": _drop_rows(drops or [], limits), "my_after": after,
     }
+
+
+def _counter(my_id, rival_id, give, get, rosters, slots, repl, values, limits, ctx, playoff_pct, reg_season_weeks) -> dict | None:
+    """The one swap that turns a counter into a yes for me while staying fair on his chart: replace one piece I give
+    with another player of mine, or drop one piece from what I give. Returns {give, get, my_delta_ppw, fair_his} or
+    None when no single change gets there."""
+    mine = rosters.get(my_id, [])
+    in_deal = {p.espn_id for p in give} | {p.espn_id for p in get}
+    options: list[list[PlayerProj]] = []
+    for g in give:
+        for q in mine:
+            if q.espn_id in in_deal or q.pos in ("K", "D/ST") or q.mu_ros <= 0:
+                continue
+            if values and not _value(q, values):
+                continue  # a piece the chart does not price cannot be shown to be fair
+            options.append([q if p.espn_id == g.espn_id else p for p in give])
+        if len(give) > 1:
+            options.append([p for p in give if p.espn_id != g.espn_id])
+    best = None
+    rv = market_value(get, values)
+    for new_give in options:
+        ev = _evaluate_once(my_id, rival_id, new_give, get, rosters, slots, repl, values, limits, ctx, playoff_pct, reg_season_weeks)
+        if ev["verdict"] != "accept":
+            continue
+        fair_his = fairness(market_value(new_give, values), rv, len(new_give), len(get))
+        if fair_his is not None and fair_his < 1 - FAIR_BAND:
+            continue  # a counter he reads as a lowball is not a counter
+        key = (-(abs((fair_his or 1.0) - 1.0)), ev["my_delta_ppw"])
+        if best is None or key > best[0]:
+            best = (key, {"give": [p.name for p in new_give], "get": [p.name for p in get], "my_delta_ppw": ev["my_delta_ppw"], "fair_his": fair_his})
+    return best[1] if best else None
+
+
+def _evaluate_once(my_id, rival_id, give, get, rosters, slots, repl, values, limits, ctx, playoff_pct, reg_season_weeks) -> dict:
+    """`evaluate` without the counter search, so the search cannot recurse."""
+    return evaluate(my_id, rival_id, give, get, rosters, slots, repl, values, limits=limits, ctx=ctx, playoff_pct=playoff_pct,
+                    reg_season_weeks=reg_season_weeks, _counter_search=False)
 
 
 def drop_already_offered(cands: list[dict], pending: list[dict] | None, by_id: dict[int, PlayerProj]) -> list[dict]:
