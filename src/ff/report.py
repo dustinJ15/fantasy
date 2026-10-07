@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from datetime import date
 
 
 def slug(text: str) -> str:
@@ -261,6 +262,18 @@ def _weeks(r: dict) -> str:
     return f"~{r['weeks_out']:.0f} wk{'s' if r['weeks_out'] >= 1.5 else ''}"
 
 
+def _stash_note(r: dict, drop: str | None) -> str:
+    """", added when he was stashed Oct 3" when the drop an activation takes is the body that stash brought in."""
+    st = r.get("stash") or {}
+    if not drop or drop not in (st.get("added") or []):
+        return ""
+    try:
+        when = date.fromisoformat(st["stashed"]).strftime("%b %-d")
+    except (KeyError, TypeError, ValueError):
+        return ", added when he was stashed"
+    return f", added when he was stashed {when}"
+
+
 def _injury_items(lg: dict, spots: _Spots | None = None) -> list[dict]:
     """One row per hurt player, the verb decided by `model.injuries`; this only puts words on the numbers.
 
@@ -291,12 +304,14 @@ def _injury_items(lg: dict, spots: _Spots | None = None) -> list[dict]:
             st = (r.get("espn_status") or "active").replace("_", " ").lower()
             text = f"move {who} off IR, ESPN lists him {st} so the slot has to be cleared"
             drop, suffix = spots.take(for_whom=r["name"])
+            # The drop is the body the stash brought in: say so, so a round trip reads as one (Daniels, Oct 3 to 7).
+            came_in = _stash_note(r, drop)
             if drop in drop_rows:
                 d = drop_rows[drop]
                 folded.add(drop)
-                text += f"; drop {drop} ({d['pos']}, out {_weeks(d)}, worth ~{d['hold_value']:.0f} pts the rest of the way) to make room"
+                text += f"; drop {drop} ({d['pos']}, out {_weeks(d)}, worth ~{d['hold_value']:.0f} pts the rest of the way{came_in}) to make room"
             else:
-                text += suffix.replace("; drop ", "; drop ") + (" to make room" if drop else "")
+                text += suffix + (f"{came_in} to make room" if drop else "")
         elif v == "drop":
             text = f"drop {who}: out {_weeks(r)}{back}, worth ~{r['hold_value']:.0f} pts the rest of the way"
             if add:

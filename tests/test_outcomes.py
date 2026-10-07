@@ -91,3 +91,39 @@ def test_a_counter_names_the_one_swap_that_makes_it_a_yes(slots):
     assert out["counter"]["my_delta_ppw"] >= 0.75 and out["counter"]["fair_his"] >= 0.9
     accepted = evaluate(1, 2, [by_id[4]], [by_id[18]], {1: mine, 2: theirs}, slots, REPL, values)
     assert accepted["verdict"] == "accept" and accepted["counter"] is None
+
+
+# ---------- the IR-slot memory (rulings.note_ir_roster / ir_memory) ----------
+
+def _ir_roster(*players):
+    return [{"espn_id": i, "name": n, "slot": slot} for i, n, slot in players]
+
+
+def test_ir_moves_stamp_the_stash_with_who_came_in_and_the_exit():
+    from ff.rulings import ir_memory, load_ir_moves, note_ir_roster
+    moves = load_ir_moves(__file__ + ".missing")  # no file: an empty memory, not an error
+    d1, d2, d3 = date(2026, 10, 1), date(2026, 10, 3), date(2026, 10, 7)
+    # first run only seeds the roster: Daniels is already on IR, nothing is claimed about how he got there
+    assert note_ir_roster(moves, "L2", _ir_roster((1, "Daniels", "IR"), (2, "Jacobs", "BE")), d1) == []
+    assert ir_memory(moves, "L2", d1) == {}
+    # Daniels came off, Jacobs was cut for the spot (not a stash, not recorded)
+    assert note_ir_roster(moves, "L2", _ir_roster((1, "Daniels", "BE")), d2) == ["L2|1: left"]
+    assert ir_memory(moves, "L2", d2)[1] == {"left_days": 0, "stashed": None, "added": []}
+    # back on IR the same week, McGowan came in on the freed spot
+    assert note_ir_roster(moves, "L2", _ir_roster((1, "Daniels", "IR"), (3, "McGowan", "BE")), d2) == ["L2|1: stashed"]
+    mem = ir_memory(moves, "L2", d3)
+    assert mem[1] == {"left_days": 4, "stashed": "2026-10-03", "added": ["McGowan"]}
+    assert ir_memory(moves, "L1", d3) == {}  # another league sees nothing
+
+
+def test_ir_moves_survive_a_round_trip_through_the_file(tmp_path):
+    from ff.rulings import load_ir_moves, note_ir_roster, save_ir_moves
+    path = tmp_path / "ir_moves.json"
+    moves = load_ir_moves(path)
+    note_ir_roster(moves, "L1", _ir_roster((5, "Williams", "BE")), date(2026, 10, 5))
+    note_ir_roster(moves, "L1", _ir_roster((5, "Williams", "IR"), (6, "Brissett", "BE")), date(2026, 10, 6))
+    save_ir_moves(moves, path)
+    again = load_ir_moves(path)
+    assert again["moves"]["L1|5"]["added"] == ["Brissett"] and again["rosters"]["L1"]["ir"] == ["5"]
+    # a drop straight off IR (not on the roster any more) is not an activation
+    assert note_ir_roster(again, "L1", _ir_roster((6, "Brissett", "BE")), date(2026, 10, 7)) == []

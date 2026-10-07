@@ -28,11 +28,11 @@ def fa(delta, name="FA", pos="RB", slot="RB"):
     return [{"name": name, "pos": pos, "slot": slot, "delta_over_starter": delta, "streamer": False}]
 
 
-def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=None, repl=None, handcuffs=()):
+def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=None, repl=None, handcuffs=(), memory=None):
     wr = 17 - week + 1
     starters = starters if starters is not None else {p.espn_id for p in mine if p.weeks_out < 1 and p.name not in ("RB4", "TE2")}
     return decide(mine, {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}, week, wr, REG, playoff_pct,
-                  ir_slots, list(waivers), list(trades), {}, starters, repl, list(handcuffs))
+                  ir_slots, list(waivers), list(trades), {}, starters, repl, list(handcuffs), memory)
 
 
 def test_week_weights_count_playoff_weeks_by_my_odds():
@@ -231,3 +231,33 @@ def test_a_dropped_backup_qb_is_replaced_by_the_best_skill_body_not_another_qb()
     rb = P(98, "RB4", "RB", 6)
     tied = [dict(depth_fa("Low RB", score=1.5), mu_ros=5.0), dict(depth_fa("High RB", score=1.5), mu_ros=9.0)]
     assert fill_spot(rb, tied, [], set())["name"] == "High RB"
+
+
+# ---------- a bouncing ESPN tag: just off IR, tagged Out again ----------
+
+def test_a_player_who_just_came_off_ir_is_not_re_stashed_for_a_short_absence():
+    """Daniels, Oct 3: activated Wednesday, Out again Saturday with a two-week guess. The stash rented a bench body
+    for four days. Now a hold, with the bounce as the first reason."""
+    mine = roster(); hurt(mine[1], 2, 15, 3)
+    memory = {2: {"left_days": 3, "stashed": "2026-09-20", "added": []}}
+    (row,) = run(mine, 3, 60, ir_slots=1, memory=memory)
+    assert row["verdict"] == "hold"
+    assert row["why"][0] == "came off IR 3 days ago and ESPN's tag is bouncing; not worth the round trip for ~2 wks"
+    assert row["stash"] == memory[2]
+
+
+def test_a_real_absence_or_an_old_exit_still_takes_the_slot():
+    mine = roster(); hurt(mine[1], 4, 15, 3)
+    (row,) = run(mine, 3, 60, ir_slots=1, memory={2: {"left_days": 3, "stashed": None, "added": []}})
+    assert row["verdict"] == "ir"  # four weeks is a real absence, back he goes
+    mine = roster(); hurt(mine[1], 2, 15, 3)
+    (row,) = run(mine, 3, 60, ir_slots=1, memory={2: {"left_days": 20, "stashed": None, "added": []}})
+    assert row["verdict"] == "ir"  # left the slot three weeks ago, that was a different injury
+    (row,) = run(mine, 3, 60, ir_slots=1, memory={2: {"left_days": None, "stashed": None, "added": []}})
+    assert row["verdict"] == "ir"  # never left it
+
+
+def test_the_same_morning_he_comes_off_ir_counts_as_a_bounce():
+    mine = roster(); hurt(mine[1], 2, 15, 3)
+    (row,) = run(mine, 3, 60, ir_slots=1, memory={2: {"left_days": 0, "stashed": None, "added": []}})
+    assert row["verdict"] == "hold" and row["why"][0].startswith("came off IR today")

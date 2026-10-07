@@ -362,3 +362,15 @@ def test_incoming_offer_says_what_accepting_would_cut():
          "why": [], "drops": [{"name": "WR Six", "pos": "WR", "cap": 6}]}
     row = by_id(capped_league(incoming_trades=[t]))["offer:garrett-wilson"]
     assert "accepting means dropping WR Six (6-WR cap)" in row["text"]
+
+
+def test_an_activation_names_the_body_the_stash_added_when_it_is_the_drop():
+    """Daniels off IR on Oct 7 dropped the McGowan the Oct 3 stash had added: the row says so, so the round trip reads as one."""
+    row = injury("Back Guy", "activate", weeks_out=1, return_week=4)
+    row["stash"] = {"left_days": None, "stashed": "2026-10-03", "added": ["Bench WR"]}
+    lg = league(injuries=[row])
+    text = by_id(lg)["injury:back-guy"]["text"]
+    assert text.endswith("; drop Bench WR, added when he was stashed Oct 3 to make room")
+    # a different drop, or a stash nobody came in on, says nothing extra
+    row["stash"] = {"left_days": None, "stashed": "2026-10-03", "added": ["Someone Else"]}
+    assert by_id(league(injuries=[row]))["injury:back-guy"]["text"].endswith("; drop Bench WR to make room")

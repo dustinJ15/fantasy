@@ -82,6 +82,12 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   (with a note) is recorded in `data/projlog/pushed_trades.json` by `ff render-email` and comes back at the top of the card
   every morning ("asked N mornings running") until it shows up in my pending offers (sent), Claude rules `skip` on it, or
   the scan stops producing it. One push per league at a time; the packet only reads the memory.
+- IR slot moves: `ff packet` notes who sits in each league's IR slot in `data/projlog/ir_moves.json` (`src/ff/rulings.py`
+  `note_ir_roster`, before the injury rule runs, so the morning he comes off IR already counts) and stamps `left` when a
+  player comes off the slot and `stashed` + `added` (the names that joined the roster that run) when one goes on. A player
+  who left the slot in the last `IR_REENTRY_DAYS` (10) is not stashed again unless he is out `IR_REENTRY_WEEKS` (3) or more;
+  the hold row says the tag is bouncing. The activate row names the drop as "added when he was stashed <date>" when it is
+  the body that stash brought in. Rides the `projlog` branch.
 - Checklist ledger: `report._Spots` hands out roster spots (open bench spot first, then the cheapest drop not already
   named), so an activation and a pickup never spend the same drop. It also counts bodies per position against ESPN's
   caps (`settings.position_limits`): a trade row that brings in a WR at the cap says which WR to drop in the trade
@@ -103,6 +109,7 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Sleeper projections missing for many players | crosswalk join | `Crosswalk.sleeper_id()`; check `shared.unmatched_ids` in the packet |
 | Agent sent >1 email or investigated git/Gmail history | skill scope drift | SKILL.md step 10 forbids it; tighten wording if it recurs |
 | Card says "activate" on a stash still listed Out, or names one drop on two rows | old checklist logic (fixed 2026-09-23) | activation keys off `ir_eligible`; drops come from `report._Spots` |
+| Card says activate, then "move to IR" three days later, then activate again (Daniels, Sep 30 to Oct 7: a four-day McGowan rental) | ESPN's tag bounced Questionable → Out → Questionable and the stash rule had no memory of the activation | fixed 2026-10-07: `ir_moves.json` remembers the exit; a short Out inside `IR_REENTRY_DAYS` holds instead. If it still churns, check the projlog branch restored the file and that `weeks_out` in overrides.json is not inflating a one-week Out |
 | Same trade package returns the morning after a `skip` | `data/projlog/skipped_trades.json` missing (projlog branch not restored) | check cloud_setup.sh fetched `origin/projlog`; the key is `<league>|<get names>` |
 | Email card says do it and Claude's read says don't | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
