@@ -1,7 +1,7 @@
 """ESPN league reads via espn-api. Read-only by design."""
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from espn_api.football import League
@@ -109,6 +109,16 @@ class PlayerRow:
     injured: bool = False           # ESPN's own flag on the player record
     ir_eligible_raw: bool = False   # ESPN listed the IR slot in eligibleSlots (evidence for whether that is a real signal)
     waiver_status: str | None = None  # free agents only: "WAIVERS" (claim, processes on waiver day) or "FREEAGENT" (add now)
+    bye_weeks: list[int] = field(default_factory=list)  # weeks his NFL team does not play, from the pro schedule
+
+
+def bye_weeks(p) -> list[int]:
+    """The weeks missing from espn-api's per-player pro schedule. A schedule that is mostly missing is not a bye list."""
+    sched = getattr(p, "schedule", None) or {}
+    if not sched:
+        return []
+    missing = [w for w in range(1, 19) if str(w) not in sched]
+    return missing if len(missing) <= 2 else []
 
 
 def _status(p) -> str | None:
@@ -137,6 +147,7 @@ def roster_rows(league: League, week: int) -> list[PlayerRow]:
                 percent_owned=p.percent_owned, pos_rank=p.posRank,
                 bye=(str(week) not in p.schedule) if p.schedule else False,
                 injured=bool(getattr(p, "injured", False)), ir_eligible_raw="IR" in p.eligibleSlots,
+                bye_weeks=bye_weeks(p),
             ))
     return rows
 
@@ -222,6 +233,8 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
             "wins": t.wins, "losses": t.losses, "ties": t.ties,
             "points_for": t.points_for, "points_against": t.points_against,
             "faab_spent": t.acquisition_budget_spent, "waiver_rank": t.waiver_rank,
+            # ESPN's transaction counter: a manager who has traded this season takes offers; one with no moves at all does not
+            "trades": int(getattr(t, "trades", 0) or 0), "acquisitions": int(getattr(t, "acquisitions", 0) or 0),
             "streak": f"{t.streak_type}{t.streak_length}", "seed": t.standing,
             "espn_playoff_pct": t.playoff_pct,
             "schedule": [getattr(o, "team_id", None) for o in t.schedule],

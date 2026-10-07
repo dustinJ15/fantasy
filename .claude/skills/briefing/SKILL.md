@@ -78,6 +78,10 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
      say what you want and why it helps *them*, end with a question. Example: "hey, any interest in Rice + Montgomery for Henry?
      you're thin at WR and I could use the RB. no worries if not". Never mention projections, models, points per week, or Claude.
      Set `paste_to` to the rival named in the trade row you gave a `do`, so the message renders under that row.
+     Write it from the row, not from memory: the row says what he is left with ("he'd start Mac Jones (the wire) at QB after")
+     and whether he gets the best player in the deal. Never claim a fact about his roster the row does not print ("you're set
+     at QB" to a man whose row says the wire starts for him is the 2026-10-07 mistake; `ff render-email` warns on it). Ask for
+     one thing, give one reason that is true from his side, and if the row says "coin flip" do not oversell it.
    - Avoid the known AI tells: no em dashes (use a comma or a period), no "not X, but Y" reframes, no lists of three, no
      "label: explanation" openers, no "worth noting"/"that said"/"ultimately", no hedging stacks. Vary sentence length. Contractions.
      If a sentence sounds like a press release or a LinkedIn post, rewrite it. `ff render-email` prints a warning for

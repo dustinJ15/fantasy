@@ -24,6 +24,8 @@ LAST = ["Vell", "Ruiz-Hollis", "Okafor", "Brandt", "Castellano", "Whitlock", "Mb
         "Solano", "Whitfield", "Grantham", "Ibarra", "Tolliver", "McCrae", "Pennington", "Danforth"]
 TEAMS = ["Regression to the Mean", "The Tuesday Regrets", "Waiver Wire Widows", "Bye Week Blues", "Gronk's Ghost",
          "Ctrl+Alt+Delete Kelce", "Sunday Scaries", "Punt Return Policy"]
+# NFL bye weeks for the three pro teams the demo uses, so the per-week trade math has a bye to price.
+BYES = {"GB": 7, "KC": 9, "DAL": 11}
 DST = ["Packers", "Chiefs", "Cowboys", "Bills", "Ravens", "Eagles", "49ers", "Lions", "Steelers", "Broncos", "Texans", "Seahawks",
        "Dolphins", "Bengals", "Chargers", "Vikings", "Rams", "Buccaneers", "Jets", "Falcons", "Bears", "Browns", "Colts", "Saints"]
 
@@ -67,7 +69,7 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
                 roster.append({"espn_id": pid, "name": name_for(pos), "pos": pos, "team": team,
                                "eligible": elig, "slot": slot, "fantasy_team_id": tid, "injury_status": rng.choice([None, "ACTIVE", "QUESTIONABLE"]),
                                "proj_week": round(mu, 1), "actual_week": 0, "proj_season": round(mu * 16, 1), "percent_owned": 90.0,
-                               "pos_rank": i + 1, "bye": False})
+                               "pos_rank": i + 1, "bye": False, "bye_weeks": [BYES[team]]})
                 pid += 1
     # Two hurt players on my side so the card shows the hurt-player row: my fourth WR went on NFL injured reserve with a
     # knee (ESPN zeroes his weekly projection) and is still sitting on my bench, and my third RB is out this week.
@@ -75,13 +77,23 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
         return [r for r in roster if r["fantasy_team_id"] == 1 and r["pos"] == pos][i]
     mine_at("WR", 3).update(injury_status="INJURY_RESERVE", proj_week=0.0)
     mine_at("RB", 2).update(injury_status="OUT")
+    # One rival (team 4) with a quarterback problem and a good tight end, so the card has a trade a real person would
+    # take: my spare QB starts for him, his spare TE starts for me, and nobody gives up the best player for pieces.
+    def team_at(tid: int, pos: str, i: int) -> dict:
+        return [r for r in roster if r["fantasy_team_id"] == tid and r["pos"] == pos][i]
+    team_at(4, "QB", 0).update(proj_week=9.0, proj_season=9.0 * 16)
+    team_at(4, "QB", 1).update(proj_week=7.0, proj_season=7.0 * 16)
+    team_at(4, "TE", 0).update(proj_week=13.0, proj_season=13.0 * 16)
+    team_at(4, "TE", 1).update(proj_week=10.0, proj_season=10.0 * 16)
+    mine_at("QB", 1).update(proj_week=16.0, proj_season=16.0 * 16)
+    mine_at("TE", 0).update(proj_week=6.0, proj_season=6.0 * 16)
     fas = []
     for _ in range(40):
         pos = rng.choice(["RB", "WR", "TE", "QB", "K", "D/ST"])
         mu = max(rng.gauss(6, 3), 0.5)
         fas.append({"espn_id": pid, "name": name_for(pos), "pos": pos, "team": "GB", "eligible": [pos] + (["RB/WR/TE"] if pos in ("RB", "WR", "TE") else []),
                     "slot": "FA", "fantasy_team_id": None, "injury_status": None, "proj_week": round(mu, 1), "actual_week": 0,
-                    "proj_season": round(mu * 16, 1), "percent_owned": 20.0, "pos_rank": 30, "bye": False})
+                    "proj_season": round(mu * 16, 1), "percent_owned": 20.0, "pos_rank": 30, "bye": False, "bye_weeks": [BYES["GB"]]})
         pid += 1
     ids = list(range(1, teams + 1))
     sched = {t: [] for t in ids}
@@ -93,7 +105,8 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
             sched[b].append(a)
     team_rows = [{"team_id": t, "name": TEAMS[(t - 1) % len(TEAMS)], "abbrev": f"T{t}", "owners": [], "wins": rng.randint(1, 3), "losses": 0, "ties": 0,
                   "points_for": rng.uniform(80, 130), "points_against": 100, "faab_spent": rng.randint(0, 30), "waiver_rank": t,
-                  "streak": "W1", "seed": t, "espn_playoff_pct": 50, "schedule": sched[t], "scores": [], "outcomes": [], "is_me": t == 1} for t in ids]
+                  "streak": "W1", "seed": t, "espn_playoff_pct": 50, "schedule": sched[t], "scores": [], "outcomes": [], "is_me": t == 1,
+                  "trades": rng.choice([0, 0, 1, 2]), "acquisitions": rng.randint(0, 9)} for t in ids]
     for row in team_rows:
         row["losses"] = 4 - row["wins"]
     team_rows[0]["wins"], team_rows[0]["losses"] = 4, 0  # it's a demo; let me have this

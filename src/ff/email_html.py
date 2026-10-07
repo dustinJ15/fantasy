@@ -336,11 +336,13 @@ def _league_detail(lg: dict) -> str:
     if lg["trades"]:
         rows = []
         for t in lg["trades"][:3]:
-            worth = t["their_delta_ppw"] >= 0
+            worth = t.get("sendable", t["their_delta_ppw"] >= 0)
             td = f" · title odds you {t['my_title_delta']:+.1f} / them {t['their_title_delta']:+.1f}" if "my_title_delta" in t else ""
+            odds = f" · {t['accept_word']}" if t.get("accept_word") else ""
+            after = f" · {t['after_line']}" if t.get("after_line") else ""
             rows.append([_badge("SEND" if worth else "REACH", "good" if worth else "grey"),
                          f"Give <b>{_e(', '.join(t['give']))}</b> → get <b>{_e(', '.join(t['get']))}</b> from {_e(t['rival'])}"
-                         f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td} · {_e('; '.join(t['why']))}</div>"])
+                         f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{odds}{after} · {_e('; '.join(t['why']))}</div>"])
         body += _table(["", "Offer"], rows, "ll", 13)
     else:
         body += _muted("No mutually beneficial package found this week.")

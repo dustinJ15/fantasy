@@ -309,5 +309,15 @@ changes; `transactionCounter` in the snapshot. Tests: the full 3.7 bench and the
 
 ## Deviations from the brief
 
-None yet. The one thing this plan deliberately does not do is build a learned model: there are 19 labelled examples,
+- **PR 1 and PR 2 (2026-10-07).** The fair band is 10%, not 5%: the charts call 5% even, but a stale price on one piece and
+  the endowment effect make 10% what a real person tolerates, and the hard drop sits at 0.8. The "leaves him thin" factor
+  applies to QB only: a backup TE is streamed, and K/DST never move. The acceptance base is 0.5 with the factors in
+  `acceptance.score`; a 2-for-1 where I get the best player can reach "coin flip" only with a visible overpay, his
+  weakest slot filled, and his app grading the piece up, which is the shape the research says lands.
+- **The skip replay (3.7) cannot run offline.** The projection log holds my players only; rival rosters are not stored
+  anywhere, so the 19 skipped packages cannot be rebuilt. The regression bench encodes the two rows from the email with
+  their real FantasyCalc values instead, and the outcome log (PR 3) is the calibration set going forward.
+- **Need-driven generation (3.5) is a ranking, not a generator.** The brute-force package loop stays (it is cheap and
+  complete) and now includes 1-for-2 and 2-for-2 shapes; his weakest slot, his surplus and my sell-high chips enter as
+  scorecard factors rather than as the only seeds, so nothing the old loop could find is lost. The one thing this plan deliberately does not do is build a learned model: there are 19 labelled examples,
 all negative, and the scorecard above is legible on a phone, which a classifier is not.
