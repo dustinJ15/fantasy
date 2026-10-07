@@ -30,7 +30,9 @@ class SeasonCtx:
     def build(cls, week: int, weeks_remaining: int, reg_season_weeks: int | None = None, playoff_pct: float | None = None,
               fas: list[PlayerProj] | None = None) -> SeasonCtx:
         W = max(int(weeks_remaining), 1)
-        pp = (playoff_pct if playoff_pct is not None else 100.0) / 100.0
+        # float(): the sim hands over numpy floats, and a numpy bool downstream serialises as the string "False",
+        # which every reader of the packet takes for true (the 2026-10-07 email pushed three trades that way).
+        pp = float(playoff_pct if playoff_pct is not None else 100.0) / 100.0
         weights = [1.0 if (reg_season_weeks is None or t <= reg_season_weeks) else pp for t in range(week, week + W)]
         if sum(weights) <= 0:
             weights = [1.0] * W
