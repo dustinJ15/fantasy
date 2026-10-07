@@ -123,3 +123,22 @@ def test_evaluate_prices_my_side_week_by_week(slots):
     out = evaluate(1, 2, [mine[1]], [theirs[1]], {1: mine, 2: theirs}, slots, repl, values={},
                    ctx=SeasonCtx.build(5, 9, fas=[P(90, "Wire RB", "RB", 8, tid=None)]))
     assert out["my_after"][0]["pos"] == "RB" and any(s["wire"] for s in out["my_after"][0]["starters"])
+
+
+def test_scan_output_is_plain_json_even_with_numpy_odds(slots):
+    """The sim hands over numpy floats; a numpy bool in the packet serialises as the string "False", which the renderer
+    reads as true. The 2026-10-07 email pushed three trades that way. Everything the scan emits must be plain Python."""
+    import json
+
+    import numpy as np
+    mine = [P(1, "QB", "QB", 20, tid=1), P(2, "RB1", "RB", 16, tid=1), P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1),
+            P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1), P(7, "TE", "TE", 3, tid=1), P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "QB", "QB", 20, tid=2), P(12, "RB1", "RB", 8, tid=2), P(13, "RB2", "RB", 6, tid=2), P(15, "WR1", "WR", 14, tid=2),
+              P(16, "WR2", "WR", 12, tid=2), P(17, "WR3", "WR", 11, tid=2), P(18, "TEgood", "TE", 12, tid=2), P(22, "TE2", "TE", 6, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "R", "wins": 2, "losses": 2}}, values={},
+               ctx=SeasonCtx.build(12, 5, 14, None), playoff_pct={1: np.float64(55.5), 2: np.float64(20.0)}, reg_season_weeks=14)
+    assert out
+    text = json.dumps(out)  # no default=str: anything numpy would raise here
+    back = json.loads(text)
+    assert all(isinstance(c["sendable"], bool) and isinstance(c["must_try"], bool) for c in back)

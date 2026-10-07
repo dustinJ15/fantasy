@@ -424,10 +424,10 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             # My gain, with a backup lost on my side charged against it; ranking is p_accept times that.
             my_gain = d_me - 0.75 * len(new_thin)
             after = rival_after(new_theirs, list(get), slots, their_ctx)
-            sendable = p_accept >= acc.SENDABLE and my_gain >= 1.0 and d_them >= -0.25 and (ratio is None or ratio >= MARKET_FLOOR)
+            sendable = bool(p_accept >= acc.SENDABLE and my_gain >= 1.0 and d_them >= -0.25 and (ratio is None or ratio >= MARKET_FLOOR))
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
-                "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
+                "my_delta_ppw": round(float(d_me), 2), "their_delta_ppw": round(float(d_them), 2),
                 # Cuts ESPN demands in the trade screen (position cap), priced into the deltas above.
                 "drops": _drop_rows(drops, limits), "their_drops": [p.name for p in their_drops],
                 "get_pos": [p.pos for p in get],
@@ -436,7 +436,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "p_accept": p_accept, "accept_word": acc.bucket(p_accept), "accept_why": reasons,
                 "rival_after": after, "after_line": _after_line(after),
                 "sendable": sendable,
-                "must_try": sendable and p_accept >= acc.PUSH and my_gain >= MUST_TRY_PPW,
+                "must_try": bool(sendable and p_accept >= acc.PUSH and my_gain >= MUST_TRY_PPW),
                 "why": why,
                 "score": round(p_accept * my_gain, 3),
             })
