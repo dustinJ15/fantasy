@@ -378,11 +378,14 @@ def test_scan_notes_the_cut_a_full_roster_forces(slots):
     mine, theirs = _rosters()
     meta = {2: {"name": "Rival", "wins": 0, "losses": 2}}
     repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
-    full = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values={}, roster_max=len(theirs))
+    # priced so the 1-for-1 for his TE is a lowball to him and only the 2-for-1 (my RB1 plus my TE) reads fair
+    values = {"2": {"redraft_value": 2000}, "3": {"redraft_value": 1500}, "4": {"redraft_value": 1200}, "7": {"redraft_value": 1500},
+              "18": {"redraft_value": 3500}}
+    full = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values=values, roster_max=len(theirs))
     twos = [c for c in full if len(c["give"]) == 2]
     assert twos and all("they have to cut a body to take two" in c["why"] for c in twos)
     assert not any("cut a body" in w for c in full if len(c["give"]) == 1 for w in c["why"])
-    roomy = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values={}, roster_max=len(theirs) + 1)
+    roomy = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values=values, roster_max=len(theirs) + 1)
     assert not any("cut a body" in w for c in roomy for w in c["why"])
 
 
@@ -395,3 +398,102 @@ def test_evaluate_ignores_a_throw_in_in_what_i_get(slots):
     assert out["market_get"] == 2200 and out["market_get_eff"] == 2100
     assert any(w.startswith("TE2 is a throw-in") for w in out["why"])
     assert out["verdict"] == "accept"  # the real piece still fixes my TE hole at a fair price
+
+
+# ---------- what a rival would actually accept (docs/plans/trade-acceptance.md, PR 1) ----------
+
+def _league_rosters():
+    """My WR-deep roster and a rival who owns the WR1 overall, with FantasyCalc values from 2026-10-07."""
+    mine = [P(1, "Maye", "QB", 19, tid=1), P(2, "Taylor", "RB", 17, tid=1), P(3, "Hubbard", "RB", 12, tid=1), P(4, "RB3", "RB", 9, tid=1),
+            P(5, "McMillan", "WR", 14.5, tid=1), P(6, "Washington", "WR", 14.4, tid=1), P(7, "Evans", "WR", 13, tid=1),
+            P(8, "Coker", "WR", 11, tid=1), P(9, "McBride", "TE", 12, tid=1), P(10, "K", "K", 8, tid=1), P(11, "D", "D/ST", 7, tid=1)]
+    theirs = [P(21, "QB", "QB", 18, tid=2), P(22, "RB1", "RB", 14, tid=2), P(23, "RB2", "RB", 11, tid=2), P(24, "RB3", "RB", 8, tid=2),
+              P(25, "Chase", "WR", 19, tid=2), P(26, "WR2", "WR", 11, tid=2), P(27, "WR3", "WR", 9, tid=2), P(28, "WR4", "WR", 7, tid=2),
+              P(29, "TE", "TE", 8, tid=2), P(30, "K", "K", 8, tid=2), P(31, "D", "D/ST", 7, tid=2)]
+    values = {"2": {"redraft_value": 8575, "overall_rank": 5, "pos_rank": 3}, "3": {"redraft_value": 2000, "overall_rank": 60, "pos_rank": 25},
+              "5": {"redraft_value": 3946, "overall_rank": 28, "pos_rank": 12}, "6": {"redraft_value": 2968, "overall_rank": 42, "pos_rank": 19},
+              "7": {"redraft_value": 1670, "overall_rank": 60, "pos_rank": 26}, "8": {"redraft_value": 900, "overall_rank": 95, "pos_rank": 40},
+              "9": {"redraft_value": 3000, "overall_rank": 40, "pos_rank": 4},
+              "25": {"redraft_value": 8118, "overall_rank": 8, "pos_rank": 3}, "22": {"redraft_value": 4000, "overall_rank": 27, "pos_rank": 14},
+              "23": {"redraft_value": 2500, "overall_rank": 50, "pos_rank": 22}, "26": {"redraft_value": 2000, "overall_rank": 61, "pos_rank": 27}}
+    return mine, theirs, values
+
+
+REPL = {"QB": 15, "RB": 8, "WR": 8.5, "TE": 5, "K": 6, "D/ST": 5}
+
+
+def test_two_mid_pieces_for_the_wr1_read_as_a_lowball_after_the_tax():
+    """8118 against 3946 + 2968 passed the old 1.2x cap at 1.17. Taxed 10% for the 2-for-1 he reads 0.77."""
+    from ff.model.trades import fairness
+    assert fairness(3946 + 2968, 8118, n_recv=2, n_give=1) == pytest.approx(0.774, abs=0.001)
+    assert fairness(8118, 3946 + 2968, n_recv=1, n_give=2) == pytest.approx(1.29, abs=0.01)  # the same deal from my side
+    assert fairness(1687, 1606, 1, 1) == pytest.approx(1.05, abs=0.01)                      # Montgomery for Dak: even on the chart
+
+
+def test_scan_never_asks_for_a_star_with_pieces(slots):
+    """The Chase package: the star guard drops it before the lineup math gets a vote, and no other 2-for-1 for him survives."""
+    mine, theirs, values = _league_rosters()
+    out = scan(1, {1: mine, 2: theirs}, slots, REPL, {2: {"name": "TDs", "wins": 2, "losses": 2}}, values, roster_max=16)
+    assert all(not ("Chase" in c["get"] and "Taylor" not in c["give"]) for c in out), [(c["give"], c["get"]) for c in out]
+
+
+def test_a_star_ask_that_gives_a_star_back_must_still_show_the_premium(slots):
+    """Taylor (overall 5) for Chase (overall 8) is the one shape the guard allows, and only when he gets the premium."""
+    from ff.model.trades import STAR_PREMIUM, fairness
+    mine, theirs, values = _league_rosters()
+    out = scan(1, {1: mine, 2: theirs}, slots, REPL, {2: {"name": "TDs", "wins": 2, "losses": 2}}, values, roster_max=16)
+    for c in out:
+        if "Chase" in c["get"]:
+            assert "Taylor" in c["give"] and c["fair_his"] >= STAR_PREMIUM
+    assert fairness(8575, 8118, 1, 1) >= STAR_PREMIUM - 0.05  # the numbers are close to the line; the rule is what matters
+
+
+def test_scan_does_not_ask_a_one_qb_team_for_its_qb(slots):
+    """Montgomery for Dak: even on the chart, and the one thing he will not do. His IR'd QB is not a second QB."""
+    mine = [P(1, "Murray", "QB", 17, tid=1), P(2, "Brissett", "QB", 18.9, tid=1), P(4, "Montgomery", "RB", 12.4, tid=1),
+            P(5, "Judkins", "RB", 12.3, tid=1), P(6, "RB3", "RB", 9, tid=1), P(7, "WR1", "WR", 15, tid=1), P(8, "WR2", "WR", 13, tid=1),
+            P(9, "Jamo", "WR", 12.6, tid=1), P(10, "TE", "TE", 9, tid=1), P(11, "K", "K", 8, tid=1), P(12, "D", "D/ST", 7, tid=1)]
+    theirs = [P(21, "Dak", "QB", 17.75, tid=2), _out(P(32, "IRQB", "QB", 21, tid=2), 4), P(22, "Hampton", "RB", 11.5, tid=2),
+              P(23, "JWill", "RB", 17.5, tid=2), P(24, "Tuten", "RB", 13.9, tid=2), P(25, "Deebo", "WR", 11, tid=2), P(26, "Vele", "WR", 10, tid=2),
+              P(27, "WR3", "WR", 8, tid=2), P(29, "Likely", "TE", 12.9, tid=2), P(30, "K", "K", 8, tid=2), P(31, "D", "D/ST", 7, tid=2)]
+    values = {"4": {"redraft_value": 1687, "overall_rank": 58}, "21": {"redraft_value": 1606, "overall_rank": 65}, "32": {"redraft_value": 3000, "overall_rank": 40}}
+    out = scan(1, {1: mine, 2: theirs}, slots, REPL, {2: {"name": "Hawk Tua", "wins": 2, "losses": 2}}, values, roster_max=16)
+    assert all("Dak" not in c["get"] for c in out), [(c["give"], c["get"]) for c in out]
+    # with a healthy second QB on his bench the same ask is allowed again
+    theirs2 = [P(32, "QB2", "QB", 16, tid=2) if p.name == "IRQB" else p for p in theirs]
+    from ff.model.trades import startable_qbs
+    assert startable_qbs(theirs, REPL) == 1 and startable_qbs(theirs2, REPL) == 2
+
+
+def test_scan_never_leaves_the_rival_unable_to_field_a_lineup(slots):
+    """His only TE for my spare RB is +ppw for me and a hole for him; the old scan checked depth on my side only."""
+    mine, theirs = _rosters()
+    mine = [p for p in mine if p.name != "TE"] + [P(7, "TE", "TE", 9, tid=1), P(40, "RB4", "RB", 13, tid=1)]
+    theirs = [p for p in theirs if p.name != "TE2"]  # one TE: TEgood
+    out = scan(1, {1: mine, 2: theirs}, slots, {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5},
+               {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={})
+    assert all("TEgood" not in c["get"] or any(p.pos == "TE" for p in mine if p.name in c["give"]) for c in out)
+
+
+def test_the_uneven_bonus_goes_to_the_side_that_gets_the_best_player(slots):
+    """I give two for one: when his piece is the best player I get, the row says so and the score is docked, not boosted."""
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    values = {"18": {"redraft_value": 4000, "overall_rank": 30, "pos_rank": 4}, "2": {"redraft_value": 2000}, "3": {"redraft_value": 2000},
+              "4": {"redraft_value": 1900}, "21": {"redraft_value": 500}}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values, roster_max=20)
+    two_for_one = [c for c in out if len(c["give"]) == 2 and c["get"] == ["TEgood"]]
+    for c in two_for_one:
+        assert c["best_side"] == "mine"
+        assert any(w.startswith("I get the best player") for w in c["why"]) and not c["must_try"]
+        assert "consolidates value for them" not in c["why"]
+
+
+def test_evaluate_taxes_an_uneven_offer_from_my_side(slots):
+    """He offers two mid pieces for my star: the tax is his to pay, so an even sum is a lowball to me."""
+    mine, theirs = _rosters()
+    by_id = {p.espn_id: p for p in mine + theirs}
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    values = {"2": {"redraft_value": 6000}, "12": {"redraft_value": 3000}, "15": {"redraft_value": 3000}}
+    out = evaluate(1, 2, [by_id[2]], [by_id[12], by_id[15]], {1: mine, 2: theirs}, slots, repl, values)
+    assert out["market_ratio"] is not None and out["market_ratio"] < 1.0
