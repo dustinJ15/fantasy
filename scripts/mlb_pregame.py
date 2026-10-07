@@ -1,11 +1,13 @@
 """Plan today's MLB pregame alerts: one one-shot Claude routine per first pitch.
 
-Run by the "MLB pregame scheduler" routine each morning (cloud env `fantasy`, repo checked out, bash has
-network). It reads MLB's public schedule, keeps the games that matter (postseason, or regular-season games
-of a team in a race), groups games that share a first pitch, and prints one block per group:
-`name`, `run_once_at` (LEAD_MIN before first pitch) and the `prompt` for the one-shot. Claude creates each
-with `create_trigger` (run_once_at, create_new_session_on_fire, push notification); the one-shot fires once
-and disables itself, so there is no state file, no token and no GitHub cron in the path.
+Step 0 of the morning briefing (.claude/skills/briefing/SKILL.md) runs this in the `fantasy` cloud env, where
+the repo is checked out and bash has network. It reads MLB's public schedule, keeps the games that matter
+(postseason, or regular-season games of a team in a race), groups games that share a first pitch, and prints
+one spec per group: `name`, `run_once_at` (LEAD_MIN before first pitch) and the `prompt` for the one-shot.
+Claude creates each with `create_trigger` (run_once_at, create_new_session_on_fire, push notification); the
+one-shot fires once and disables itself, so there is no state file, no token and no GitHub cron in the path.
+The prompt is .claude/skills/mlb-pregame/SKILL.md (minus its front matter) plus the game lines: a session a
+routine spawns has no repo checkout, so the prompt has to carry everything.
 
     python3 scripts/mlb_pregame.py            # JSON: {"date", "triggers": [...]} or {"season_over": true}
     python3 scripts/mlb_pregame.py --text     # the same, readable
@@ -16,6 +18,7 @@ import json
 import sys
 import urllib.request
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 MT = ZoneInfo("America/Denver")
@@ -34,13 +37,15 @@ SERIES_NAMES = {"F": "Wild Card", "D": "Division Series", "L": "LCS", "W": "Worl
 SCHEDULE_URL = ("https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate={start}&endDate={end}"
                 "&gameType=R,F,D,L,W&hydrate=probablePitcher,team,seriesStatus")
 
-# The prompt of every one-shot. It must stand alone: the fired session starts from nothing, in the
-# `fantasy` cloud environment with this repository checked out, and its final reply is the push notification.
-PROMPT = (
-    "MLB pregame alert for Dustin. Read /home/user/fantasy/.claude/skills/mlb-pregame/SKILL.md and follow it "
-    "exactly; it is the source of truth for this job. The game details are below; do not wait for or look "
-    "for any other message. Finish within about 5 minutes.\n\n{games}"
-)
+SKILL_PATH = Path(__file__).resolve().parents[1] / ".claude" / "skills" / "mlb-pregame" / "SKILL.md"
+
+
+def alert_instructions(path: Path = SKILL_PATH) -> str:
+    """The skill file's body (front matter stripped): the standalone prompt of every one-shot."""
+    text = path.read_text()
+    if text.startswith("---"):
+        text = text.split("---", 2)[2]
+    return "MLB pregame alert for Dustin.\n\n" + text.strip()
 
 
 def get_json(url):
@@ -88,12 +93,13 @@ def short(side) -> str:
     return t.get("abbreviation") or t.get("teamName") or t["name"]
 
 
-def plan(games, now: datetime):
+def plan(games, now: datetime, instructions: str | None = None):
     """One trigger spec per distinct first pitch among today's games that matter.
 
     `run_once_at` is LEAD_MIN before first pitch. A group whose fire time has passed still gets an alert
     (two minutes from now) when first pitch is at least MIN_NOTICE_MIN away; closer than that it is dropped.
     """
+    instructions = alert_instructions() if instructions is None else instructions
     today = now.astimezone(MT).date()
     groups: dict[datetime, list] = {}
     for g in games:
@@ -111,7 +117,7 @@ def plan(games, now: datetime):
         specs.append({
             "name": f"MLB pregame: {matchups} {fp.astimezone(MT):%-I:%M%p} MT {fp.astimezone(MT):%b %-d}",
             "run_once_at": fire.replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "prompt": PROMPT.format(games="Games starting soon:\n" + "\n".join(describe(g) for g in gs)),
+            "prompt": instructions + "\n\nGames starting soon:\n" + "\n".join(describe(g) for g in gs),
         })
     return specs
 

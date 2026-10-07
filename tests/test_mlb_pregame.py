@@ -32,7 +32,14 @@ def test_one_shot_fires_lead_minutes_before_first_pitch():
     assert "gamePk 1 | type D | Tampa Bay Rays @ New York Yankees" in s["prompt"]
     assert "6:00PM MT" in s["prompt"] and "AL Division Series game 3" in s["prompt"]
     assert "TB Ace (id 1139) vs NYY Ace (id 1147)" in s["prompt"]
-    assert ".claude/skills/mlb-pregame/SKILL.md" in s["prompt"]
+    assert s["prompt"].startswith("MLB pregame alert for Dustin.\n\nDustin is in Denver")   # skill body, no front matter
+    assert "name: mlb-pregame" not in s["prompt"] and "/home/user" not in s["prompt"]
+    assert s["prompt"].rstrip().endswith("game 3")
+
+
+def test_instructions_can_be_supplied():
+    (s,) = mp.plan([game(1, NOW + timedelta(hours=4))], NOW, instructions="Say hi.")
+    assert s["prompt"].startswith("Say hi.\n\nGames starting soon:\n- gamePk 1")
 
 
 def test_same_first_pitch_is_one_trigger():
