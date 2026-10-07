@@ -14,6 +14,7 @@ from .model.injuries import decide as decide_injuries
 from .model.injuries import fill_spot
 from .model.lineup import compare, optimize
 from .model.projections import PlayerProj, blend
+from .model.season import SeasonCtx
 from .model.sim import simulate
 from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
@@ -164,7 +165,12 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
 
     # trades
     values = fantasycalc.by_espn_id(num_teams=s["team_count"], ppr=s["ppr"])
-    team_meta = {tid: {"name": t["name"], "wins": t["wins"], "losses": t["losses"]} for tid, t in teams.items()}
+    team_meta = {tid: {"name": t["name"], "wins": t["wins"], "losses": t["losses"],
+                       "trades": t.get("trades"), "acquisitions": t.get("acquisitions")} for tid, t in teams.items()}
+    # The season as the trade math sees it: each remaining week on its own, byes and return dates priced, the best
+    # free agents as the bodies the wire supplies, playoff weeks weighted by each team's odds.
+    season_ctx = SeasonCtx.build(week, weeks_remaining, s["reg_season_weeks"], None, fas=fas)
+    playoff_by_team = {tid: o["playoff_pct"] for tid, o in odds.items()}
     by_id = {p.espn_id: p for ps in by_team.values() for p in ps}
     # The trade deadline closes the scan: the offers Dustin could still send are none.
     deadline_ms = int(s.get("trade_deadline_ms") or 0)
@@ -172,7 +178,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     limits = s.get("position_limits") or {}
     roster_max = sum(slots.values()) + int(s.get("bench_slots") or 0)
     trades = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits,
-                  roster_max=roster_max if s.get("bench_slots") else None) if (my_id and not trades_closed) else []
+                  roster_max=roster_max if s.get("bench_slots") else None, ctx=season_ctx, playoff_pct=playoff_by_team,
+                  reg_season_weeks=s["reg_season_weeks"]) if (my_id and not trades_closed) else []
     trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
     trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     trades = mark_pushed(trades, pushes or {}, snap["ref"]["name"], now_dt.date())
@@ -219,7 +226,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         if tx.get("direction") != "incoming" or rid is None:
             outgoing.append({**base, "give": [p.name for p in give], "get": [p.name for p in get]})
             continue
-        ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values, limits=limits)
+        ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values, limits=limits, ctx=season_ctx,
+                      playoff_pct=playoff_by_team, reg_season_weeks=s["reg_season_weeks"])
         cut = {d["name"] for d in ev.get("drops") or []}
         new_mine = [p for p in mine if p.espn_id not in {g.espn_id for g in give} and p.name not in cut] + get
         new_theirs = [p for p in by_team.get(rid, []) if p.espn_id not in {g.espn_id for g in get}] + give

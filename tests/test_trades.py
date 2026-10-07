@@ -283,7 +283,7 @@ def test_scan_names_the_drop_espn_demands_at_the_position_cap(slots):
     mine, theirs = _capped_rosters()
     repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
     out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={},
-               limits={"WR": 6, "RB": 6}, max_per_rival=10)
+               limits={"WR": 6, "RB": 6}, max_per_rival=30, top=60)
     wr_in = [c for c in out if "WRstar" in c["get"] and all(g.startswith("RB") for g in c["give"])]
     assert wr_in, "the WR-for-RB package is still worth proposing, just with a drop attached"
     for c in wr_in:
@@ -342,13 +342,15 @@ def test_scan_drops_a_two_for_one_built_on_a_throw_in(slots):
     and read 'neutral for them' because their spare QB rides the bench. The rival laughed. Now the package is gone and
     the 1-for-1 it hid stands on its own, where the market floor judges it."""
     mine, theirs, repl, values = _two_qb_rival()
-    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 2, "losses": 2}}, values)
+    # every surviving package, not the top three: the fixture prices only the players the rule is about
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 2, "losses": 2}}, values, max_per_rival=30, top=60)
     purdy = [c for c in out if "Purdy" in c["get"]]
     assert not any(set(c["give"]) == {"KylerLike", "MontyLike"} for c in purdy)
     assert not any("KylerLike" in c["give"] for c in purdy), "the QB nobody prices is a throw-in in every package"
-    # One row per target survives, and it is the fair 1-for-1 (my second RB at even market value), not the 2-for-1
-    # that used to outscore it on the consolidation bonus: the rule removes the lowball, not the ask.
-    assert purdy and all(c["give"] == ["RB2"] and c["sendable"] and c["market_ratio"] >= 0.8 for c in purdy), purdy
+    # The 1-for-1 that survives is my second RB at near-even market value, not the one built on the throw-in: the
+    # rule removes the lowball, not the ask. (Whether it is worth sending is the acceptance model's call.)
+    one_for_one = [c for c in purdy if len(c["give"]) == 1 and len(c["get"]) == 1]
+    assert one_for_one and all(c["give"] == ["RB2"] and c["market_ratio"] >= 0.8 for c in one_for_one), purdy
 
 
 def test_a_cheap_piece_they_would_start_is_not_a_throw_in(slots):
@@ -379,7 +381,7 @@ def test_scan_notes_the_cut_a_full_roster_forces(slots):
     meta = {2: {"name": "Rival", "wins": 0, "losses": 2}}
     repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
     # priced so the 1-for-1 for his TE is a lowball to him and only the 2-for-1 (my RB1 plus my TE) reads fair
-    values = {"2": {"redraft_value": 2000}, "3": {"redraft_value": 1500}, "4": {"redraft_value": 1200}, "7": {"redraft_value": 1500},
+    values = {"2": {"redraft_value": 2500}, "3": {"redraft_value": 1500}, "4": {"redraft_value": 1200}, "7": {"redraft_value": 1500},
               "18": {"redraft_value": 3500}}
     full = scan(1, {1: mine, 2: theirs}, slots, repl, meta, values=values, roster_max=len(theirs))
     twos = [c for c in full if len(c["give"]) == 2]

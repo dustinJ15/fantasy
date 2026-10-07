@@ -166,6 +166,10 @@ def push_line(t: dict) -> str:
     return f"— too good to let slide ({why}); {asked}. Send it, or skip it with a reason and it stops"
 
 
+# Trade rows on the card. Two: a third is where the laughed-at packages used to live.
+TRADE_ROWS = 2
+
+
 def trade_tag(t: dict) -> str:
     return "worth sending" if sendable(t) else "a reach, send only if bored"
 
@@ -398,7 +402,7 @@ def todos(lg: dict) -> list[dict]:
             t["must_try"] = False  # the card's word is final: rulings memory only records the row that was pushed
     # No "reach" row: an offer only he would decline is not a thing to do today, and printing one anyway taught the
     # card to nag about packages nobody takes.
-    worth = pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(3 - len(pushed), 0)]
+    worth = pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(TRADE_ROWS - len(pushed), 0)]
     for t in worth:
         # Depth and market warnings ride along with the row: the card is the whole HTML email, so a caveat that only
         # reached the detail tables would never be seen on a phone.
@@ -410,13 +414,18 @@ def todos(lg: dict) -> list[dict]:
         # The cut ESPN's position cap forces rides in the row text: without it the paste goes out and the trade
         # screen answers "Too many players with default position WR".
         drops, cut = spots.cut(t)
+        odds = f", {t['accept_word']}" if t.get("accept_word") else ""
         text = (f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
-                f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them}){cut}")
+                f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them}{odds}){cut}")
+        # What he is left with where I ask, so the paste cannot tell a one-QB team it is set at QB.
+        if t.get("after_line"):
+            text += f"; {t['after_line']}"
         if push:
             text += " " + push_line(t)
+        thin_after = [r["pos"] for r in t.get("rival_after") or [] if any(st["wire"] for st in r["starters"]) or not r["starters"]]
         out.append({"kind": "trade", "id": f"trade:{slug('-'.join(t['get']))}", "label": "Trade (do this one)" if push else f"Trade ({trade_tag(t)})",
                     "worth": sendable(t), "push": push, "rival": t.get("rival"), "give": list(t["give"]), "get": list(t["get"]), "warn": warn,
-                    "drops": drops, "text": text})
+                    "drops": drops, "text": text, "thin_after": thin_after, "p_accept": t.get("p_accept")})
     out += [i for i in inj if i["verdict"] == "trade"]
     out += [i for i in inj if i["kind"] == "hold"]
     return out
@@ -604,6 +613,14 @@ def read_lint(packet: dict, reads: dict | None) -> list[str]:
                 out.append(f"{name}.items['{key}']: '{verdict}' needs a note saying why")
             elif verdict == "push" and known[key]["kind"] != "trade":
                 out.append(f"{name}.items['{key}']: 'push' is for trade rows only")
+        # A paste that tells him he is "set at QB" when the row says the wire starts for him at QB after the trade
+        # is the 2026-10-07 failure: the prose contradicted the math on a fact the rival knows better than anyone.
+        paste = ((reads.get(name) or {}).get("paste") or "").lower()
+        for key, x in known.items():
+            if x["kind"] == "trade" and paste and ruled.get(key) is not None and (ruled[key] if isinstance(ruled[key], str) else (ruled[key] or {}).get("verdict", "")).lower() != "skip":
+                for pos in x.get("thin_after") or []:
+                    if any(phrase in paste for phrase in (f"set at {pos.lower()}", f"deep at {pos.lower()}", f"{pos.lower()} depth", f"spare {pos.lower()}")):
+                        out.append(f"{name}.paste: says he is set at {pos}, but the row says the wire starts for him at {pos} after the trade")
         for key, x in known.items():
             if x["kind"] == "trade" and key not in ruled:
                 out.append(f"{name}.items['{key}']: trade row has no ruling (do / skip / amend)")
@@ -769,7 +786,9 @@ def render_detail(packet: dict) -> str:
         if lg["trades"]:
             for t in lg["trades"][:3]:
                 td = f" · title odds me {t.get('my_title_delta', '?'):+} / them {t.get('their_title_delta', '?'):+}" if "my_title_delta" in t else ""
-                L.append(f"- **Give {', '.join(t['give'])} → get {', '.join(t['get'])}** from {t['rival']}: me {t['my_delta_ppw']:+.1f} ppw, them {t['their_delta_ppw']:+.1f} ppw{td}. {'; '.join(t['why'])}")
+                pa = f" · p(accept) {t['p_accept']:.2f} ({t.get('accept_word') or 'not a row'}: {'; '.join(t.get('accept_why') or [])})" if t.get("p_accept") is not None else ""
+                after = f" · {t['after_line']}" if t.get("after_line") else ""
+                L.append(f"- **Give {', '.join(t['give'])} → get {', '.join(t['get'])}** from {t['rival']}: me {t['my_delta_ppw']:+.1f} ppw, them {t['their_delta_ppw']:+.1f} ppw{td}{pa}{after}. {'; '.join(t['why'])}")
         else:
             L.append("No mutually beneficial package found this week.")
 

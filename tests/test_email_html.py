@@ -113,8 +113,9 @@ def test_the_paste_message_rides_on_the_trade_it_belongs_to(monkeypatch):
     reads = {"L9": {"paste": "any interest in this one?", "paste_to": trades[0]["rival"]}}
     html = render_email(p, reads)
     assert html.count("any interest in this one?") == 1
-    # the message sits inside the checklist, above the "Why" line, not adrift at the bottom of the card
-    assert html.index("any interest in this one?") < html.index("Why:")
+    # the message sits inside the checklist table (before it closes), not adrift at the bottom of the card
+    at = html.index("any interest in this one?")
+    assert html.rindex("TRADE", 0, at) < at < html.index("</table>", at)
 
 
 def test_title_odds_are_not_in_the_action_card(monkeypatch):

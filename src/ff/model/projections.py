@@ -62,6 +62,7 @@ class PlayerProj:
     avail_ros: float = 1.0        # (weeks_remaining - weeks_out) / weeks_remaining, floored at 0
     mu_ros_active: float | None = None  # per-game expectation when he plays; defaults to mu_ros
     return_week: int | None = None      # first matchup week he is back, None if not out or not back this season
+    bye_weeks: list[int] = field(default_factory=list)  # NFL bye weeks for his team (one, normally); [] when unknown
 
     def __post_init__(self):
         if self.mu_ros_active is None:
@@ -203,7 +204,11 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         mu=round(mu, 2), sigma=round(_sigma(pos, mu, fp_sd), 2), p_zero=round(p0, 3), mu_ros=round(mu_ros, 2),
         bye=bool(row.get("bye")),
         weeks_out=round(weeks_out, 2), avail_ros=round(avail_ros, 3), mu_ros_active=round(mu_ros_active, 2), return_week=return_week,
+        bye_weeks=sorted({int(w) for w in (row.get("bye_weeks") or [])} | ({week} if row.get("bye") and week else set())),
         sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "sleeper_pts": sleeper_pts, "implied_total": implied_total,
+                 # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
+                 "espn_pg": round(ros_pg, 2) if season_left else None,
+                 "pos_rank": row.get("pos_rank"),
                  "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
                  "grade": fp.get("start_sit_grade") if fp else None, "espn_status": status, "sleeper_status": sl_status,
                  "sleeper_notes": (sleeper or {}).get("notes"), "sleeper_roster_status": sl_roster or None,
