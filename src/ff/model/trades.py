@@ -67,10 +67,56 @@ MUST_TRY_PPW = 2.0
 THROW_IN_FRAC = 0.25
 # ESPN lineup slots that mean the manager is starting him today (PlayerProj.slot is ESPN's current slot).
 _BENCH_SLOTS = ("BE", "IR", "")
+# The side sending more bodies pays this much over the single player it gets back; PFF's redraft chart says 5-10%,
+# Cummings (CBS) 10% on a 2-for-1 and 25% on a 3-for-1, KeepTradeCut and Draft Sharks strip the throw-ins first.
+# Summing two WR2s to a WR1 is how McMillan + Washington for Ja'Marr Chase (8118 against 3946 + 2968) passed a 1.2x
+# cap at 1.17 on 2026-10-07; taxed, the same package reads 0.77 on the chart the rival opens before he declines.
+CONSOLIDATION_TAX = {2: 0.10, 3: 0.25}
+# A 1-for-1 reads as even inside this (the charts call 5% even; the endowment effect and a stale price on one piece
+# make 10% the band a real person tolerates); below it the receiver reads a lowball, and under twice it the package
+# is not worth a row.
+FAIR_BAND = 0.10
+# Nobody sells a top-12 player, or one of the top three at his position, for pieces; the only version that lands is
+# the one where the best player in the deal comes back to him, and even then he wants to see the premium.
+STAR_OVERALL_RANK = 12
+STAR_POS_RANK = 3
+STAR_GIVE_RANK = 24
+STAR_PREMIUM = 1.10
 
 
 def _value(p: PlayerProj, values: dict[str, dict]) -> float:
     return values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0
+
+
+def _rank(p: PlayerProj, values: dict[str, dict], key: str) -> int | None:
+    v = values.get(str(p.espn_id), {}).get(key)
+    return int(v) if v else None
+
+
+def fairness(recv: float, give: float, n_recv: int, n_give: int) -> float | None:
+    """How a trade reads on the chart from the side that receives `recv` for `give`: 1.0 is even, below 1 - FAIR_BAND
+    is a lowball. The side sending more bodies pays CONSOLIDATION_TAX over the single player it gets, so a receiver
+    of two for one expects to see the premium and a sender of two expects to pay it."""
+    if not recv or not give:
+        return None
+    if n_give > n_recv:
+        return round(recv * (1 + CONSOLIDATION_TAX.get(n_give, 0.25)) / give, 3)
+    if n_recv > n_give:
+        return round(recv / (give * (1 + CONSOLIDATION_TAX.get(n_recv, 0.25))), 3)
+    return round(recv / give, 3)
+
+
+def is_star(p: PlayerProj, values: dict[str, dict]) -> bool:
+    o, r = _rank(p, values, "overall_rank"), _rank(p, values, "pos_rank")
+    return (o is not None and o <= STAR_OVERALL_RANK) or (r is not None and r <= STAR_POS_RANK)
+
+
+def startable_qbs(roster: list[PlayerProj], repl: dict[str, float]) -> int:
+    """QBs he could start this week: healthy now and at least a replacement-level body. A stash on IR and a QB4 nobody
+    would roster are not the second quarterback that makes his first one tradeable."""
+    floor = 0.85 * repl.get("QB", 0.0)
+    return len([p for p in roster if p.pos == "QB" and p.weeks_out < 1 and (p.mu_ros_active or 0) > 0
+                and (p.mu_ros_active or 0) >= floor])
 
 
 def throw_ins(pieces: list[PlayerProj], other_side: float, starters: set[int], values: dict[str, dict]) -> list[PlayerProj]:
@@ -120,8 +166,9 @@ def depth(roster: list[PlayerProj], slots: dict[str, int]) -> tuple[bool, list[s
     as free right up until that QB is hurt or on bye and the slot is empty. This is the check that math is missing.
     """
     # Only bodies that could actually start count as depth: a QB out for the season is not a backup QB, and
-    # counting him hides the cost of shipping the healthy one (mu_ros is 0 for out/IR players).
-    counts = Counter(p.pos for p in roster if p.mu_ros > 0)
+    # counting him hides the cost of shipping the healthy one (mu_ros is 0 for out/IR players). Nor is a QB on
+    # IR for a month: `mu_ros` averages him over the season, but the slot he is meant to cover is empty next Sunday.
+    counts = Counter(p.pos for p in roster if p.mu_ros > 0 and p.weeks_out < 1)
     ok, thin = True, []
     for pos in POS_ORDER:
         need = slots.get(pos, 0)
@@ -207,12 +254,35 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
         rival_cands = []
         packages = [((a,), (b,)) for a in my_assets for b in their_assets]
         packages += [((a1, a2), (b,)) for a1, a2 in combinations(my_assets, 2) for b in their_assets[:5]]
+        their_qbs = startable_qbs(theirs, repl)
+        _, their_thin0 = depth(theirs, slots)
         for give, get in packages:
             # crude pre-filter on market value to avoid absurd asks; my hurt players count at their discounted value
             gv, gv_raw = market_value(give, values, discount_injured=True), market_value(give, values)
             rv = market_value(get, values)
-            if gv and rv and (rv > gv * 1.2 or gv > rv * 2.2):
+            if gv and rv and gv > rv * 2.2:
                 continue
+            # How the chart he opens reads it: what he receives over what he gives, taxed when one side sends more
+            # bodies. He prices my hurt player healthy until the chart catches up, so his side reads the raw figure
+            # (the discounted one guards my side, below). Under 0.9 he reads a lowball and the package is not a row.
+            fair_his = fairness(gv_raw, rv, len(give), len(get))
+            if fair_his is not None and fair_his < 1 - 2 * FAIR_BAND:
+                continue
+            # The star guard: his top-12 player (or top three at the position) is not for sale for pieces. The one
+            # version that lands sends him a top-24 player back and still shows him the premium.
+            star_ask = any(is_star(p, values) for p in get)
+            if star_ask and not any((_rank(p, values, "overall_rank") or 999) <= STAR_GIVE_RANK for p in give):
+                continue
+            if star_ask and fair_his is not None and fair_his < STAR_PREMIUM:
+                continue
+            # The QB rule (1-QB league): a man with one quarterback is not selling it, whatever the chart says it is
+            # worth, because the chart says it is worth nothing and the wire would start his backup. And a top-24
+            # piece is never the price of a QB in a league where five of them sit on the wire.
+            if any(p.pos == "QB" for p in get) and slots.get("QB", 0) == 1 and not slots.get("OP"):
+                if their_qbs < 2:
+                    continue
+                if all(p.pos == "QB" for p in get) and any((_rank(p, values, "overall_rank") or 999) <= STAR_GIVE_RANK for p in give):
+                    continue
             new_mine = _swap(mine, {p.espn_id for p in give}, get)
             new_theirs = _swap(theirs, {p.espn_id for p in get}, give)
             drops = cap_drops(new_mine, limits, keep={p.espn_id for p in get})
@@ -224,6 +294,12 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             can_field, thin = depth(new_mine, slots)
             if not can_field:
                 continue
+            # The same check on his side: a package that leaves him unable to field a lineup next Sunday is not an
+            # offer, and one that takes his last backup at a slot the flex cannot cover is a hard sell.
+            their_can_field, their_thin = depth(new_theirs, slots)
+            if not their_can_field:
+                continue
+            their_new_thin = [pos for pos in their_thin if pos not in their_thin0]
             new_thin = [pos for pos in thin if pos not in thin0]
             my_mu1, _ = lineup_strength(new_mine, slots)
             their_mu1, their_starters = _lineup(new_theirs, slots)
@@ -235,7 +311,23 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             # A piece they would neither start nor price is a throw-in; the package is the smaller deal in disguise.
             if throw_ins(give, rv, their_starters, values):
                 continue
+            # Whose side holds the single best player in the deal. The receiver of the best player is assumed to
+            # win the trade, so a 2-for-1 that sends it to him is the one people take.
+            best_give, best_get = max((_value(p, values) for p in give), default=0), max((_value(p, values) for p in get), default=0)
+            best_side = None if not (best_give and best_get) else ("theirs" if best_give >= best_get else "mine")
             why = []
+            if fair_his is not None and fair_his < 1 - FAIR_BAND:
+                tax = f" after the {len(give)}-for-{len(get)} tax" if len(give) != len(get) else ""
+                why.append(f"he reads it as a lowball on any chart ({fair_his:.2f}{tax})")
+            if best_side == "theirs" and len(give) != len(get):
+                why.append("he gets the best player in the deal")
+            elif best_side == "mine" and len(give) > len(get):
+                why.append("I get the best player in the deal, which is the version people decline")
+            # His last backup at a slot the flex cannot cover: a QB matters (the wire starts for him next bye), a TE
+            # he can stream, and K/DST are never in a package.
+            their_new_thin = [pos for pos in their_new_thin if pos == "QB"]
+            for pos in their_new_thin:
+                why.append(f"leaves them no backup {pos}")
             # ESPN says he is in their lineup today while my rest-of-season math benches him: they value him more
             # than I do, and an ask for a man's starter is a harder sell than the delta reads.
             asks_starter = [p for p in get if starts_today(p) and p.espn_id not in their_starters0]
@@ -263,12 +355,13 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             meta = team_meta.get(rid, {})
             games = meta.get("wins", 0) + meta.get("losses", 0)
             if games >= 4 and meta.get("losses", 0) >= meta.get("wins", 0) + 2: why.append("rival is losing (motivated)")
-            # 2-for-1: consolidation (they get the single best player) is accepted; two mid pieces for a star is a lowball
+            # Uneven packages: the one where he gets the best player is the shape people accept; the one where I do
+            # (two mid pieces for his star) is the shape they laugh at. The old bonus had this backwards.
             consol = 0.0
-            if len(give) > len(get):
-                best_give = max((values.get(str(p.espn_id), {}).get("redraft_value", 0) or 0) for p in give)
-                consol = 0.5 if rv >= best_give else -0.75
-                if rv >= best_give and "consolidates value for them" not in why: why.append("consolidates value for them")
+            if len(give) != len(get):
+                # Unpriced on either side, the uneven deal still costs him a roster spot.
+                consol = {"theirs": 0.5, "mine": -0.75}.get(best_side, -0.25)
+            fair_ok = fair_his is None or fair_his >= 1 - FAIR_BAND
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
@@ -276,11 +369,14 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "drops": _drop_rows(drops, limits), "their_drops": [p.name for p in their_drops],
                 "get_pos": [p.pos for p in get],
                 "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_ratio": round(ratio, 2) if ratio is not None else None,
-                # Worth actually sending: helps them (or is neutral) *and* I am not overpaying at market.
-                "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR),
-                "must_try": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR) and d_me >= MUST_TRY_PPW,
+                "fair_his": fair_his, "best_side": best_side,
+                # Worth actually sending: helps them (or is neutral), I am not overpaying at market, and the chart he
+                # opens does not read it as a lowball.
+                "sendable": d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR) and fair_ok,
+                "must_try": (d_them >= 0 and (ratio is None or ratio >= MARKET_FLOOR) and d_me >= MUST_TRY_PPW
+                             and (fair_his is None or fair_his >= 1.0)),
                 "why": why,
-                "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin)
+                "score": round(d_them + 0.5 * min(d_me, 3) + consol - 0.75 * len(new_thin) - 0.5 * len(their_new_thin)
                                - 0.5 * len(asks_starter) - (0.25 if squeeze else 0.0), 2),
             })
         rival_cands.sort(key=lambda c: -c["score"])
@@ -324,7 +420,8 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     # Same rule the scan applies to my offers: a body I would neither start nor price does not pad their side.
     filler = throw_ins(get, gv, my_starters, values)
     rv_eff = market_value([p for p in get if p not in filler], values)
-    market_ratio = (rv_eff / gv) if gv and rv_eff else None
+    # The same chart test the scan applies to his side, from mine: taxed when one side sends more bodies.
+    market_ratio = fairness(rv_eff, gv, len(get), len(give))
 
     can_field, thin = depth(new_mine, slots)
     _, thin0 = depth(mine, slots)
@@ -369,7 +466,8 @@ def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[Player
     return {
         "give": [p.name for p in give], "get": [p.name for p in get],
         "my_delta_ppw": round(d_me, 2), "their_delta_ppw": round(d_them, 2),
-        "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_get_eff": rv_eff, "why": why, "verdict": verdict,
+        "market_give": gv_raw, "market_give_eff": gv, "market_get": rv, "market_get_eff": rv_eff, "market_ratio": market_ratio,
+        "why": why, "verdict": verdict,
         "drops": _drop_rows(drops or [], limits),
     }
 

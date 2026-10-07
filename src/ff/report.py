@@ -189,7 +189,8 @@ COVER_POS = ("QB", "TE", "K", "D/ST")
 # Chance of sitting at which a starter needs a contingency plan rather than a note.
 RISKY_TO_SIT = 0.4
 # The model's why-vocabulary is first person ("leaves me no backup QB"); the checklist is addressed to Dustin.
-TO_DUSTIN = (("leaves me ", "leaves you "), ("market says I give", "market says you give"), ("for me", "for you"))
+TO_DUSTIN = (("leaves me ", "leaves you "), ("market says I give", "market says you give"), ("for me", "for you"),
+             ("I get the best player", "you get the best player"))
 
 
 def _to_dustin(s: str) -> str:
@@ -395,12 +396,15 @@ def todos(lg: dict) -> list[dict]:
     for t in lg["trades"]:
         if t not in pushed:
             t["must_try"] = False  # the card's word is final: rulings memory only records the row that was pushed
+    # No "reach" row: an offer only he would decline is not a thing to do today, and printing one anyway taught the
+    # card to nag about packages nobody takes.
     worth = pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(3 - len(pushed), 0)]
-    for t in worth or lg["trades"][:1]:
+    for t in worth:
         # Depth and market warnings ride along with the row: the card is the whole HTML email, so a caveat that only
         # reached the detail tables would never be seen on a phone.
         warn = [_to_dustin(w) for w in t["why"]
-                if w.startswith(("leaves me", "market says I", "they start", "they have to cut a body"))]
+                if w.startswith(("leaves me", "leaves them", "market says I", "they start", "they have to cut a body",
+                                 "he reads it as a lowball", "I get the best player"))]
         them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
         push = bool(t.get("pushed") or t.get("must_try"))
         # The cut ESPN's position cap forces rides in the row text: without it the paste goes out and the trade

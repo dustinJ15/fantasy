@@ -112,9 +112,10 @@ def test_depth_warnings_speak_to_dustin():
     assert by_id(lg)["trade:kai"]["warn"] == ["leaves you no backup QB"]
 
 
-def test_a_reach_is_labelled_as_one():
+def test_a_reach_is_not_a_row():
+    """An offer only he would decline is not a thing to do today; the card used to print one anyway."""
     lg = league(trades=[trade(["Kai"], ["Maye"], sendable=False, theirs=-0.4)])
-    assert "reach" in by_id(lg)["trade:kai"]["label"]
+    assert "trade:kai" not in by_id(lg)
 
 
 def test_neutral_for_them_reads_as_words_not_plus_zero():
