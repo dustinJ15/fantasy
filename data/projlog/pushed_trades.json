@@ -17,7 +17,7 @@
   "closed": "2026-09-24"
  },
  "L2|Drake London": {
-  "status": "open",
+  "status": "sent",
   "since": "2026-09-26",
   "last": "2026-09-26",
   "league": "L2",
@@ -30,7 +30,8 @@
    "Drake London"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-10-07"
  },
  "L1|Jaylen Warren": {
   "status": "open",
@@ -44,6 +45,22 @@
   ],
   "get": [
    "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L2|Ja'Marr Chase": {
+  "status": "open",
+  "since": "2026-10-07",
+  "last": "2026-10-07",
+  "league": "L2",
+  "rival": "Let me see your TDs ",
+  "give": [
+   "Tetairoa McMillan",
+   "Parker Washington"
+  ],
+  "get": [
+   "Ja'Marr Chase"
   ],
   "source": "math",
   "note": null
