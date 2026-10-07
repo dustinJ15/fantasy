@@ -50,7 +50,7 @@
   "note": null
  },
  "L2|Ja'Marr Chase": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-10-07",
   "last": "2026-10-07",
   "league": "L2",
@@ -63,6 +63,8 @@
    "Ja'Marr Chase"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-10-07",
+  "skip_note": "two mid WRs for the WR1 overall reads 0.77 on his chart after the 2-for-1 tax; the scan no longer proposes it"
  }
 }
