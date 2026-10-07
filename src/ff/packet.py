@@ -19,7 +19,7 @@ from .model.sim import simulate
 from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
-from .rulings import drop_recently_skipped, history, load_outcomes, load_pushes, load_skips, mark_pushed, record_outcomes
+from .rulings import drop_recently_skipped, history, ir_memory, load_ir_moves, load_outcomes, load_pushes, load_skips, mark_pushed, note_ir_roster, record_outcomes, save_ir_moves
 from .sources import espn, fantasycalc, sleeper, vegas, weather
 
 PACKET_VERSION = 6
@@ -85,7 +85,10 @@ def _hours_left(ms, now=None) -> float | None:
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
                    overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None,
-                   now=None, skips: dict | None = None, pushes: dict | None = None, offer_history: dict | None = None) -> dict:
+                   now=None, skips: dict | None = None, pushes: dict | None = None, offer_history: dict | None = None,
+                   ir_moves: dict | None = None) -> dict:
+    """`ir_moves` is the IR-slot memory (`rulings.load_ir_moves`), updated in place with this roster; the real build
+    passes it and saves it afterwards, tests and the demo leave it out."""
     s = snap["settings"]
     week = snap["week"]
     slots = s["lineup_slots"]
@@ -196,11 +199,18 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         c["my_title_delta"] = round(o2[my_id]["title_pct"] - odds[my_id]["title_pct"], 1)
         c["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
 
-    # hurt players: IR / trade / drop / hold, from the waiver and trade results above
+    # hurt players: IR / trade / drop / hold, from the waiver and trade results above. The IR-slot memory is noted
+    # first so the morning a player comes off IR already counts against re-stashing him.
     me_odds = odds.get(my_id) or {}
+    ir_events: list[str] = []
+    ir_mem: dict[int, dict] = {}
+    if ir_moves is not None and my_id:
+        ir_events = note_ir_roster(ir_moves, snap["ref"]["name"], [{"espn_id": p.espn_id, "name": p.name, "slot": p.slot} for p in mine],
+                                   now_dt.date())
+        ir_mem = ir_memory(ir_moves, snap["ref"]["name"], now_dt.date())
     injuries = decide_injuries(mine, slots, week, weeks_remaining, s["reg_season_weeks"], me_odds.get("playoff_pct"),
                                s.get("ir_slots", 0), waivers, trades, values,
-                               {p.espn_id for ps in win_lu.assignment.values() for p in ps}, repl, cuffs) if my_id else []
+                               {p.espn_id for ps in win_lu.assignment.values() for p in ps}, repl, cuffs, ir_mem) if my_id else []
 
     # bench spots already open (a drop made, nobody added): name who fills each one, after the hurt-player rows
     open_spots = max(roster_max - len([p for p in mine if p.slot != "IR"]), 0) if my_id and s.get("bench_slots") else 0
@@ -266,7 +276,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "lineup_ev": ev_lu.to_dict(), "lineup_win": win_lu.to_dict(), "lineup_diff": compare(ev_lu, win_lu),
         "replacement": repl,
         "waivers": waivers, "handcuffs": cuffs, "trades": trades, "injuries": injuries,
-        "open_spots": open_spots, "open_spot_adds": open_adds,
+        "open_spots": open_spots, "open_spot_adds": open_adds, "ir_events": ir_events,
         "incoming_trades": incoming, "outgoing_trades": outgoing,
         "pending_trades_error": snap.get("pending_trades_error"),
         "odds": {str(tid): {**o, "name": teams[tid]["name"], "record": f"{teams[tid]['wins']}-{teams[tid]['losses']}", "is_me": tid == my_id} for tid, o in odds.items()},
@@ -304,7 +314,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     except Exception:
         sl_proj = {}
 
-    skips, pushes, outcomes = load_skips(), load_pushes(), load_outcomes()
+    skips, pushes, outcomes, ir_moves = load_skips(), load_pushes(), load_outcomes(), load_ir_moves()
     league_blocks, watch, injured, exposure = [], [], [], defaultdict(list)
     for ref in leagues(only):
         snap = league_snapshot(ref, force)
@@ -313,7 +323,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
             lines_by_week[wk] = vegas.implied_totals(wk or None)
         lines = lines_by_week[wk]
         blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines,
-                             now=datetime.now(UTC), skips=skips, pushes=pushes, offer_history=history(outcomes, ref.name))
+                             now=datetime.now(UTC), skips=skips, pushes=pushes, offer_history=history(outcomes, ref.name),
+                             ir_moves=ir_moves)
         for p in blk["roster"]:
             exposure[p["name"]].append(ref.name)
             st = (p["sources"].get("espn_status") or p["sources"].get("sleeper_status") or "").upper()
@@ -345,6 +356,9 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     }
     # What ESPN did with the offers I sent: opened the morning they show, closed the morning they are gone.
     packet["shared"]["offer_outcomes"] = record_outcomes(packet)
+    # Who moved in or out of an IR slot since the last run (noted per league above, before the injury rule ran).
+    save_ir_moves(ir_moves)
+    packet["shared"]["ir_moves"] = [e for b in league_blocks for e in b.get("ir_events") or []]
     PACKET_DIR.mkdir(parents=True, exist_ok=True)
     out = PACKET_DIR / f"{date.today().isoformat()}.json"
     out.write_text(json.dumps(packet, indent=1, default=str))

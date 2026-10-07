@@ -29,6 +29,11 @@ ONE_STARTER = ("QB", "K", "D/ST")
 DEPTH_WEIGHT = 0.25
 # The IR slot is for a real absence. Stashing a one-week Out means activating him next week and dropping someone then.
 IR_MIN_WEEKS = 2
+# ESPN's tag bounces: Questionable Wednesday, Out Saturday, Questionable the next Wednesday. A player who came off IR in
+# the last IR_REENTRY_DAYS is not stashed again for a short absence (the round trip costs a drop each way and rents a
+# bench body for days); only a real one, IR_REENTRY_WEEKS or more, is worth sending him back.
+IR_REENTRY_DAYS = 10
+IR_REENTRY_WEEKS = 3
 
 
 def week_weights(week: int, weeks_remaining: int, reg_season_weeks: int, playoff_pct: float | None) -> dict[int, float]:
@@ -91,13 +96,17 @@ def fill_spot(p: PlayerProj | None, waivers: list[dict], handcuffs: list[dict], 
 
 def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remaining: int, reg_season_weeks: int,
            playoff_pct: float | None, ir_slots: int, waivers: list[dict], trades: list[dict], values: dict[str, dict],
-           starters_week: set[int], repl: dict[str, float] | None = None, handcuffs: list[dict] | None = None) -> list[dict]:
+           starters_week: set[int], repl: dict[str, float] | None = None, handcuffs: list[dict] | None = None,
+           ir_memory: dict[int, dict] | None = None) -> list[dict]:
     """One entry per hurt player (weeks_out >= 1, or already in the IR slot), most valuable first.
 
     `repl` is the league's replacement level per position (`vbd.replacement_levels`), the floor for depth value.
-    `handcuffs` is `waivers.handcuffs` output; a free-agent one is the first choice for a freed bench spot."""
+    `handcuffs` is `waivers.handcuffs` output; a free-agent one is the first choice for a freed bench spot.
+    `ir_memory` is `rulings.ir_memory` for this league: when he last left the IR slot and who came in when he was
+    stashed, so a bouncing tag does not re-stash him and the activate row can name the body the stash added."""
     repl = repl or {}
     handcuffs = handcuffs or []
+    ir_memory = ir_memory or {}
     weights = week_weights(week, weeks_remaining, reg_season_weeks, playoff_pct)
     w_eff = sum(weights.values())
     hurt = [p for p in mine if p.weeks_out >= 1 or p.slot == "IR"]
@@ -117,7 +126,11 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
 
     # The open IR slots go to the stashes worth the most, not to whoever is listed first: a one-week Out never takes
     # the slot from a four-week IR player. Ties (two dead spots) go to the better player when healthy.
-    stashable = [p for p in hurt if p.slot != "IR" and ir_eligible(p) and p.weeks_out >= IR_MIN_WEEKS]
+    # Just activated and tagged Out again: not back in the slot unless the absence is a real one.
+    bounced = {p.espn_id for p in hurt if p.slot != "IR" and p.weeks_out < IR_REENTRY_WEEKS
+               and (ir_memory.get(p.espn_id) or {}).get("left_days") is not None
+               and ir_memory[p.espn_id]["left_days"] <= IR_REENTRY_DAYS}
+    stashable = [p for p in hurt if p.slot != "IR" and ir_eligible(p) and p.weeks_out >= IR_MIN_WEEKS and p.espn_id not in bounced]
     stashable.sort(key=lambda q: (-calc[q.espn_id]["hold_value"], -(q.mu_ros_active or 0)))
     to_ir = {p.espn_id for p in stashable[:ir_open]}
     stash_ids = {p.espn_id for p in stashable}
@@ -142,6 +155,7 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
                          "ppw": round(fa_ppw(c["fa"]), 2)} if c["fa"] else None),
             "trades": [{"rival": t.get("rival"), "get": list(t.get("get") or [])} for t in sends],
             "market": ({"redraft_value": v.get("redraft_value"), "trend_30d": v.get("trend_30d")} if v else None),
+            "stash": ir_memory.get(p.espn_id),  # when he was last stashed / left the slot, and who came in
             "why": [],
         }
         why = row["why"]
@@ -173,6 +187,11 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
                 row["verdict"] = "ir"; row["ir_occupant"] = occ.name
                 swappable.remove(occ)
                 why.append(f"{occ.name} is worth less the rest of the way ({occ_val:.0f} vs {c['hold_value']:.0f} pts)")
+        if p.espn_id in bounced:
+            days = ir_memory[p.espn_id]["left_days"]
+            ago = "today" if days == 0 else ("1 day ago" if days == 1 else f"{days} days ago")
+            wks = f"~{p.weeks_out:.0f} wk" + ("s" if p.weeks_out >= 1.5 else "")
+            why.append(f"came off IR {ago} and ESPN's tag is bouncing; not worth the round trip for {wks}")
         if "verdict" not in row:
             if sends:
                 row["verdict"] = "trade"; why.append("a rival takes him in a package that helps me")

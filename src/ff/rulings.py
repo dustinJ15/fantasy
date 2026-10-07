@@ -216,3 +216,68 @@ def history(outs: dict[str, dict], league: str, today: date | None = None) -> di
             t["recent_decline"] = True
     return {rid: {"n": t["n"], "recent_decline": t["recent_decline"],
                   "prior": round((t["accepted"] + 0.5) / (t["n"] + 1), 3) if t["n"] >= 2 else None} for rid, t in tally.items()}
+
+
+# ---------- IR slot moves: who sat in the slot each morning, so a bouncing ESPN tag does not churn the bench ----------
+# Jayden Daniels, Sep 30 to Oct 7: Questionable (card: activate, drop Jacobs), Out again Saturday (card: stash him, add
+# McGowan), Questionable Wednesday (card: activate, drop McGowan). Three clicks, a four-day rental, nothing gained. The
+# stash rule had no memory that he had just left the slot; this is that memory. `ff packet` notes each league's roster
+# before the injury rule runs, so the morning he comes off IR already counts.
+
+IR_MOVES_PATH = DATA_DIR / "projlog" / "ir_moves.json"
+
+
+def load_ir_moves(path: Path = IR_MOVES_PATH) -> dict:
+    d = _load(path)
+    return d if "moves" in d else {"rosters": {}, "moves": {}}
+
+
+def save_ir_moves(moves: dict, path: Path = IR_MOVES_PATH) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps(moves, indent=1))
+
+
+def note_ir_roster(moves: dict, league: str, roster: list[dict], today: date | None = None) -> list[str]:
+    """Diff one league's roster (`espn_id`, `name`, `slot`) against the last run and stamp the IR moves in place.
+
+    A player in the slot who was not: `stashed` today, with `added` = the names that joined the roster the same run
+    (the body the stash made room for, whoever Dustin actually picked). A player out of the slot but still rostered:
+    `left` today. The first run for a league only seeds the roster. Returns "<league>|<id>: stashed|left" lines."""
+    today = today or date.today()
+    prev = moves.setdefault("rosters", {}).get(league)
+    cur_names = {str(p["espn_id"]): p["name"] for p in roster}
+    cur_ir = {str(p["espn_id"]) for p in roster if p.get("slot") == "IR"}
+    events = []
+    if prev is not None:
+        prev_ids, prev_ir = set(prev.get("names") or {}), set(prev.get("ir") or [])
+        joined = sorted(cur_names[i] for i in cur_names if i not in prev_ids)
+        for pid in sorted(cur_ir - prev_ir):
+            m = moves.setdefault("moves", {}).setdefault(f"{league}|{pid}", {})
+            m.update({"name": cur_names[pid], "league": league, "stashed": today.isoformat(), "added": joined})
+            events.append(f"{league}|{pid}: stashed")
+        for pid in sorted(prev_ir - cur_ir):
+            if pid in cur_names:  # still mine, just not in the slot: an activation, not a drop
+                m = moves.setdefault("moves", {}).setdefault(f"{league}|{pid}", {})
+                m.update({"name": cur_names[pid], "league": league, "left": today.isoformat()})
+                events.append(f"{league}|{pid}: left")
+    moves["rosters"][league] = {"date": today.isoformat(), "names": cur_names, "ir": sorted(cur_ir)}
+    return events
+
+
+def ir_memory(moves: dict, league: str, today: date | None = None) -> dict[int, dict]:
+    """What the injury rule needs per player: `left_days` since he last came off IR (None if never), the date he
+    was last `stashed` and the names `added` that morning."""
+    today = today or date.today()
+    out: dict[int, dict] = {}
+    for key, m in (moves.get("moves") or {}).items():
+        lg, _, pid = key.partition("|")
+        if lg != league or not pid.isdigit():
+            continue
+        left_days = None
+        if m.get("left"):
+            try:
+                left_days = (today - date.fromisoformat(m["left"])).days
+            except ValueError:
+                left_days = None
+        out[int(pid)] = {"left_days": left_days, "stashed": m.get("stashed"), "added": list(m.get("added") or [])}
+    return out
