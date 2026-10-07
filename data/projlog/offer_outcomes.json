@@ -1,0 +1,31 @@
+{
+ "L1|37d622ff-d751-4623-810b-440f528fa0b2": {
+  "status": "open",
+  "league": "L1",
+  "rival": "Lake America",
+  "rival_team_id": 4,
+  "give": [
+   "Jalen Coker"
+  ],
+  "get": [
+   "Rashee Rice"
+  ],
+  "opened": "2026-10-07",
+  "expires": "2026-10-08T19:12"
+ },
+ "L2|106016a8-66a3-4572-ab13-48ebecde5b84": {
+  "status": "open",
+  "league": "L2",
+  "rival": "Mikiko Squad",
+  "rival_team_id": 10,
+  "give": [
+   "Mike Evans",
+   "Parker Washington"
+  ],
+  "get": [
+   "Drake London"
+  ],
+  "opened": "2026-10-07",
+  "expires": "2026-10-08T14:00"
+ }
+}
