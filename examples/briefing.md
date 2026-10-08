@@ -5,14 +5,14 @@ _4-0 · vs Bye Week Blues · win 59% · playoffs 97.6% · title 21.4%_
 
 - **Incoming offer (DECLINE):** The Tuesday Regrets offers Dontae Kowalczyk for your Jalen Haggerty, Silas Pennington: -4.5 pts/wk for you, +4.5 for them, title odds -11.6; expires in 21h
 - **Lineup (in order):** Cole Ibarra: QB → bench · Beau Whitlock: bench → QB · Nico Vell: bench → RB/WR/TE
-- **IR:** move Grady Sorensen (WR) to IR (out ~4 wks, back wk 9), then add Kwame Brandt (WR, +0.9/wk)
-- **Waiver:** add Jermaine Vell (TE) and start him at TE (+7 pts this week) (there is an open bench spot)
+- **IR:** move Grady Sorensen (WR) to IR (out ~4 wks, back wk 9), then add Kwame Brandt (WR, +0.9/wk) — **note:** Brandt is cover for the Sorensen weeks only; he is the first cut when a spot is needed
+- **Waiver:** add Jermaine Vell (TE) and start him at TE (+7 pts this week) (there is an open bench spot) — **note:** the full bid is right; Beau Bassett is the fallback if you're outbid
 - **Stream:** swap in Texans D/ST at D/ST (+2.6 this week)
 - **Already sent:** your Rico Achebe for Rico Saldana is still waiting on Waiver Wire Widows, 21h left
-- **Trade (worth sending):** offer Bye Week Blues your Beau Whitlock for Darius Solano, Dontae Rutherford (+2.2 pts/wk for you, +0.9 for them, coin flip, p(accept) 0.43); drop Rico Achebe in the trade screen (ESPN caps TE at 3); he'd start Jermaine Vell (the wire), Beau Bassett (the wire) at TE; Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after — they start Darius Solano today; they start Dontae Rutherford today; leaves you no backup QB
+- **Trade (worth sending):** offer Bye Week Blues your Beau Whitlock for Darius Solano, Dontae Rutherford (+2.2 pts/wk for you, +0.9 for them, coin flip, p(accept) 0.43); drop Rico Achebe in the trade screen (ESPN caps TE at 3); he'd start Jermaine Vell (the wire), Beau Bassett (the wire) at TE; Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after — they start Darius Solano today; they start Dontae Rutherford today; leaves you no backup QB — **note:** send it Monday, not today: Ibarra is a game-time call and Whitlock is your only other QB this week
 
-**Claude's read:** Rutherford was in a boot Thursday and hasn't practiced since, so I'd wait a week before buying him.  
-**Paste to Bye Week Blues:** "hey, any interest in Haggerty + Sorensen for Xavier Vell? you're thin at WR and I've got a spare. no worries if not"  
+**Claude's read:** Rutherford's boot was precautionary and he practiced in full Thursday, so the package is live. Ibarra is still a game-time call, so Whitlock has to stay through Sunday; send the offer Monday. Brandt is a bye-week body until Sorensen is back in week 9, not a starter.  
+**Paste to Bye Week Blues:** "hey, would you do Solano + Rutherford for Whitlock? you've been streaming QB and he'd start for you every week, and I need the bodies back for byes. no worries if not"  
 **Reply to The Tuesday Regrets:** "appreciate it but I'm gonna hold for now, hit me up if you'd do Kowalczyk for Haggerty straight up"  
 
 **Out:** Grady Sorensen out ~4 wks, back wk 9 (demo); Malik Okafor out ~1 wk, back wk 6 (demo)  

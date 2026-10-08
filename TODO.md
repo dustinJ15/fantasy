@@ -69,9 +69,4 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Docs
 
-- [ ] **R2 (XS). `examples/reads.json` rules on the September card.** `scripts/screenshots.sh` regenerated
-  `examples/` on 2026-10-08 (R1) and the scan now proposes a different package (`trade:darius-solano-dontae-rutherford`),
-  so `render-email` warns that the trade row is unruled and the paste in the README screenshot names Xavier Vell,
-  who is no longer on the card. Rewrite the `items`, `read` and `paste` in `examples/reads.json` (and `overrides.json`
-  if a note is stale) against the current `examples/briefing.md` row ids, re-run the script, and make the lint silent.
-  Done when: `scripts/screenshots.sh` prints no `reads:` warning and every name in the paste is on the card.
+(none open)
