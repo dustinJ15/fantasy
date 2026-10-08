@@ -56,11 +56,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   HTML into the Gmail tool and check `wc -c`. `ff email` already exists (`src/ff/mail.py`); give the cloud env
   `GMAIL_USER`/`GMAIL_APP_PASSWORD` and make the skill call it, with the paste as the fallback.
 
-- [ ] **C8 (XS). `ff accuracy` scores up to Sleeper's week, not the league's.** Found while fixing C6 (2026-10-08):
-  `cli.py` `accuracy` passes `sleeper.state().get("week", 1)` to `projlog.accuracy` as the current week. The packet no
-  longer reads Sleeper's clock anywhere; the harness should take the week from the newest log row (or a `--week`
-  flag), so a Monday run does not score the week in progress, or skip the one just finished.
-
 ## Tier D — where real edge would come from (after Tier A)
 
 - [ ] **D1 (M-L). In-season rest-of-season projection.** Season-to-date points per game, target and carry share

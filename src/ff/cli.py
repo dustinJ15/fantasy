@@ -264,14 +264,14 @@ def log_projections(league: str | None = LeagueOpt):
 
 
 @app.command()
-def accuracy():
-    """MAE / bias by source × position over logged weeks (needs >=1 completed week)."""
+def accuracy(week: int | None = typer.Option(None, "--week", help="Score the weeks before this one (default: the newest log's week)")):
+    """MAE / bias by source × position over logged weeks (needs >=1 completed week). Offline: the week comes from the log."""
     from . import projlog
-    from .sources import sleeper
-    wk = sleeper.state().get("week", 1)
-    df = projlog.accuracy(env().season, wk)
+    wk = week if week is not None else projlog.current_week(env().season)
+    df = projlog.accuracy(env().season, wk) if wk is not None else projlog.pl.DataFrame()
     if df.is_empty():
         rprint("no completed weeks logged yet"); return
+    rprint(f"[dim]weeks before week {wk} ({'--week' if week is not None else 'the newest log'})[/]")
     t = Table("pos", "source", "n", "MAE", "bias")
     for r in df.iter_rows(named=True):
         t.add_row(r["pos"], r["source"], str(r["n"]), str(r["mae"]), str(r["bias"]))

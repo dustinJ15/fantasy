@@ -126,8 +126,24 @@ def scored_rows(logs: dict[int, list[list[dict]]], through_week: int) -> list[di
     return recs
 
 
-def accuracy(season: int, through_week: int) -> pl.DataFrame:
-    """MAE and bias per source × position over all logged weeks < through_week, against ESPN's actual in league scoring."""
+def current_week(season: int) -> int | None:
+    """The league's week as of the newest log (by date), or None with no log: the week still in progress, never Sleeper's clock.
+
+    The harness runs offline, and Sleeper's week rolls on its own schedule (ahead of ESPN's on a Monday, behind it on a
+    Tuesday), which scored a half-played week or skipped the one just finished (TODO C8). The newest log is the last
+    packet's own `week`; everything before it has its finals (`actual_prev` rides in on that log)."""
+    newest = max(LOG_DIR.glob(f"{season}-w*.csv"), key=lambda p: p.name.split("-", 2)[2], default=None)
+    return int(newest.name.split("-w")[1][:2]) if newest else None
+
+
+def accuracy(season: int, through_week: int | None = None) -> pl.DataFrame:
+    """MAE and bias per source × position over all logged weeks < through_week, against ESPN's actual in league scoring.
+
+    `through_week` defaults to `current_week`, the newest log's week."""
+    if through_week is None:
+        through_week = current_week(season)
+    if through_week is None:
+        return pl.DataFrame()
     recs = scored_rows(_logs(season), through_week)
     if not recs:
         return pl.DataFrame()

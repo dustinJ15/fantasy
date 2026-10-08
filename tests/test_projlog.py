@@ -1,5 +1,6 @@
 """The accuracy harness scores a pre-kickoff forecast against ESPN's actual, never the blend against itself (TODO A2)."""
 import csv
+import re
 
 import pytest
 
@@ -107,3 +108,43 @@ def test_clock_keeps_the_pre_lock_projection():
     apply_clock([p], [{"espn_id": 1, "actual_week": 19.0}], {"SF": {"state": "post"}}, now=datetime(2026, 10, 5, 12, tzinfo=UTC))
     assert (p.mu, p.mu_pre, p.actual, p.locked) == (19.0, 13.3, 19.0, True)
     assert projlog.phase_of(p.to_dict()) == "post"
+
+
+def _monday_of_week_5(log_dir):
+    """Week 4 is complete (its finals rode in on week 5's first log); week 5 is in progress, Monday night still pre."""
+    a = {"espn_id": "1", "name": "A", "pos": "QB", "blend": 20.0, "espn": 20.0}
+    b = {"espn_id": "2", "name": "B", "pos": "RB", "blend": 12.0, "espn": 12.0}
+    _write(log_dir, 2026, 4, "2026-10-01", [_row(a, league="L1"), _row(b, league="L1")])
+    _write(log_dir, 2026, 4, "2026-10-05", [_row(a, league="L1", phase="post", actual=25.0), _row(b, league="L1")])
+    _write(log_dir, 2026, 5, "2026-10-06", [_row(a, league="L1", blend=18.0, actual_prev=25.0), _row(b, league="L1", actual_prev=6.0)])
+    _write(log_dir, 2026, 5, "2026-10-12", [_row(a, league="L1", phase="post", blend=18.0, actual=10.0), _row(b, league="L1")])
+
+
+def test_accuracy_scores_up_to_the_newest_logged_week_not_sleepers_clock(log_dir, monkeypatch):
+    """TODO C8: `ff accuracy` took the current week from Sleeper's clock, which runs ahead of or behind the league's."""
+    from typer.testing import CliRunner
+
+    from ff.cli import app
+    from ff.sources import sleeper
+    _monday_of_week_5(log_dir)
+    monkeypatch.setenv("SEASON", "2026")
+
+    def no_network(force=False):
+        raise AssertionError("ff accuracy must not read Sleeper's clock")
+    monkeypatch.setattr(sleeper, "state", no_network)
+    # The newest log is week 5, in progress: only week 4 is scored (A: 20 vs 25, B: 12 vs 6), n=1 per position.
+    assert projlog.accuracy(2026).filter(projlog.pl.col("source") == "blend")["n"].to_list() == [1, 1]
+    r = CliRunner().invoke(app, ["accuracy"])
+    assert r.exit_code == 0, r.output
+    assert "week 5" in r.output and "QB" in r.output and "RB" in r.output
+    # `--week` overrides the log: 6 pulls in the half-played week 5 (the QB scored, the Monday-night RB not), 4 scores nothing.
+    assert projlog.accuracy(2026, 6).filter(projlog.pl.col("source") == "blend")["n"].to_list() == [2, 1]
+    assert projlog.accuracy(2026, 4).is_empty()
+    out = CliRunner().invoke(app, ["accuracy", "--week", "6"]).output
+    assert "week 6 (--week)" in out and re.search(r"QB\s+│\s+blend\s+│\s+2\s+│", out), out
+    assert "no completed weeks" in CliRunner().invoke(app, ["accuracy", "--week", "4"]).output
+
+
+def test_accuracy_with_no_logs_at_all(log_dir):
+    assert projlog.current_week(2026) is None
+    assert projlog.accuracy(2026).is_empty()
