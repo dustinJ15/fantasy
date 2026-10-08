@@ -81,7 +81,9 @@ def drop_recently_skipped(cands: list[dict], skips: dict[str, dict], league: str
 def record_pushes(packet: dict, reads: dict, path: Path = PUSHES_PATH, today: date | None = None) -> list[str]:
     """Open, close or keep every push. A trade row is pushed when the math flags it (`must_try`) or Claude rules
     `push` on it. A push closes when the package shows up among Dustin's own pending offers (sent), or when he
-    rules `skip` on it (which the skip memory also records). Returns "<key>: opened|sent|skipped" lines."""
+    rules `skip` on it (which the skip memory also records). A closed push stays closed for SKIP_DAYS however often
+    the math re-flags the package (a declined offer comes straight back from the scan); only Claude ruling `push`
+    again reopens it. Returns "<key>: opened|sent|skipped" lines."""
     from .report import apply_reads, todos
     today = today or date.today()
     pushes = _load(path)
@@ -104,8 +106,12 @@ def record_pushes(packet: dict, reads: dict, path: Path = PUSHES_PATH, today: da
                     events.append(f"{key}: skipped")
                 continue
             if row.get("ruling") == "push" or row.get("push"):  # `push` on the row: the math flagged it, or it is remembered
-                if cur and cur.get("status") in ("sent", "skipped") and cur.get("closed") == today.isoformat():
-                    continue  # closed this morning (sent, or skipped with a reason): the same row does not reopen it
+                if cur and cur.get("status") in ("sent", "skipped") and row.get("ruling") != "push" \
+                        and _closed_within(cur, today, SKIP_DAYS):
+                    # Sent (and then declined or expired: the offer left `pending_trades` and the scan re-derived the
+                    # same must_try row) or skipped with a reason: the math alone does not reopen it for SKIP_DAYS.
+                    # Only Claude ruling `push` again does; the day he says so is a new ask with his note as the reason.
+                    continue
                 if cur and cur.get("status") == "open":
                     cur["last"] = today.isoformat()
                     if row.get("ruling") == "push" and row.get("ruling_note"):
@@ -120,6 +126,13 @@ def record_pushes(packet: dict, reads: dict, path: Path = PUSHES_PATH, today: da
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(json.dumps(pushes, indent=1))
     return events
+
+
+def _closed_within(push: dict, today: date, days: int) -> bool:
+    try:
+        return today - date.fromisoformat(push.get("closed") or "") <= timedelta(days=days)
+    except ValueError:
+        return True  # an unreadable close date keeps it closed: the memory errs toward not nagging
 
 
 def mark_pushed(cands: list[dict], pushes: dict[str, dict], league: str, today: date | None = None) -> list[dict]:

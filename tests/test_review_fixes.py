@@ -318,3 +318,30 @@ def test_a_remembered_math_push_drops_when_the_row_stops_being_sendable():
     claude = {**stale(), "my_delta_ppw": 0.5, "pushed": {"since": "2026-10-06", "days": 3, "note": "Allen wins leagues", "source": "claude"}}
     rows = by_id(league(trades=[claude]))
     assert rows["trade:star"]["push"] and "Allen wins leagues" in rows["trade:star"]["text"] and "asked 3 mornings running" in rows["trade:star"]["text"]
+
+
+def test_a_sent_or_skipped_push_stays_closed_until_claude_pushes_again(tmp_path):
+    """B4: the math pushed Star, Dustin sent it, the rival declined two days later. The morning the offer leaves
+    `pending_trades` the scan re-derives the same `must_try` row; the push must not reopen as a fresh "first ask"
+    for SKIP_DAYS. Claude ruling `push` on it again (with a note) is the one thing that reopens it."""
+    path = tmp_path / "pushed.json"
+    math_row = league(trades=[big("Star", mine=2.5)])  # must_try: the math's push
+    assert rulings.record_pushes({"leagues": [math_row]}, {}, path, today=date(2026, 9, 23)) == ["L1|Star: opened"]
+    sent = {**league(trades=[]), "outgoing_trades": [{"rival": "Them", "give": ["A"], "get": ["Star"], "hours_left": 30}]}
+    assert rulings.record_pushes({"leagues": [sent]}, {}, path, today=date(2026, 9, 24)) == ["L1|Star: sent"]
+    # declined: the offer is gone from pending and the math flags the package again
+    assert rulings.record_pushes({"leagues": [math_row]}, {}, path, today=date(2026, 9, 26)) == []
+    assert rulings.load_pushes(path)["L1|Star"] == {**rulings.load_pushes(path)["L1|Star"], "status": "sent", "closed": "2026-09-24"}
+    assert rulings.record_pushes({"leagues": [math_row]}, {}, path, today=date(2026, 10, 7)) == []  # still inside SKIP_DAYS
+    # Claude says push anyway: that reopens it, with his note as the reason
+    reads = {"L1": {"items": {"trade:star": {"verdict": "push", "note": "he is thin at QB now"}}}}
+    assert rulings.record_pushes({"leagues": [math_row]}, reads, path, today=date(2026, 9, 26)) == ["L1|Star: opened"]
+    p = rulings.load_pushes(path)["L1|Star"]
+    assert p["status"] == "open" and p["since"] == "2026-09-26" and p["source"] == "claude" and p["note"] == "he is thin at QB now"
+    # a skip with a reason closes it; a math row the next week (skip memory lost) does not reopen it...
+    skip = {"L1": {"items": {"trade:star": {"verdict": "skip", "note": "not selling A"}}}}
+    assert rulings.record_pushes({"leagues": [math_row]}, skip, path, today=date(2026, 9, 27)) == ["L1|Star: skipped"]
+    assert rulings.record_pushes({"leagues": [math_row]}, {}, path, today=date(2026, 10, 4)) == []
+    assert rulings.load_pushes(path)["L1|Star"]["status"] == "skipped"
+    # ...until SKIP_DAYS have passed, when the math may ask again
+    assert rulings.record_pushes({"leagues": [math_row]}, {}, path, today=date(2026, 10, 12)) == ["L1|Star: opened"]

@@ -37,10 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B4 (S). Pushes reopen the morning after a decline.** `src/ff/rulings.py:106-118`: once the sent offer
-  leaves `pending_trades`, a `sent` push with `closed != today` falls through to a new `open`. A `sent` or
-  `skipped` push should stay closed for `SKIP_DAYS` unless Claude rules `push` again.
-
 - [ ] **B5 (S). Offer outcomes mislabel.** `rulings.py:185-190`: an offer I withdrew, or a counter he accepted
   under a different id, is recorded as his decline and penalises him for 7 days. `:187` compares the expiry
   date only, in machine-local (UTC) time, so an offer that lapsed at 9 PM Denver reads "declined". `:215`
