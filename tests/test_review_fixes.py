@@ -1,11 +1,13 @@
 """The 2026-09-23 review: wrong instructions the live card produced that morning, each pinned here."""
 from datetime import UTC, date, datetime
 
+import pytest
+
 from ff import report, rulings
 from ff.model.lineup import optimize
 from ff.model.projections import blend
 from tests.conftest import P
-from tests.test_card import by_id, ids, injury, league, player
+from tests.test_card import by_id, ids, injury, league, player, trade
 
 # ---------- lineup: no-op swaps ----------
 
@@ -80,6 +82,35 @@ def test_an_activation_takes_the_drop_row_with_it_instead_of_spending_it_twice()
     text = rows["injury:daniels"]["text"]
     assert text.startswith("move Daniels (QB) off IR, ESPN lists him questionable") and "drop Dart (QB, out ~1 wk" in text
     assert "Concepcion" not in text
+
+
+@pytest.mark.parametrize("drop_row_first", [False, True])
+def test_an_activation_folds_the_drop_row_whichever_order_decide_put_them_in(drop_row_first):
+    """`injuries.decide` orders rows by `mu_ros_active`, so Dart's Drop row can come before Daniels' activation; the
+    card once printed "drop Dart to make room" and "drop Dart: out ... add Concepcion" on that morning. One drop, one row."""
+    rows = [injury("Daniels", "activate", pos="QB", weeks_out=1, return_week=4, fa=None),
+            {**injury("Dart", "drop", pos="QB", weeks_out=1, return_week=4, fa=("Concepcion", 0.0)), "hold_value": 0.0}]
+    rows[0]["espn_status"] = "QUESTIONABLE"
+    if drop_row_first:
+        rows.reverse()
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Dart", pos="QB", ros=0.8), player("Bench WR", ros=3.0)], injuries=rows)
+    items = report.todos(lg)
+    assert "injury:dart" not in {i["id"] for i in items}
+    assert sum("drop Dart" in i["text"] for i in items) == 1
+    assert "drop Dart (QB, out ~1 wk" in by_id(lg)["injury:daniels"]["text"]
+    assert not any("Concepcion" in i["text"] for i in items)
+
+
+def test_a_folded_drop_rows_add_is_not_counted_on_the_ledger():
+    """Dart's Drop row would add Concepcion (QB); Daniels' activation folds it in whatever the order, so Concepcion is
+    never added and the trade row's cap check sees Dart off and nobody on: one QB, not two, against a cap of one."""
+    rows = [{**injury("Dart", "drop", pos="QB", weeks_out=1, return_week=4, fa=("Concepcion", 0.0)), "hold_value": 0.0},
+            injury("Daniels", "activate", pos="QB", weeks_out=1, return_week=4, fa=None)]
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Dart", pos="QB", ros=0.8), player("Bench WR", ros=3.0)], injuries=rows,
+                settings={"lineup_slots": {"QB": 1}, "position_limits": {"QB": 1}},
+                trades=[{**trade(["QB In"], ["Bench WR"]), "get_pos": ["QB"], "drops": []}])
+    row = by_id(lg)["trade:qb-in"]
+    assert row["drops"] == [] and "ESPN caps" not in row["text"]
 
 
 def test_an_activation_uses_an_open_spot_before_naming_a_drop():

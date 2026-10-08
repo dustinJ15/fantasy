@@ -37,12 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B2 (S). Activation folding is order-dependent.** `report.py:288-312` folds the activate row's drop into
-  the drop row only when the activate row comes first; `injuries.decide` orders by `mu_ros_active`, so a cheap
-  returning player and a dearer season-ender print both "drop Dart to make room" and "drop Dart: out for the
-  season; add X". Pre-compute the activations' drops before emitting any row.
-  Done when: `tests/test_review_fixes.py` runs the Daniels/Dart case in both orders.
-
 - [ ] **B3 (S). A remembered push stays "do this one" after the math stops supporting it.**
   `report.py:415-423` never re-checks `sendable` on a remembered math push, and `push_line` still says "too
   good to let slide". Drop a math-sourced push whose row is no longer `sendable`; keep Claude-sourced pushes.
@@ -72,11 +66,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 - [ ] **B9 (XS). Row ids can collide.** `trade:<get>` (`report.py:446`) ignores `give`; `waiver:<name>` is shared
   by the Waiver and Open-spot rows. Latent today; `apply_reads` would rule both with one key.
-
-- [ ] **B10 (XS). A folded Drop row's add is still counted.** `report.todos` notes every drop row's `add` on the
-  ledger (`spots.note(add_pos=)`) before `_injury_items` runs; when an activation then folds that Drop row in, the
-  add is never printed but his position still counts one body high in `cut()`. Count the add where the row prints it
-  (falls out of B2's pre-computation).
 
 ## Tier C — operations
 

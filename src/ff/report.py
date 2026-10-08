@@ -282,10 +282,13 @@ def _injury_items(lg: dict, spots: _Spots | None = None) -> list[dict]:
     Rows lead with the click (move to IR, drop X and add Y) so the checklist reads as a sequence. A hold is not a
     click, so it comes back as kind `hold` and the renderers print it below the list, not in it. An activation
     needs a bench spot, so it draws on the ledger; when the drop it takes is a player who has his own Drop row, that
-    row folds into this one (one click, one drop)."""
+    row folds into this one (one click, one drop). The ledger counts a drop or an add on the row that prints it."""
     spots = spots or _Spots(lg, lg.get("open_spots") or 0, set())
     drop_rows = {r["name"]: r for r in lg.get("injuries") or [] if r["verdict"] == "drop"}
-    folded: set[str] = set()
+    # Every activation draws its spot before any row prints. `injuries.decide` orders rows by `mu_ros_active`, so the
+    # Drop row an activation folds in can come first; folding on the fly then printed "drop Dart" on both rows.
+    taken = {r["name"]: spots.take(for_whom=r["name"]) for r in lg.get("injuries") or [] if r["verdict"] == "activate"}
+    folded = {drop for drop, _ in taken.values() if drop in drop_rows}
     out = []
     for r in lg.get("injuries") or []:
         if r["name"] in folded:
@@ -302,20 +305,21 @@ def _injury_items(lg: dict, spots: _Spots | None = None) -> list[dict]:
                 text += f" in place of {r['ir_occupant']}"
             elif add:
                 text += f", then add {add['name']} ({add['pos']}, {add['why']})"
+                spots.note(add_pos=add["pos"])
         elif v == "activate":
             st = (r.get("espn_status") or "active").replace("_", " ").lower()
             text = f"move {who} off IR, ESPN lists him {st} so the slot has to be cleared"
-            drop, suffix = spots.take(for_whom=r["name"])
+            drop, suffix = taken[r["name"]]
             # The drop is the body the stash brought in: say so, so a round trip reads as one (Daniels, Oct 3 to 7).
             came_in = _stash_note(r, drop)
-            if drop in drop_rows:
+            if drop in folded:
                 d = drop_rows[drop]
-                folded.add(drop)
                 text += f"; drop {drop} ({d['pos']}, out {_weeks(d)}, worth ~{d['hold_value']:.0f} pts the rest of the way{came_in}) to make room"
             else:
                 text += suffix + (f"{came_in} to make room" if drop else "")
         elif v == "drop":
             text = f"drop {who}: out {_weeks(r)}{back}, worth ~{r['hold_value']:.0f} pts the rest of the way"
+            spots.note(drop=r["name"], add_pos=add["pos"] if add else None)
             if add:
                 text += f"; add {add['name']} ({add['pos']}, {add['why']})"
         elif v == "trade":
@@ -361,12 +365,7 @@ def todos(lg: dict) -> list[dict]:
     reserved = {r["name"] for r in lg.get("injuries") or [] if r["verdict"] in ("ir", "trade")}
     n_open = lg["open_spots"] if lg.get("open_spots") is not None else len(lg.get("open_spot_adds") or [])
     spots = _Spots(lg, n_open, reserved)
-    for r in lg.get("injuries") or []:
-        if r["verdict"] == "drop":
-            spots.note(drop=r["name"])
-        if r.get("add") and r["verdict"] in ("ir", "drop"):
-            spots.note(add_pos=r["add"]["pos"])
-    inj = _injury_items(lg, spots)
+    inj = _injury_items(lg, spots)  # counts each drop and add on the ledger as its row prints it (a folded Drop row's add never does)
     # A Drop row spends its spot on its own add, so he is not the drop for a pickup too (the card once cut one body
     # for two adds). An activation may still have folded him in above; that spot is spent either way.
     spots.reserved |= {r["name"] for r in lg.get("injuries") or [] if r["verdict"] == "drop" and r.get("add")}
