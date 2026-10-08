@@ -1,5 +1,7 @@
 # Roadmap — making the analysis genuinely sharp
 
+The ordered, actionable backlog is `TODO.md` (one PR per item, each with its evidence and a done-when). This file is the direction.
+
 Honest status of the model and what would move the needle, in priority order. Current standing in all three leagues: not yet
 dominant, which the model attributes to variance.
 
