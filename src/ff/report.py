@@ -74,6 +74,7 @@ class _Spots:
 
     def __init__(self, lg: dict, open_spots: int, reserved: set[str]):
         self.lg, self.open, self.reserved, self.dropped = lg, max(int(open_spots or 0), 0), set(reserved), []
+        self.gone: set[str] = set()  # drops already counted off, so a body noted twice (a Drop row the ledger then hands out) is one body
         # Bodies per position as the rows above leave them, against ESPN's caps (the IR occupant counts).
         self.pos_of = {p["name"]: p["pos"] for p in lg["roster"]}
         self.counts = Counter(self.pos_of.values())
@@ -83,7 +84,8 @@ class _Spots:
         """A row moved a body on or off the roster; keep the position counts honest for `cut`."""
         if add_pos:
             self.counts[add_pos] += 1
-        if drop and drop in self.pos_of:
+        if drop and drop in self.pos_of and drop not in self.gone:
+            self.gone.add(drop)
             self.counts[self.pos_of[drop]] -= 1
 
     def take(self, for_whom: str | None = None, adding: str | None = None) -> tuple[str | None, str]:
@@ -365,6 +367,9 @@ def todos(lg: dict) -> list[dict]:
         if r.get("add") and r["verdict"] in ("ir", "drop"):
             spots.note(add_pos=r["add"]["pos"])
     inj = _injury_items(lg, spots)
+    # A Drop row spends its spot on its own add, so he is not the drop for a pickup too (the card once cut one body
+    # for two adds). An activation may still have folded him in above; that spot is spent either way.
+    spots.reserved |= {r["name"] for r in lg.get("injuries") or [] if r["verdict"] == "drop" and r.get("add")}
     out += [i for i in inj if i["verdict"] in ("ir", "activate")]
     added = {r["add"]["name"] for r in lg.get("injuries") or [] if r.get("add")}
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]

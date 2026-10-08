@@ -108,6 +108,28 @@ def test_two_pickups_name_two_different_drops():
     assert rows["waiver:now-guy"]["text"].endswith("; drop Bench A") and rows["waiver:later-guy"]["text"].endswith("; drop Bench B")
 
 
+def test_a_drop_row_with_its_own_add_is_not_the_drop_for_a_pickup_too():
+    """Done Guy is cut and Pickup takes his spot; a start-worthy waiver add needs a spot of its own, so it names the
+    next cheapest body (Bench B), not Done Guy a second time. The position counts end up one down per drop, not two."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Done Guy", pos="RB", ros=0.5), player("Bench B", ros=5.0)],
+                injuries=[injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0, fa=("Pickup", 1.2))],
+                waivers=[waiver("Now Guy", d_week=3.0)])
+    rows = by_id(lg)
+    assert rows["injury:done-guy"]["text"].endswith("; add Pickup (RB, +1.2/wk)")
+    assert rows["waiver:now-guy"]["text"].endswith("; drop Bench B")
+
+
+def test_a_drop_is_counted_once_even_when_the_ledger_hands_him_out():
+    """Dart has a Drop row and the activation takes him as its cut: one body off at QB, not two."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Dart", pos="QB", ros=0.8), player("Bench WR", ros=3.0)],
+                injuries=[injury("Daniels", "activate", pos="QB", weeks_out=1, return_week=4, fa=None),
+                          {**injury("Dart", "drop", pos="QB", weeks_out=1, return_week=4, fa=None), "hold_value": 0.0}])
+    spots = report._Spots(lg, 0, set())
+    spots.note(drop="Dart")
+    report._injury_items(lg, spots)
+    assert spots.dropped == ["Dart"] and spots.counts["QB"] == 0
+
+
 def test_a_player_headed_to_ir_is_never_the_drop_for_a_pickup():
     lg = league(roster=[player("Starter WR", slot="WR"), player("Stash", ros=0.5), player("Bench B", ros=5.0)],
                 injuries=[injury("Stash", "ir", weeks_out=15, return_week=None, avail=0.0, fa=("Pickup", 1.2))],

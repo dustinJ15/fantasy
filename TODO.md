@@ -37,13 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B1 (S). One drop is spent twice.** `src/ff/report.py:359` reserves only `ir` and `trade` verdict
-  players. A `drop`-verdict player is noted (`:362-366`) but never added to `reserved` or `spots.dropped`, so
-  `_drop_order` (`:58-60`) hands him out again as the drop for a waiver pickup. Reproduced: two adds against one
-  freed spot. `note(drop=)` then runs twice for him, so `cut()` position counts are off by one.
-  Fix: add drop-verdict names to `reserved` (or `dropped`) when the row carries an `add`.
-  Done when: a test with an injury drop plus a start-worthy pickup names two different drops.
-
 - [ ] **B2 (S). Activation folding is order-dependent.** `report.py:288-312` folds the activate row's drop into
   the drop row only when the activate row comes first; `injuries.decide` orders by `mu_ros_active`, so a cheap
   returning player and a dearer season-ender print both "drop Dart to make room" and "drop Dart: out for the
@@ -79,6 +72,11 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 - [ ] **B9 (XS). Row ids can collide.** `trade:<get>` (`report.py:446`) ignores `give`; `waiver:<name>` is shared
   by the Waiver and Open-spot rows. Latent today; `apply_reads` would rule both with one key.
+
+- [ ] **B10 (XS). A folded Drop row's add is still counted.** `report.todos` notes every drop row's `add` on the
+  ledger (`spots.note(add_pos=)`) before `_injury_items` runs; when an activation then folds that Drop row in, the
+  add is never printed but his position still counts one body high in `cut()`. Count the add where the row prints it
+  (falls out of B2's pre-computation).
 
 ## Tier C — operations
 
