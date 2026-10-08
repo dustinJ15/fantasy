@@ -68,7 +68,7 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
                 team = rng.choice(["GB", "KC", "DAL"])
                 roster.append({"espn_id": pid, "name": name_for(pos), "pos": pos, "team": team,
                                "eligible": elig, "slot": slot, "fantasy_team_id": tid, "injury_status": rng.choice([None, "ACTIVE", "QUESTIONABLE"]),
-                               "proj_week": round(mu, 1), "actual_week": 0, "proj_season": round(mu * 16, 1), "percent_owned": 90.0,
+                               "proj_week": round(mu, 1), "actual_week": 0, "proj_season": round(mu * 17, 1), "percent_owned": 90.0,
                                "pos_rank": i + 1, "bye": False, "bye_weeks": [BYES[team]]})
                 pid += 1
     # Two hurt players on my side so the card shows the hurt-player row: my fourth WR went on NFL injured reserve with a
@@ -81,19 +81,19 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
     # take: my spare QB starts for him, his spare TE starts for me, and nobody gives up the best player for pieces.
     def team_at(tid: int, pos: str, i: int) -> dict:
         return [r for r in roster if r["fantasy_team_id"] == tid and r["pos"] == pos][i]
-    team_at(4, "QB", 0).update(proj_week=9.0, proj_season=9.0 * 16)
-    team_at(4, "QB", 1).update(proj_week=7.0, proj_season=7.0 * 16)
-    team_at(4, "TE", 0).update(proj_week=13.0, proj_season=13.0 * 16)
-    team_at(4, "TE", 1).update(proj_week=10.0, proj_season=10.0 * 16)
-    mine_at("QB", 1).update(proj_week=16.0, proj_season=16.0 * 16)
-    mine_at("TE", 0).update(proj_week=6.0, proj_season=6.0 * 16)
+    team_at(4, "QB", 0).update(proj_week=9.0, proj_season=9.0 * 17)
+    team_at(4, "QB", 1).update(proj_week=7.0, proj_season=7.0 * 17)
+    team_at(4, "TE", 0).update(proj_week=13.0, proj_season=13.0 * 17)
+    team_at(4, "TE", 1).update(proj_week=10.0, proj_season=10.0 * 17)
+    mine_at("QB", 1).update(proj_week=16.0, proj_season=16.0 * 17)
+    mine_at("TE", 0).update(proj_week=6.0, proj_season=6.0 * 17)
     fas = []
     for _ in range(40):
         pos = rng.choice(["RB", "WR", "TE", "QB", "K", "D/ST"])
         mu = max(rng.gauss(6, 3), 0.5)
         fas.append({"espn_id": pid, "name": name_for(pos), "pos": pos, "team": "GB", "eligible": [pos] + (["RB/WR/TE"] if pos in ("RB", "WR", "TE") else []),
                     "slot": "FA", "fantasy_team_id": None, "injury_status": None, "proj_week": round(mu, 1), "actual_week": 0,
-                    "proj_season": round(mu * 16, 1), "percent_owned": 20.0, "pos_rank": 30, "bye": False, "bye_weeks": [BYES["GB"]]})
+                    "proj_season": round(mu * 17, 1), "percent_owned": 20.0, "pos_rank": 30, "bye": False, "bye_weeks": [BYES["GB"]]})
         pid += 1
     ids = list(range(1, teams + 1))
     sched = {t: [] for t in ids}

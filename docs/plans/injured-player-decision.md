@@ -72,6 +72,9 @@ So finding 4 is exact: neither lever reaches `mu_ros`. Corrections and additions
   settles this in one probe; the fix, if needed, is `(proj_season - points_to_date) / weeks_remaining` with
   `points_to_date` summed from `p.stats[w]["points"]`, which espn-api already carries. It is not part of the
   injury work but every number in this plan sits on top of it.
+  Settled 2026-10-08 (TODO A1): the figure is a full-season total and not "actual plus remaining" either, so the
+  fix is per-game arithmetic (`season_pg` in `projections.py`: points per game played, `proj_season / 17` as a
+  fading prior), with `weeks_remaining` out of the denominator altogether.
 
 ## Design
 

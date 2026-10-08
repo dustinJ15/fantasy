@@ -102,7 +102,7 @@ class PlayerRow:
     injury_status: str | None
     proj_week: float
     actual_week: float
-    proj_season: float
+    proj_season: float              # ESPN's full-season total (a static preseason-style figure, not "remaining")
     percent_owned: float
     pos_rank: int | None
     bye: bool
@@ -110,6 +110,15 @@ class PlayerRow:
     ir_eligible_raw: bool = False   # ESPN listed the IR slot in eligibleSlots (evidence for whether that is a real signal)
     waiver_status: str | None = None  # free agents only: "WAIVERS" (claim, processes on waiver day) or "FREEAGENT" (add now)
     bye_weeks: list[int] = field(default_factory=list)  # weeks his NFL team does not play, from the pro schedule
+    actual_season: float = 0.0      # points scored so far this season (ESPN's season total)
+    games_played: int = 0           # games he has played this season (ESPN's season total over its per-game average)
+
+
+def games_played(p) -> int:
+    """ESPN's `appliedAverage` is points per game played, so total / average is the games he has played; a player
+    whose games all scored zero reads as none, which only leaves the preseason prior in charge of him."""
+    total, avg = float(getattr(p, "total_points", 0) or 0), float(getattr(p, "avg_points", 0) or 0)
+    return int(round(total / avg)) if avg > 0 else 0
 
 
 def bye_weeks(p) -> list[int]:
@@ -148,6 +157,7 @@ def roster_rows(league: League, week: int) -> list[PlayerRow]:
                 bye=(str(week) not in p.schedule) if p.schedule else False,
                 injured=bool(getattr(p, "injured", False)), ir_eligible_raw="IR" in p.eligibleSlots,
                 bye_weeks=bye_weeks(p),
+                actual_season=float(getattr(p, "total_points", 0) or 0), games_played=games_played(p),
             ))
     return rows
 

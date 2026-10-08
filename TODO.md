@@ -32,7 +32,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier A — bugs that distort every number today
 
-- [ ] **A1 (M). Rest-of-season per-game values are inflated and the inflation grows every week.**
+- [x] **A1 (M). Rest-of-season per-game values are inflated and the inflation grows every week.**
   `src/ff/model/projections.py:179-181` does `ros_pg = proj_season / weeks_remaining`. Confirmed against a live
   league on 2026-10-08 (week 5, 13 matchup weeks left): ESPN's `projected_total_points` is a static full-season
   figure, not a remaining total. Amon-Ra St. Brown: 91.3 scored, season total 246.2, the code says 18.9 per game
@@ -50,6 +50,10 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   Re-check every absolute threshold above once the scale is honest.
   Done when: a synthetic row with `proj_week=10, proj_season=170, weeks_remaining=5` gives `mu_ros_active` near
   10, not 34; `ff roster` on a real league shows ROS/g within ~15% of the weekly projection for healthy starters.
+  Done 2026-10-08: `season_pg` / `per_game` in `projections.py`; the row carries `actual_season` and `games_played`
+  (ESPN's total over its per-game average); the prior is `proj_season / 17` and is gone after six games. The
+  thresholds were set in weeks 1-3, when the inflation was under 13%, so they stand. The `ff roster` check on a
+  real league is still owed (no cookies in the session that fixed it).
 
 - [ ] **A2 (S). The accuracy harness scores the blend against itself.**
   `src/ff/projlog.py:37-42` picks the latest log per week, which is Monday's, written after `model/clock.py`
@@ -87,10 +91,11 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   Done when: the demo and a real packet show `lineup_diff` only with a stated P(win) gain above the floor; a
   test with a 0.3pp gain keeps the EV lineup.
 
-- [ ] **A6 (S, fold into A1). This week's matchup leaks into rest-of-season value.**
+- [x] **A6 (S, fold into A1). This week's matchup leaks into rest-of-season value.**
   `projections.py:181` shrinks `mu_ros_active` halfway toward `mu`, which already carries the Vegas multiplier
   and this week's opponent. A starter facing the league's best defense this week is worth less in every trade
   and hold row for the rest of the season. Shrink toward a matchup-neutral number instead.
+  Done 2026-10-08 with A1: `mu_neutral` (the blend before the Vegas multiplier) is what `per_game` shrinks toward.
 
 ## Tier B — checklist and ledger bugs
 

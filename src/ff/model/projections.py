@@ -36,6 +36,13 @@ ACTIVE_STATUSES = (None, "", "ACTIVE", "NORMAL")
 
 FLEX_LABELS = {"RB/WR/TE", "RB/WR", "WR/TE", "OP"}
 
+# ESPN's `proj_season` is a full-season total, so its per-game reading is over the NFL's 17 games, never over the
+# weeks left in the fantasy season (that read 18.9 a game for a 14.5-a-game receiver in week 5 and grew every week).
+NFL_GAMES = 17
+# The preseason season total is a prior on a player's level that his own games replace: full weight before his first
+# game, gone after this many.
+PRIOR_FADE_GAMES = 6
+
 
 @dataclass
 class PlayerProj:
@@ -104,6 +111,28 @@ VEGAS_K = {"QB": 0.35, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}
 LEAGUE_AVG_IMPLIED = 23.0
 
 
+def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None) -> float | None:
+    """A player's healthy per-game level from the season so far: his own points per game played, with ESPN's
+    preseason total (per game) as a prior that fades out over his first PRIOR_FADE_GAMES games. None without either."""
+    if ytd_pg is None or games <= 0:
+        return prior_pg
+    if not prior_pg:
+        return ytd_pg
+    w_prior = max(0.0, 1.0 - games / PRIOR_FADE_GAMES)
+    return w_prior * prior_pg + (1 - w_prior) * ytd_pg
+
+
+def per_game(season: float | None, weekly: float, plays_this_week: bool) -> float:
+    """Rest-of-season per-game expectation: the season level shrunk halfway toward this week's projection when he is
+    expected to play it (this week's number carries the freshest read on his role), the season level alone when
+    he is not (a player listed Out projects ~0 this week, which says nothing about his healthy level)."""
+    if season is None:
+        return weekly
+    if plays_this_week and weekly:
+        return 0.5 * season + 0.5 * weekly
+    return season
+
+
 def _num(x) -> float | None:
     """A number from a source column, or None: the FantasyPros mirror writes NA for a missing value and a column with
     one NA in it arrives as text, so a missing consensus must read as missing, not crash the packet."""
@@ -146,6 +175,7 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         mu = fp_pts
     else:
         mu = 0.0
+    mu_neutral = mu   # the blend before this week's matchup (Vegas, the opponent) is applied: the rest of the season's input
     if implied_total and mu and VEGAS_K.get(pos, 0):
         mu *= 1 + VEGAS_K[pos] * (implied_total / LEAGUE_AVG_IMPLIED - 1)
 
@@ -172,12 +202,17 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     designated = (status not in ACTIVE_STATUSES or sl_status not in ACTIVE_STATUSES or sl_roster in SLEEPER_ROSTER_MULTI_WEEK
                   or "p_zero" in ov)
 
-    # Rest-of-season per-game expectation: ESPN season projection spread over remaining games, shrunk toward this
-    # week's blended number. This is the healthy, when-he-plays number, so this week only counts when he is expected
-    # to play it: a player listed Out has a weekly projection of ~0 that says nothing about his healthy level.
-    season_left = float(row.get("proj_season") or 0)
-    ros_pg = season_left / max(weeks_remaining, 1) if season_left else mu
-    mu_ros_active = 0.5 * ros_pg + 0.5 * mu if (mu and inj_p0 < 0.5) else ros_pg
+    # Rest-of-season per-game expectation (the healthy, when-he-plays number): his season so far per game played,
+    # ESPN's full-season total per NFL game as the fading prior, shrunk toward this week's matchup-neutral blend when
+    # he is expected to play this week. `weeks_remaining` is not in the denominator: ESPN's total is a season figure,
+    # not what is left of it. `espn_pg` is the same arithmetic on ESPN's own numbers: what a rival's app shows him.
+    games = int(row.get("games_played") or 0)
+    ytd_pg = float(row.get("actual_season") or 0) / games if games > 0 else None
+    prior_pg = float(row.get("proj_season") or 0) / NFL_GAMES or None
+    plays = inj_p0 < 0.5 and not row.get("bye")
+    level = season_pg(ytd_pg, games, prior_pg)
+    mu_ros_active = per_game(level, mu_neutral, plays)
+    espn_pg = per_game(level, espn_pts, plays) if level is not None else None
     if "p_zero" in ov and not row.get("bye"):
         p0 = float(ov["p_zero"]); flags.append("llm:p_zero")
     if "mu_mult" in ov:
@@ -207,7 +242,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         bye_weeks=sorted({int(w) for w in (row.get("bye_weeks") or [])} | ({week} if row.get("bye") and week else set())),
         sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "sleeper_pts": sleeper_pts, "implied_total": implied_total,
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
-                 "espn_pg": round(ros_pg, 2) if season_left else None,
+                 "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
+                 "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
                  "pos_rank": row.get("pos_rank"),
                  "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
                  "grade": fp.get("start_sit_grade") if fp else None, "espn_status": status, "sleeper_status": sl_status,
