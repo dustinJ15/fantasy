@@ -58,14 +58,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   longer reads Sleeper's clock anywhere; the harness should take the week from the newest log row (or a `--week`
   flag), so a Monday run does not score the week in progress, or skip the one just finished.
 
-- [ ] **C7 (XS, needs Dustin). `leagues.toml` is committed on the `projlog` branch.** Found while fixing C1
-  (2026-10-08): `origin/projlog` commit `850834e` (2026-09-14) added the whole working tree, `leagues.toml` included,
-  and every projlog commit since carries it (`git show origin/projlog:leagues.toml`). `scripts/projlog_push.sh`
-  only adds `data/projlog` and never rewrites history, so it stays until removed on purpose. The file holds league
-  and team ids, not cookies; still, CLAUDE.md says never commit it. A commit on `projlog` that deletes it (and
-  drops the branch's `!data/projlog/` `.gitignore` line, which is why git refused the old checkout on a second run)
-  is the cheap fix; purging it from history is Dustin's call, since it rewrites the branch.
-
 ## Tier D — where real edge would come from (after Tier A)
 
 - [ ] **D1 (M-L). In-season rest-of-season projection.** Season-to-date points per game, target and carry share
