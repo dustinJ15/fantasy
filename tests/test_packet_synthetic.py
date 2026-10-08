@@ -47,24 +47,84 @@ def test_end_to_end_synthetic(monkeypatch):
     gone = next(p for p in blk3["roster"] if p["espn_id"] == ir_guy["espn_id"])
     assert gone["mu_ros"] == 0 and gone["return_week"] is None and gone["sources"]["weeks_out_source"] == "override"
     assert {r["verdict"] for r in blk3["injuries"] if r["espn_id"] == ir_guy["espn_id"]} == {"ir"}
-    pid = str(blk["roster"][0]["espn_id"])
-    blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={pid: {"p_zero": 1.0}}, sims=100)
-    assert blk2["roster"][-1]["espn_id"] == int(pid) or any(r["espn_id"] == int(pid) and r["p_zero"] == 1.0 for r in blk2["roster"])
+
+
+def _starters(blk: dict, key: str) -> set[str]:
+    return {name for names in blk[key]["slots"].values() for name in names}
+
+
+def test_p_zero_override_sits_the_starter(monkeypatch):
+    """A `p_zero` of 1.0 in overrides.json is a sit, not a note: this week's EV goes to zero, the player leaves both
+    lineups and the card's lineup row, the EV-ordered roster puts him in the zero tail, and the horizon counts the game
+    missed. (The old assertion ended in `or any(p_zero == 1.0)`, which the override itself made true, so an `ev` that
+    ignored sit risk still passed.)"""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    snap = make_snapshot()
+    base = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=100)
+    star = base["roster"][0]  # EV-ordered: the top healthy starter
+    assert star["p_zero"] < 0.1 and star["name"] in _starters(base, "lineup_ev") & _starters(base, "lineup_win")
+    base_lineup = next(x for x in report.todos(base) if x["kind"] == "lineup")
+    assert f"{star['name']}: bench → " in base_lineup["text"]  # the demo benches him; the card says start him
+    blk = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides={str(star["espn_id"]): {"p_zero": 1.0}}, sims=100)
+    me = next(p for p in blk["roster"] if p["espn_id"] == star["espn_id"])
+    assert me["p_zero"] == 1.0 and me["ev"] == 0.0 and "llm:p_zero" in me["flags"]
+    assert me["mu"] == star["mu"]  # sit risk, not a downgrade: the when-he-plays number is untouched
+    assert me["weeks_out"] == 1.0 and me["return_week"] == blk["week"] + 1 and me["mu_ros"] < star["mu_ros"]
+    assert me["name"] not in _starters(blk, "lineup_ev") | _starters(blk, "lineup_win")
+    assert sum(len(v) for v in blk["lineup_win"]["slots"].values()) == 9  # the backup fills the slot
+    assert all(p["ev"] == 0.0 for p in blk["roster"][blk["roster"].index(me):])
+    lineup = next(x for x in report.todos(blk) if x["kind"] == "lineup")
+    assert star["name"] not in lineup["text"] and f"{star['name']}: bench → " not in lineup["text"]
+
+
+def _trade(rival: str, give: list[str], get: list[str], mine: float, theirs: float, **kw) -> dict:
+    return {"rival": rival, "give": give, "get": get, "my_delta_ppw": mine, "their_delta_ppw": theirs, "sendable": theirs >= 0,
+            "must_try": False, "pushed": None, "why": [], "drops": [], "accept_word": None, "p_accept": None,
+            "after_line": None, "fallback": None, "rival_after": [], **kw}
+
+
+def _trade_rows(blk: dict, trades: list[dict]) -> list[dict]:
+    blk["trades"] = trades
+    return [t for t in report.todos(blk) if t["kind"] == "trade"]
 
 
 def test_card_lists_every_worth_sending_trade(monkeypatch):
-    """More than one sendable offer means more than one checklist row, capped at 3; reaches stay a single row."""
+    """The trade card: the one pushed package first, then sendable packages in scan order, `TRADE_ROWS` rows in all,
+    and never a reach (a package only I like). Hand-built packages over the demo block, so each row's id, label and
+    text is known before the card is rendered."""
     monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
-    blk = analyze_league(make_snapshot(), FakeXW(), {}, {}, {}, {}, overrides=None, sims=200)
-    rows = [t for t in report.todos(blk) if t["kind"] == "trade"]
-    pushed = [t for t in blk["trades"] if t.get("must_try")][:1]  # the one big package goes first, however it was ranked
-    worth = pushed + [t for t in blk["trades"] if t["their_delta_ppw"] >= 0 and t not in pushed][:3 - len(pushed)]
-    assert len(rows) <= 3
-    if worth:
-        assert len(rows) == len(worth) and all(r["worth"] for r in rows)
-        assert [r["text"].split(" your ")[0] for r in rows] == [f"offer {t['rival']}" for t in worth]
-    else:
-        assert len(rows) <= 1 and not any(r["worth"] for r in rows)
+    blk = analyze_league(make_snapshot(), FakeXW(), {}, {}, {}, {}, overrides=None, sims=100)
+    assert report.TRADE_ROWS == 2
+    reach = _trade("Bye Week Blues", ["Pat Reach"], ["Vic Target"], 4.0, -0.8)  # my biggest gain, but he loses
+    fair = _trade("Sunday Scaries", ["Al Fair"], ["Bo Swap"], 1.1, 0.3)
+    big = _trade("Ctrl+Alt+Delete Kelce", ["Cy Big"], ["Dee Star"], 2.6, 0.1, must_try=True, accept_word="he'd likely take it", p_accept=0.7)
+    even = _trade("Bye Week Blues", ["Ed Even"], ["Fy Even"], 0.9, 0.0)
+    rows = _trade_rows(blk, [reach, fair, big, even])
+    assert [r["id"] for r in rows] == ["trade:dee-star", "trade:bo-swap"]  # pushed first, then scan order; `even` is over the cap
+    assert [r["label"] for r in rows] == ["Trade (do this one)", "Trade (worth sending)"]
+    assert [r["push"] for r in rows] == [True, False] and all(r["worth"] for r in rows)
+    assert rows[0]["rival"] == "Ctrl+Alt+Delete Kelce" and rows[0]["give"] == ["Cy Big"] and rows[0]["get"] == ["Dee Star"]
+    assert rows[0]["text"] == ("offer Ctrl+Alt+Delete Kelce your Cy Big for Dee Star (+2.6 pts/wk for you, +0.1 for them, he'd likely take it) "
+                               "— too good to let slide (+2.6 pts/wk is a big lineup gain by the math); first ask. "
+                               "Send it, or skip it with a reason and it stops")
+    assert rows[1]["text"] == "offer Sunday Scaries your Al Fair for Bo Swap (+1.1 pts/wk for you, +0.3 for them)"
+    assert rows[0]["p_accept"] == 0.7 and rows[1]["p_accept"] is None and rows[0]["drops"] == [] and rows[0]["warn"] == []
+    # a neutral package reads "neutral for them"; with no push the sendable ones fill the card in scan order
+    rows = _trade_rows(blk, [reach, even, fair])
+    assert [r["id"] for r in rows] == ["trade:fy-even", "trade:bo-swap"] and not any(r["push"] for r in rows)
+    assert rows[0]["text"] == "offer Bye Week Blues your Ed Even for Fy Even (+0.9 pts/wk for you, neutral for them)"
+    # two packages the math flags: only the bigger gain is pushed, the other is demoted and not on the card this morning
+    small = _trade("Sunday Scaries", ["Gus Small"], ["Hal Small"], 2.2, 0.2, must_try=True)
+    rows = _trade_rows(blk, [fair, small, big])
+    assert [(r["id"], r["push"]) for r in rows] == [("trade:dee-star", True), ("trade:bo-swap", False)]
+    assert small["must_try"] is False and big["must_try"] is True
+    # Claude's remembered push leads even when the math no longer calls it sendable, with his note and the day count
+    held = _trade("Bye Week Blues", ["Ian Hold"], ["Jo Hold"], 1.4, -0.2, pushed={"source": "claude", "days": 3, "note": "he needs a QB"})
+    rows = _trade_rows(blk, [fair, held])
+    assert [(r["id"], r["label"], r["worth"]) for r in rows] == [("trade:jo-hold", "Trade (do this one)", False), ("trade:bo-swap", "Trade (worth sending)", True)]
+    assert rows[0]["text"].endswith("— too good to let slide (he needs a QB); asked 3 mornings running. Send it, or skip it with a reason and it stops")
+    # nothing sendable: no trade row at all, not a "reach" row
+    assert _trade_rows(blk, [reach]) == [] and _trade_rows(blk, []) == []
 
 
 def test_empty_offer_has_zero_title_delta(monkeypatch):

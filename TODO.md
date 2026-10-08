@@ -97,8 +97,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier E — tests that would catch model errors
 
-- [ ] **E2.** `tests/test_packet_synthetic.py:155-170` reconstructs the expected rows from the block it tests
-  and branches on the output; `:155`'s `or any(p_zero == 1.0)` is always true.
 - [ ] **E3.** Regression tests for B1, B2, B3, B4 and `_Spots.cut` reaching the `stuck` branch.
 - [ ] **E4.** `tests/test_email_html.py:124` `assert "Title" not in html` breaks on any name containing "Title".
 - [ ] **E5.** `tests/test_season.py:616` accepts any `accept_word`; `test_sim.py` has no symmetry check (four
