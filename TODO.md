@@ -33,13 +33,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier A — bugs that distort every number today
 
-- [ ] **A3 (S). The title-odds delta on trade and offer rows is seed noise.**
-  `src/ff/packet.py:152` simulates the baseline with seed 7 at `sims`; `:198` and `:245` re-simulate with seed
-  11 at 1500. With no trade at all the demo shows deltas from -1.5 to +0.9 title points between the two.
-  Fix: common random numbers. Re-run the baseline with the same seed and n as the re-sim (or pass the baseline
-  draws in), so a null trade reads 0.0.
-  Done when: a test applies an empty trade and asserts `my_title_delta == 0.0`.
-
 - [ ] **A4 (S). Opponent strength is the optimizer's guess, not his set lineup.**
   `src/ff/packet.py:120` runs the EV optimizer over the opponent's roster. From Saturday on his lineup is set
   and visible in each player's `slot`. Use the starters in non-bench slots when the run is on a weekend (or

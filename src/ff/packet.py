@@ -151,6 +151,16 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     n_rounds = max(len(s["playoff_weeks"]), 1)
     odds = simulate(ids, records, strength, remaining, s["playoff_team_count"], n_rounds, n=sims)
 
+    def title_deltas(st2: dict, rid: int) -> tuple[float, float]:
+        """Title-odds change for me and the rival if the rosters were as `st2` prices them.
+
+        Common random numbers: the re-sim uses the baseline's seed and draw count, so the two runs see the same
+        scores and a null trade reads exactly 0.0; the delta is the trade, not seed noise (a 1500-draw re-sim on a
+        different seed used to read up to +-1.5 title points with no trade at all)."""
+        o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=sims)
+        return (round(float(o2[my_id]["title_pct"] - odds[my_id]["title_pct"]), 1),
+                round(float(o2[rid]["title_pct"] - odds[rid]["title_pct"]), 1))
+
     # waivers
     my_lineup_ros = optimize([p.ros() for p in mine], slots, objective="ev")
     my_lineup = my_lineup_ros.assignment
@@ -186,7 +196,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
     trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     trades = mark_pushed(trades, pushes or {}, snap["ref"]["name"], now_dt.date())
-    # attach title-odds delta for the top few (re-sim is expensive; do 3)
+    # attach title-odds delta for the top few (one re-sim each; do 3)
     for c in trades[:3]:
         rid = c["rival_team_id"]
         give = {p.espn_id for p in mine if p.name in c["give"]}
@@ -195,9 +205,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         new_mine = [p for p in mine if p.espn_id not in give and p.name not in cut] + get
         new_theirs = [p for p in by_team[rid] if p.name not in c["get"]] + [p for p in mine if p.espn_id in give]
         st2 = dict(strength); st2[my_id] = lineup_strength(new_mine, slots); st2[rid] = lineup_strength(new_theirs, slots)
-        o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=1500, seed=11)
-        c["my_title_delta"] = round(o2[my_id]["title_pct"] - odds[my_id]["title_pct"], 1)
-        c["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
+        c["my_title_delta"], c["their_title_delta"] = title_deltas(st2, rid)
 
     # hurt players: IR / trade / drop / hold, from the waiver and trade results above. The IR-slot memory is noted
     # first so the morning a player comes off IR already counts against re-stashing him.
@@ -242,9 +250,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         new_mine = [p for p in mine if p.espn_id not in {g.espn_id for g in give} and p.name not in cut] + get
         new_theirs = [p for p in by_team.get(rid, []) if p.espn_id not in {g.espn_id for g in get}] + give
         st2 = dict(strength); st2[my_id] = lineup_strength(new_mine, slots); st2[rid] = lineup_strength(new_theirs, slots)
-        o2 = simulate(ids, records, st2, remaining, s["playoff_team_count"], n_rounds, n=min(sims, 1500), seed=11)
-        ev["my_title_delta"] = round(o2[my_id]["title_pct"] - odds[my_id]["title_pct"], 1)
-        ev["their_title_delta"] = round(o2[rid]["title_pct"] - odds[rid]["title_pct"], 1)
+        ev["my_title_delta"], ev["their_title_delta"] = title_deltas(st2, rid)
         incoming.append({**base, **ev})
     incoming.sort(key=lambda t: t.get("proposed_ts") or 0, reverse=True)
 

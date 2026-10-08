@@ -63,3 +63,17 @@ def test_card_lists_every_worth_sending_trade(monkeypatch):
         assert [r["text"].split(" your ")[0] for r in rows] == [f"offer {t['rival']}" for t in worth]
     else:
         assert len(rows) <= 1 and not any(r["worth"] for r in rows)
+
+
+def test_empty_offer_has_zero_title_delta(monkeypatch):
+    """A3: trade and offer rows compare a re-sim against the baseline with common random numbers, so an offer that
+    moves nobody reads 0.0 at any draw count; a re-sim on its own seed used to read up to +-1.5 title points."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    snap = make_snapshot()
+    null = {**snap["pending_trades"][0], "give": [], "get": []}
+    snap["pending_trades"] = [null]
+    for sims in (100, 300):
+        blk = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=sims)
+        inc = blk["incoming_trades"]
+        assert len(inc) == 1 and inc[0]["my_title_delta"] == 0.0 and inc[0]["their_title_delta"] == 0.0
+        assert type(inc[0]["my_title_delta"]) is float
