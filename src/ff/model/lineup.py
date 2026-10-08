@@ -115,6 +115,29 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     return Lineup(assignment, mu, var, pw, bench)
 
 
+def as_set(players: list[PlayerProj], lineup_slots: dict[str, int],
+           opp_mu: float | None = None, opp_var: float | None = None) -> Lineup:
+    """The lineup as ESPN shows it: whoever sits in each starter slot today, no search. What a rival will actually
+    score once his lineup is set, where `optimize` is the best he could have done."""
+    assignment: dict[str, list[PlayerProj]] = {s: [] for s in lineup_slots}
+    bench = []
+    for p in players:
+        if p.slot in assignment:
+            assignment[p.slot].append(p)
+        else:
+            bench.append(p)
+    starters = [p for ps in assignment.values() for p in ps]
+    mu, var = sum(p.ev for p in starters), sum(p.var for p in starters)
+    pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
+    return Lineup(assignment, mu, var, pw, bench)
+
+
+def is_complete(lineup: Lineup, lineup_slots: dict[str, int]) -> bool:
+    """Every starter slot holds a player who has a game this week: nothing left for the manager to do."""
+    return all(len(lineup.assignment.get(s, [])) >= n and not any(p.bye for p in lineup.assignment.get(s, []))
+               for s, n in lineup_slots.items())
+
+
 def _settle(slots: list[str], combo: tuple) -> list[tuple[str, PlayerProj | None]]:
     """Re-seat the chosen starters so as many as possible keep the ESPN slot they are already in.
 

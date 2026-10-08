@@ -1,4 +1,6 @@
 """End-to-end over the synthetic demo league: analyze_league -> report.render, no network."""
+from datetime import UTC, datetime
+
 from ff import demo, report
 from ff.packet import PACKET_VERSION, analyze_league
 
@@ -77,3 +79,42 @@ def test_empty_offer_has_zero_title_delta(monkeypatch):
         inc = blk["incoming_trades"]
         assert len(inc) == 1 and inc[0]["my_title_delta"] == 0.0 and inc[0]["their_title_delta"] == 0.0
         assert type(inc[0]["my_title_delta"]) is float
+
+
+def _bench_best_rb(snap: dict, tid: int) -> tuple[dict, dict]:
+    """Swap the rival's top RB to the bench and his fourth RB into the slot; returns (benched, promoted)."""
+    rbs = sorted((r for r in snap["roster"] if r["fantasy_team_id"] == tid and r["pos"] == "RB"), key=lambda r: -r["proj_week"])
+    best, scrub = rbs[0], rbs[-1]
+    assert best["slot"] == "RB" and scrub["slot"] == "BE"
+    best["slot"], scrub["slot"] = "BE", "RB"
+    return best, scrub
+
+
+def _fill_flex(snap: dict, tid: int) -> None:
+    wr = sorted((r for r in snap["roster"] if r["fantasy_team_id"] == tid and r["pos"] == "WR" and r["slot"] == "BE"), key=lambda r: -r["proj_week"])[0]
+    wr["slot"] = "RB/WR/TE"
+
+
+def test_a_set_lineup_on_sunday_is_the_opponents_strength(monkeypatch):
+    """A4: from Saturday on the rival's lineup is set and visible in each player's `slot`, so a rival who benched his
+    best RB projects for less than the optimizer's guess; midweek, with a slot still open, the optimizer stands."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    sunday, wednesday = datetime(2026, 10, 11, 14, tzinfo=UTC), datetime(2026, 10, 7, 14, tzinfo=UTC)
+    snap = make_snapshot()
+    opp = snap["matchups"][0]["away"]
+    run = lambda s, now: analyze_league(s, FakeXW(), {}, {}, {}, {}, overrides=None, sims=100, now=now)
+    full = run(snap, sunday)["opponent"]
+    best, scrub = _bench_best_rb(snap, opp)
+    benched = run(snap, sunday)["opponent"]
+    assert benched["lineup"] == "set" and full["lineup"] == "set"
+    drop = full["mu"] - benched["mu"]
+    assert 0.5 * (best["proj_week"] - scrub["proj_week"]) < drop < 1.5 * (best["proj_week"] - scrub["proj_week"]), (full, benched)
+    # midweek the flex is still empty (the demo never fills it), so the optimizer's lineup is the forecast
+    mid = run(snap, wednesday)["opponent"]
+    assert mid["lineup"] == "projected" and mid["mu"] > benched["mu"]
+    # ...unless every starter slot is already filled: a set lineup is a set lineup whatever the day
+    _fill_flex(snap, opp)
+    mid_full = run(snap, wednesday)["opponent"]
+    assert mid_full["lineup"] == "set" and mid_full["mu"] < mid["mu"]
+    # fixtures and the demo pass no `now`: nothing changes with the calendar there
+    assert run(snap, None)["opponent"]["lineup"] == "set"

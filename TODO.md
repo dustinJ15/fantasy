@@ -33,13 +33,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier A — bugs that distort every number today
 
-- [ ] **A4 (S). Opponent strength is the optimizer's guess, not his set lineup.**
-  `src/ff/packet.py:120` runs the EV optimizer over the opponent's roster. From Saturday on his lineup is set
-  and visible in each player's `slot`. Use the starters in non-bench slots when the run is on a weekend (or
-  when every starter slot is filled), the optimizer otherwise.
-  Done when: a Sunday fixture with a rival who benched his best RB produces a lower `opponent.mu` than the
-  optimizer's.
-
 - [ ] **A5 (S, then M). P(win) lineups trade real points for unfitted variance with no threshold.**
   `src/ff/model/lineup.py:102` benches a higher-EV player for any P(win) gain, even 0.001. Sigma is a guess
   (`projections.py:14-16`) scaled by a FantasyPros rank-sd fudge (`:94-100`). Until variance is fitted, require

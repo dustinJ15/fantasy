@@ -761,7 +761,8 @@ def render_detail(packet: dict) -> str:
             L.append(f"Playoff odds **{me['playoff_pct']}%** · title odds **{me['title_pct']}%** · expected wins {me['exp_wins']}")
         opp = lg["opponent"]
         if opp.get("name"):
-            L.append(f"\n## Matchup vs {opp['name']} (their proj {opp['mu']} ± {opp['sd']})")
+            theirs = "their set lineup" if opp.get("lineup") == "set" else "their proj"
+            L.append(f"\n## Matchup vs {opp['name']} ({theirs} {opp['mu']} ± {opp['sd']})")
         lw, le = lg["lineup_win"], lg["lineup_ev"]
         L.append(f"Recommended lineup (max P(win){' = ' + str(lw['p_win']) if lw.get('p_win') is not None else ''}), proj {lw['mu']} ± {lw['sd']}; current ESPN lineup proj {lg['current_lineup_mu']}")
         L.append("")

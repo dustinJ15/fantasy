@@ -12,7 +12,7 @@ from .model import usage as usage_mod
 from .model.clock import apply_clock, week_state
 from .model.injuries import decide as decide_injuries
 from .model.injuries import fill_spot
-from .model.lineup import compare, optimize
+from .model.lineup import as_set, compare, is_complete, optimize
 from .model.projections import PlayerProj, blend
 from .model.season import SeasonCtx
 from .model.sim import simulate
@@ -26,6 +26,8 @@ PACKET_VERSION = 6
 AMBIGUOUS = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE", "DAY_TO_DAY"}
 # ESPN and Sleeper spell one team differently; Sleeper's DEF projections are keyed by its own abbreviation.
 SLEEPER_TEAM = {"WSH": "WAS"}
+# Saturday, Sunday, Monday: the rival's lineup is the one he set, not the optimizer's guess (ESPN rolls the week Tuesday).
+LINEUP_SET_DAYS = {5, 6, 0}
 
 
 def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
@@ -116,8 +118,16 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
             opp_id = m["away"] if m["home"] == my_id else m["home"]
     strength = {tid: lineup_strength(ps, slots) for tid, ps in by_team.items()}
     opp_mu, opp_var = strength.get(opp_id, (None, None))
+    opp_lineup = None
     if opp_id:
-        opp_week = optimize(by_team[opp_id], slots, objective="ev")
+        # His lineup is set and visible in each player's `slot` from Saturday on (and whenever every starter slot is
+        # already filled); earlier in the week it is last week's carried over, so the optimizer is the better guess.
+        shown = as_set(by_team[opp_id], slots)
+        set_day = now is not None and now_dt.weekday() in LINEUP_SET_DAYS
+        if set_day or is_complete(shown, slots):
+            opp_week, opp_lineup = shown, "set"
+        else:
+            opp_week, opp_lineup = optimize(by_team[opp_id], slots, objective="ev"), "projected"
         opp_mu, opp_var = opp_week.mu, opp_week.var
 
     mine = by_team.get(my_id, [])
@@ -276,7 +286,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "faab_remaining": budget if s["faab"] else None,
         "waiver_rank": teams[my_id]["waiver_rank"] if my_id in teams else None,
         "opponent": {"team_id": opp_id, "name": teams[opp_id]["name"] if opp_id in teams else None, "mu": round(opp_mu, 1) if opp_mu else None,
-                     "sd": round(opp_var ** 0.5, 1) if opp_var else None},
+                     "sd": round(opp_var ** 0.5, 1) if opp_var else None, "lineup": opp_lineup},
         "roster": [enrich(p) for p in sorted(mine, key=lambda p: (-p.ev))],
         "current_lineup_mu": round(cur_mu, 1),
         "lineup_ev": ev_lu.to_dict(), "lineup_win": win_lu.to_dict(), "lineup_diff": compare(ev_lu, win_lu),
