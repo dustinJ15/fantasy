@@ -33,13 +33,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier A — bugs that distort every number today
 
-- [ ] **A5 (S, then M). P(win) lineups trade real points for unfitted variance with no threshold.**
-  `src/ff/model/lineup.py:102` benches a higher-EV player for any P(win) gain, even 0.001. Sigma is a guess
-  (`projections.py:14-16`) scaled by a FantasyPros rank-sd fudge (`:94-100`). Until variance is fitted, require
-  a minimum P(win) gain over the EV lineup (start at 1.5 percentage points) before deviating, and say the gain
-  on the lineup row. Then (A2 is done) fit `BASE_SIGMA` and `CV_FLOOR` per position from projlog residuals.
-  Done when: the demo and a real packet show `lineup_diff` only with a stated P(win) gain above the floor; a
-  test with a 0.3pp gain keeps the EV lineup.
+(none open)
 
 ## Tier B — checklist and ledger bugs
 
@@ -121,7 +115,9 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   from `model/usage.py` (computed, rendered nowhere, moves no number), and the weekly blend, with the
   preseason total as a prior that fades by week 6. This is ROADMAP item 1 and the only private edge; plan in
   `docs/plans/`.
-- [ ] **D2 (M). Fitted variance** per position from the projlog (fixed 2026-10-08: `ff accuracy` scores pre-kickoff forecasts against ESPN's actuals). Then A5's floor can come down.
+- [ ] **D2 (M). Fitted variance** per position from the projlog (fixed 2026-10-08: `ff accuracy` scores pre-kickoff
+  forecasts against ESPN's actuals): fit `BASE_SIGMA` and `CV_FLOOR` in `model/projections.py` from the residuals
+  (the "then M" half of the old A5). Then `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp since 2026-10-08) can come down.
 - [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
   (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
 - [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.

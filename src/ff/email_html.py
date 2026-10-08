@@ -305,7 +305,7 @@ def _league_detail(lg: dict) -> str:
                    f" · current ESPN lineup {lg['current_lineup_mu']}")
     body += _lineup_table(lg)
     if lg["lineup_diff"]:
-        body += _muted("Pure-points lineup differs: " + _e("; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"])), 12)
+        body += _muted(f"Pure-points lineup differs{_e(report.win_gain_note(lw))}: " + _e("; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"])), 12)
     body += _muted("Bench: " + _e(", ".join(lw["bench"])), 12)
 
     body += _h("Roster") + _muted("Wk = projected points this week · ROS = rest-of-season per game · Q/D = questionable/doubtful", 11)

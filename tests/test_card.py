@@ -72,6 +72,13 @@ def test_why_only_mentions_game_script_when_it_moved_a_slot():
     assert any("play it safe" in w for w in report.why_parts(lg))
 
 
+def test_why_states_the_p_win_gain_behind_a_lineup_that_leaves_points_on_the_bench():
+    lg = league(lineup_diff=[{"name": "Starter WR", "in": "win", "ev": 9.0, "sd": 6.0}])
+    lg["lineup_win"]["win_gain"] = 0.021
+    why = " ".join(report.why_parts(lg))
+    assert "not the highest-points lineup (+2.1 pp P(win))" in why
+
+
 # ---------- rows and rulings ----------
 
 def test_open_offers_show_up_as_a_row():

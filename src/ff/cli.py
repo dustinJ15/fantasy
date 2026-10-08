@@ -164,7 +164,7 @@ def lineup(league: str | None = LeagueOpt):
         for s, names in lw["slots"].items():
             rprint(f"  {s:10} {', '.join(names)}")
         if lg["lineup_diff"]:
-            rprint("[dim]diff vs E[points] lineup:[/]", lg["lineup_diff"])
+            rprint(f"[dim]diff vs E[points] lineup (+{(lw.get('win_gain') or 0) * 100:.1f} pp P(win)):[/]", lg["lineup_diff"])
 
 
 @app.command()

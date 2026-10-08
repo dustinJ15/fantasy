@@ -502,12 +502,19 @@ def why_parts(lg: dict) -> list[str]:
     # P(win) is already a badge at the top of the card. The game script only earns a line when it actually changed
     # something: that is exactly when the P(win) lineup differs from the plain highest-points one.
     if lg.get("lineup_diff") and lw.get("p_win") is not None and ph != "final":
-        why.append(game_script(lw["p_win"]) + ", so this is not the highest-points lineup")
+        why.append(game_script(lw["p_win"]) + ", so this is not the highest-points lineup" + win_gain_note(lw))
     return why
 
 
 def game_script(p_win: float) -> str:
     return "underdog, favor upside" if p_win < 0.42 else ("favorite, play it safe" if p_win > 0.58 else "coin flip")
+
+
+def win_gain_note(lw: dict) -> str:
+    """The P(win) the recommended lineup buys over the highest-points one, as ' (+2.1 pp P(win))'; empty when the
+    packet has no number (an older packet, or no opponent)."""
+    g = lw.get("win_gain")
+    return f" (+{g * 100:.1f} pp P(win))" if g else ""
 
 
 def watchlist(packet: dict) -> list[dict]:
@@ -769,7 +776,7 @@ def render_detail(packet: dict) -> str:
         for slot, names in lw["slots"].items():
             L.append(f"- {slot}: {', '.join(names)}")
         if lg["lineup_diff"]:
-            L.append(f"Differs from the pure-points lineup ({le['mu']}): " + "; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"]))
+            L.append(f"Differs from the pure-points lineup ({le['mu']}){win_gain_note(lw)}: " + "; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"]))
         L.append("")
         L.append(f"Bench: {', '.join(lw['bench'])}")
 

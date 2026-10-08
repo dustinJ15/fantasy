@@ -7,6 +7,12 @@ from math import erf, sqrt
 
 from .projections import PlayerProj
 
+# The P(win) lineup may bench a higher-points player only when it buys at least this much P(win) over the
+# highest-points lineup. Sigma is a positional guess (`projections.BASE_SIGMA`, `CV_FLOOR`) scaled by a
+# FantasyPros rank-sd fudge, not a fitted number, so a 0.3pp edge from it is noise and the points are real. The floor
+# comes down once variance is fitted from the projlog residuals (TODO D2).
+MIN_WIN_GAIN = 0.015
+
 
 def phi(z: float) -> float:
     return 0.5 * (1 + erf(z / sqrt(2)))
@@ -24,12 +30,16 @@ class Lineup:
     var: float
     p_win: float | None
     bench: list[PlayerProj]
+    # P(win) bought over the highest-points lineup against the same opponent: 0.0 when this is that lineup (including
+    # when the search found a better P(win) but under MIN_WIN_GAIN), None when there was no P(win) search.
+    win_gain: float | None = None
 
     def to_dict(self) -> dict:
         return {
             "slots": {s: ([p.name for p in ps] or ["(EMPTY — no eligible player)"]) for s, ps in self.assignment.items()},
             "mu": round(self.mu, 2), "sd": round(self.var**0.5, 2),
             "p_win": round(self.p_win, 3) if self.p_win is not None else None,
+            "win_gain": round(self.win_gain, 3) if self.win_gain is not None else None,
             "bench": [p.name for p in self.bench],
         }
 
@@ -48,8 +58,14 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     """
     objective: 'ev' maximizes expected points; 'win' maximizes P(win) vs opponent; 'auto' = win if opponent known.
     Exact search over candidates: for each slot we consider the top-K eligible players by EV, then brute force.
+
+    A P(win) search is held to MIN_WIN_GAIN: when the best P(win) lineup beats the highest-points lineup by less than
+    that, the highest-points lineup is returned (with its P(win)) and `win_gain` reads 0.0.
     """
     use_win = objective == "win" or (objective == "auto" and opp_mu is not None)
+    if use_win and opp_mu is None:
+        use_win = False  # 'win' asked for with no opponent: nothing to beat, same as 'ev'
+    ev_lineup = optimize(players, lineup_slots, opp_mu, opp_var, objective="ev") if use_win else None
     slots = _expand_slots(lineup_slots)
     # Locked players (game started) can't move: pin locked starters to their current slot and drop locked bench.
     pinned: dict[str, list[PlayerProj]] = {}
@@ -69,7 +85,7 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     if not slots:
         pw = win_prob(pin_mu, pin_var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
         return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, pw,
-                      [p for p in players_all if p not in pin_list])
+                      [p for p in players_all if p not in pin_list], win_gain=0.0 if ev_lineup is not None else None)
     avail = [p for p in players if p.ev > 0 or p.mu > 0]
     # Candidate pool per slot: exact search over the top few eligible players. For the E[points]
     # objective the answer is nearly greedy, so a small pool is enough; the win-prob objective
@@ -104,6 +120,11 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     if best is None:
         return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, None, [p for p in players_all if p not in pin_list])
     score, mu, var, combo = best
+    if ev_lineup is not None:
+        gain = score - ev_lineup.p_win
+        if gain < MIN_WIN_GAIN:
+            ev_lineup.win_gain = 0.0
+            return ev_lineup
     assignment: dict[str, list[PlayerProj]] = {s_: list(ps) for s_, ps in pinned.items()}
     for s, p in _settle(slots, combo):
         assignment.setdefault(s, [])
@@ -112,7 +133,7 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     chosen = {p.espn_id for p in combo if p is not None} | {p.espn_id for p in pin_list}
     bench = [p for p in players_all if p.espn_id not in chosen]
     pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
-    return Lineup(assignment, mu, var, pw, bench)
+    return Lineup(assignment, mu, var, pw, bench, win_gain=pw - ev_lineup.p_win if ev_lineup is not None else None)
 
 
 def as_set(players: list[PlayerProj], lineup_slots: dict[str, int],
