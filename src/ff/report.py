@@ -132,6 +132,9 @@ def _drop_note(lg: dict, name: str, exclude: set[str] = frozenset()) -> str:
     return out
 
 
+_COUNT_WORD = {2: "two", 3: "three", 4: "four"}  # how many more bodies a half-covered cap cut still owes
+
+
 class _Spots:
     """The roster-spot ledger for one league's checklist: every add needs a spot, every spot is spent once.
 
@@ -185,20 +188,30 @@ class _Spots:
             excess = {pos: after[pos] - cap for pos, cap in self.caps.items() if after[pos] > cap}
         else:
             excess = dict(Counter(d["pos"] for d in named))
-        drops, stuck = [], []
+        drops, found, short = [], [], {}  # found: positions with at least one named cut; short: bodies still owed per position
         for pos, n in excess.items():
             excl = self.reserved | set(self.dropped) | set(drops) | set(t.get("give") or [])
             pool = list(dict.fromkeys([d["name"] for d in named if d["pos"] == pos and d["name"] not in excl]
                                       + [p for p in _drop_order(self.lg, excl) if self.pos_of.get(p) == pos]))
             drops += pool[:n]
+            if pool:
+                found.append(pos)
             if len(pool) < n:
-                stuck.append(pos)
+                short[pos] = n - len(pool)
         cap = lambda pos: f"ESPN caps {pos} at {self.caps.get(pos)}"  # noqa: E731
         parts = []
         if drops:
-            parts.append(f"drop {', '.join(drops)} in the trade screen ({'; '.join(cap(p) for p in excess if p not in stuck)})")
-        for pos in stuck:
-            parts.append(f"{cap(pos)} and there is no obvious {pos} to drop, your call")
+            # The cap note names every position a cut was found for, including one the bench only half covers (B11:
+            # filtering it out as `stuck` printed "()" and then said nobody was found right after naming him).
+            part = f"drop {', '.join(drops)} in the trade screen ({'; '.join(cap(p) for p in found)})"
+            owed = [f"one more {pos} has to go" if k == 1 else f"{_COUNT_WORD.get(k, str(k))} more {pos}s have to go"
+                    for pos, k in short.items() if pos in found]
+            if owed:
+                part += f" and {', '.join(owed)}, your call"
+            parts.append(part)
+        for pos in short:
+            if pos not in found:
+                parts.append(f"{cap(pos)} and there is no obvious {pos} to drop, your call")
         return drops, ("; " + "; ".join(parts)) if parts else ""
 
 

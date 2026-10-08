@@ -43,13 +43,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   `docs/plans/trade-acceptance.md` open question 3: probe `mTransactions2` (or the activity feed) for a terminal
   status on a cancelled proposal; if one is readable, close the entry as `withdrawn` from it.
 
-- [ ] **B11 (XS). A half-filled cap cut prints empty parentheses and contradicts itself.** `report._Spots.cut`: when a
-  trade pushes a position two over the cap and only one body there can be dropped (a 2-for-1 bringing two WRs onto a
-  roster at the cap with one bench WR), the row reads "drop Bench WR in the trade screen (); ESPN caps WR at 3 and
-  there is no obvious WR to drop, your call": the cap note is filtered out because the position is also `stuck`, and
-  the second clause says nobody was found right after naming one. Say "drop X in the trade screen (ESPN caps WR at 3)
-  and one more WR has to go, your call". Found writing E3 (2026-10-08); the E3 test pins only the clean `stuck` case.
-
 ## Tier C — operations
 
 - [ ] **C1 (S). The projlog push step fails as written.** `scripts/cloud_setup.sh:31-33` restores

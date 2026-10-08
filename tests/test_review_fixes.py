@@ -200,6 +200,35 @@ def test_a_cap_with_nobody_to_drop_says_your_call_instead_of_naming_a_cut():
     assert by_id(ir_wr)["trade:wr-in"]["drops"] == []
 
 
+def test_a_cap_cut_the_bench_only_half_covers_names_the_drop_and_says_one_more_has_to_go():
+    """B11: a 2-for-1 brings two WRs onto a roster at the WR cap with one bench WR. The ledger finds one body and is
+    short one; the row must name the body with its cap note and say one more has to go, not print empty parentheses
+    and then claim nobody was found."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("WR Two", slot="WR"), player("Bench WR", ros=3.0),
+                        player("RB Two", pos="RB", ros=5.0)],
+                lineup_win={"slots": {"WR": ["Starter WR", "WR Two"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                settings={"lineup_slots": {"RB": 2, "WR": 2}, "position_limits": {"WR": 3}},
+                trades=[{**trade(["WR In", "WR Also"], ["RB Two"]), "get_pos": ["WR", "WR"], "drops": []}])
+    spots = report._Spots(lg, 0, set())
+    drops, cut = spots.cut(lg["trades"][0])
+    assert drops == ["Bench WR"]
+    assert cut == "; drop Bench WR in the trade screen (ESPN caps WR at 3) and one more WR has to go, your call"
+    assert "()" not in cut and "no obvious" not in cut
+    assert spots.dropped == [] and spots.counts["WR"] == 3  # trade rows are alternatives: nothing spent on the ledger
+    row = by_id(lg)["trade:wr-in-wr-also"]
+    assert row["drops"] == ["Bench WR"]
+    assert row["text"] == ("offer Rival your RB Two for WR In, WR Also (+1.5 pts/wk for you, +0.5 for them)"
+                           "; drop Bench WR in the trade screen (ESPN caps WR at 3) and one more WR has to go, your call")
+    # two short: the count is spelled out and the position is plural
+    lg2 = league(roster=[player("Starter WR", slot="WR"), player("WR Two", slot="WR"), player("Bench WR", ros=3.0),
+                         player("RB Two", pos="RB", ros=5.0)],
+                 lineup_win={"slots": {"WR": ["Starter WR", "WR Two"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                 settings={"lineup_slots": {"RB": 2, "WR": 2}, "position_limits": {"WR": 3}},
+                 trades=[{**trade(["WR In", "WR Also", "WR Three"], ["RB Two"]), "get_pos": ["WR", "WR", "WR"], "drops": []}])
+    assert report._Spots(lg2, 0, set()).cut(lg2["trades"][0]) == (
+        ["Bench WR"], "; drop Bench WR in the trade screen (ESPN caps WR at 3) and two more WRs have to go, your call")
+
+
 # ---------- claim vs add ----------
 
 def test_a_player_on_waivers_is_a_claim_with_the_priority_spelled_out():
