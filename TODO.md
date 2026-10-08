@@ -37,9 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B8 (XS). A skipped hold loses its strike in the HTML.** `src/ff/email_html.py:199` strips `~~` from
-  `hold_line`, the only skip marker on holds; the markdown keeps it, the email does not.
-
 - [ ] **B10 (XS, needs a live ESPN pull). An in-app withdrawal still reads `declined`.** `rulings.record_outcomes`
   (B5, 2026-10-08) tells a counter, a voided proposal and a lapse from a decline by the roster, the pending list and
   the clock, but an offer I cancel in the app with my roster unchanged leaves no trace in `mPendingTransactions`.

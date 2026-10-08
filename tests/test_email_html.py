@@ -122,3 +122,27 @@ def test_title_odds_are_not_in_the_action_card(monkeypatch):
     p = _packet(monkeypatch)
     html = render_email(p, {})
     assert "Playoffs" in html and "Title" not in html
+
+
+def test_a_skipped_hold_is_struck_through_in_the_html(monkeypatch):
+    """B8: `~~` is the only skip marker a hold carries. The markdown keeps it; the email used to strip it and print
+    the hold as if Claude had agreed with it."""
+    p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    lg["injuries"] = [{"name": "Backup Bench", "pos": "WR", "verdict": "hold", "weeks_out": 3, "back_eff": 4.0,
+                       "mu_ros_active": 9.0, "hold_value": 36.0, "return_week": 8, "why": []}]
+    holds = [t for t in report.todos(lg) if t["kind"] == "hold"]
+    assert len(holds) == 1, "the fixture should carry exactly one hold row to rule on"
+    reads = {"L9": {"items": {holds[0]["id"]: {"verdict": "skip", "note": "he was cut on Tuesday"}}}}
+    html = render_email(p, reads)
+    md = report.render(p, reads=reads)
+    assert "~~Backup Bench (WR)" in md  # the markdown strikes the hold
+    assert "~~" not in html  # no raw markdown in the email
+    at = html.index("Holding:")
+    line = html[at:html.index("</div>", at)]
+    assert "line-through" in line, "the skipped hold renders as a plain hold in the email"
+    assert escape("he was cut on Tuesday") in line
+    # a hold that is not skipped stays plain
+    plain = render_email(p, {})
+    at = plain.index("Holding:")
+    assert "line-through" not in plain[at:plain.index("</div>", at)]

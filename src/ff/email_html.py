@@ -196,8 +196,19 @@ def _todo_rows(lg: dict, r: dict) -> tuple[str, bool]:
     html = f'<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">{"".join(rows)}</table>'
     if holds:
         # Not steps: the hurt players staying put, one muted line under the list so the sequence above stays clean.
-        html += _muted("Holding: " + "; ".join(_e(report.hold_line(h)).replace("~~", "") for h in holds))
+        html += _muted("Holding: " + "; ".join(_hold(h) for h in holds))
     return html, attached
+
+
+def _hold(h: dict) -> str:
+    """One hold in the footnote. A skip is the only ruling a hold can carry, and `~~` is how `report.hold_line` marks it;
+    here the strike is the same line-through the checklist rows use, with Claude's note after it, not stripped (B8)."""
+    text = _e(h["text"])
+    if h.get("ruling") == "skip":
+        text = f'<span style="text-decoration:line-through">{text}</span>'
+    if h.get("ruling_note"):
+        text += f" ({_e(h['ruling_note'])})"
+    return text
 
 
 def _phase(lg: dict) -> str:
