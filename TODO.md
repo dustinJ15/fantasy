@@ -53,8 +53,10 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   HTML into the Gmail tool and check `wc -c`. `ff email` already exists (`src/ff/mail.py`); give the cloud env
   `GMAIL_USER`/`GMAIL_APP_PASSWORD` and make the skill call it, with the paste as the fallback.
 
-- [ ] **C6 (XS). Sleeper's week can differ from ESPN's on Monday and Tuesday.** `packet.py:313` fetches
-  Sleeper projections for `sleeper.state().week`; ESPN's `current_week` rolls Tuesday. Use the league's week.
+- [ ] **C8 (XS). `ff accuracy` scores up to Sleeper's week, not the league's.** Found while fixing C6 (2026-10-08):
+  `cli.py` `accuracy` passes `sleeper.state().get("week", 1)` to `projlog.accuracy` as the current week. The packet no
+  longer reads Sleeper's clock anywhere; the harness should take the week from the newest log row (or a `--week`
+  flag), so a Monday run does not score the week in progress, or skip the one just finished.
 
 - [ ] **C7 (XS, needs Dustin). `leagues.toml` is committed on the `projlog` branch.** Found while fixing C1
   (2026-10-08): `origin/projlog` commit `850834e` (2026-09-14) added the whole working tree, `leagues.toml` included,

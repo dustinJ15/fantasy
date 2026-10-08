@@ -302,6 +302,17 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     }
 
 
+def _sleeper_projections(season: int, week: int) -> dict:
+    """Sleeper's weekly projections for the week the league is pricing; empty when the week is unknown or Sleeper is down
+    (the blend then runs on ESPN and FantasyPros alone, as before)."""
+    if not week:
+        return {}
+    try:
+        return sleeper.projections(season, week)
+    except Exception:
+        return {}
+
+
 def build(only: str | None = None, overrides_path: str | None = None, force: bool = False, sims: int = 3000) -> dict:
     e = env()
     overrides = json.load(open(overrides_path)) if overrides_path else None
@@ -323,12 +334,11 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     else:
         usage_err = None
     # ESPN's un-parameterised scoreboard stays on last week until Tuesday night (fantasy leagues roll Tuesday morning),
-    # so always ask for the league's week; otherwise the clock locks every player as already played.
+    # so always ask for the league's week; otherwise the clock locks every player as already played. Sleeper's
+    # `/state/nfl` week rolls on its own clock, so on Monday and Tuesday it can differ from ESPN's `current_week`:
+    # the Sleeper projections are fetched for the league's week too, the one `apply_clock` and `week_state` price.
     lines_by_week: dict[int, dict] = {}
-    try:
-        sl_proj = sleeper.projections(e.season, sleeper.state().get("week", 1))
-    except Exception:
-        sl_proj = {}
+    sl_proj_by_week: dict[int, dict] = {}
 
     skips, pushes, outcomes, ir_moves = load_skips(), load_pushes(), load_outcomes(), load_ir_moves()
     league_blocks, watch, injured, exposure = [], [], [], defaultdict(list)
@@ -337,7 +347,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
         wk = int(snap.get("week") or 0)
         if wk not in lines_by_week:
             lines_by_week[wk] = vegas.implied_totals(wk or None)
-        lines = lines_by_week[wk]
+            sl_proj_by_week[wk] = _sleeper_projections(e.season, wk)
+        lines, sl_proj = lines_by_week[wk], sl_proj_by_week[wk]
         blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines,
                              now=datetime.now(UTC), skips=skips, pushes=pushes, offer_history=history(outcomes, ref.name),
                              ir_moves=ir_moves)
