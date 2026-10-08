@@ -37,10 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B3 (S). A remembered push stays "do this one" after the math stops supporting it.**
-  `report.py:415-423` never re-checks `sendable` on a remembered math push, and `push_line` still says "too
-  good to let slide". Drop a math-sourced push whose row is no longer `sendable`; keep Claude-sourced pushes.
-
 - [ ] **B4 (S). Pushes reopen the morning after a decline.** `src/ff/rulings.py:106-118`: once the sent offer
   leaves `pending_trades`, a `sent` push with `closed != today` falls through to a new `open`. A `sent` or
   `skipped` push should stay closed for `SKIP_DAYS` unless Claude rules `push` again.

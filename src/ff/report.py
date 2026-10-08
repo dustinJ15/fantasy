@@ -416,12 +416,16 @@ def todos(lg: dict) -> list[dict]:
     # Dustin sends it or skips it with a reason), then the rest, three rows in all unless the pushes need more.
     # One push at a time: a remembered one first (Claude's, or the math's from an earlier morning), else the biggest
     # gain the math flags today. Two pushes that ship the same player would be alternatives, not a to-do list.
-    remembered = [t for t in lg["trades"] if t.get("pushed")]
+    # A math push is only as good as this morning's math: once the row stops being `sendable` (a rival move left me
+    # overpaying at market, or the package no longer helps him) the memory does not keep it at "do this one". Claude's
+    # push carries his note as the reason and stays until he sends or skips it.
+    remembered = [t for t in lg["trades"] if t.get("pushed") and ((t["pushed"] or {}).get("source") == "claude" or sendable(t))]
     flagged = sorted([t for t in lg["trades"] if t.get("must_try")], key=lambda t: -t["my_delta_ppw"])
     pushed = (remembered or flagged)[:1]
     for t in lg["trades"]:
         if t not in pushed:
             t["must_try"] = False  # the card's word is final: rulings memory only records the row that was pushed
+            t.pop("pushed", None)
     # No "reach" row: an offer only he would decline is not a thing to do today, and printing one anyway taught the
     # card to nag about packages nobody takes.
     worth = pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(TRADE_ROWS - len(pushed), 0)]

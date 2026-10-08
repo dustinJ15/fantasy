@@ -296,3 +296,25 @@ def test_only_one_package_is_pushed_at_a_time_and_alternatives_are_not_both_push
     trades = [big("Star", give=("A",), mine=2.5), big("Other", give=("A",), mine=2.2)]
     rows = by_id(league(trades=trades))
     assert rows["trade:star"]["push"] and not rows["trade:other"]["push"]
+
+
+def test_a_remembered_math_push_drops_when_the_row_stops_being_sendable():
+    """B3: the math pushed Star on Monday; by Wednesday a rival move left the package underwater at market value
+    (`sendable` False). The row must not stay "do this one" on the strength of the memory; a Claude push keeps."""
+    def stale():
+        return {**big("Star", mine=2.5), "sendable": False, "must_try": False,
+                "pushed": {"since": "2026-10-06", "days": 3, "note": None, "source": "math"}}
+    t = stale()
+    rows = by_id(league(trades=[t, {**big("Meh", mine=1.0), "must_try": False}]))
+    assert "trade:star" not in rows and not rows["trade:meh"]["push"]
+    assert "pushed" not in t  # the card's word is final: the dropped memory does not ride on as a push
+    # the same morning the math flags a different package, that one is pushed instead
+    rows = by_id(league(trades=[stale(), big("Fresh", give=("B",), mine=2.4)]))
+    assert "trade:star" not in rows and rows["trade:fresh"]["push"] and "first ask" in rows["trade:fresh"]["text"]
+    # a math push that is still sendable keeps its place and its day count
+    rows = by_id(league(trades=[{**stale(), "sendable": True}]))
+    assert rows["trade:star"]["push"] and "asked 3 mornings running" in rows["trade:star"]["text"]
+    # Claude's push survives the math turning: his note is the reason, not the lineup gain
+    claude = {**stale(), "my_delta_ppw": 0.5, "pushed": {"since": "2026-10-06", "days": 3, "note": "Allen wins leagues", "source": "claude"}}
+    rows = by_id(league(trades=[claude]))
+    assert rows["trade:star"]["push"] and "Allen wins leagues" in rows["trade:star"]["text"] and "asked 3 mornings running" in rows["trade:star"]["text"]
