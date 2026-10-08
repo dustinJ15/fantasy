@@ -45,9 +45,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier C — operations
 
-- [ ] **C3 (XS). The poller has blind spots.** `.github/workflows/trade-poll.yml:59-60` skips Monday and UTC
-  hours 0-11 with a 6h window; evening offers (prime trade time in Denver) wait for the morning briefing.
-
 - [ ] **C4 (XS, routine settings). The briefing cron drifts and the Sunday run is early.** `0 12 * * *` UTC is
   6 AM Denver only during DST; after 2026-11-01 it is 5 AM. Sunday's lineup check at 6 AM MT predates the
   11:30 ET inactives. Use `CRON_TZ=America/Denver` and add a Sunday 9:45 MT run (ops.local.md, not the repo).

@@ -6,8 +6,11 @@
 # it has not fired before (ids are persisted with actions/cache, so a wide window never causes duplicate
 # emails). The morning briefing is the final net: it lists every still-pending offer.
 #
-# The schedule is a plain hourly cron; in-season and skip-Monday logic is a shell guard in the first step,
-# because GitHub rejects month/day lists mixed with ranges and its scheduler often runs late.
+# The schedule is a plain hourly cron; the in-season / quiet-hours gate is scripts/trade_poll_gate.py (Denver
+# time, tested in tests/test_trade_poll_gate.py), because GitHub rejects month/day lists mixed with ranges and its
+# scheduler often runs late. Scheduled runs poll Sep-Jan, every weekday, except 1-5 AM Denver; the 6 AM briefing
+# covers the small hours. Until 2026-10-08 the gate skipped Monday and UTC hours 0-11, which was every Denver
+# evening from 6 PM MDT on (TODO C3).
 #
 # The window is 6h, not the hour the cron asks for, because GitHub does not honor the cron on a quiet repo:
 # observed scheduled runs land roughly 3h apart (16:32, 19:44, 22:40 UTC on 2026-09-18). A 75-minute window
@@ -30,20 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Decide whether to run (in season, not Monday, waking hours; manual runs always run)
-        id: gate
-        run: |
-          month=$(date -u +%-m); dow=$(date -u +%u); hour=$(date -u +%-H)
-          run=true
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            case "$month" in 9|10|11|12|1) ;; *) run=false ;; esac   # season: Sep-Jan
-            [ "$dow" = "1" ] && run=false                              # Monday: nothing to react to
-            [ "$hour" -lt 12 ] && run=false                            # before 6 AM Denver
-          fi
-          echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "month=$month dow=$dow hour=$hour run=$run"
       - uses: actions/checkout@v4
-        if: steps.gate.outputs.run == 'true'
+      - name: Decide whether to run (in season, not 1-5 AM Denver; manual runs always run)
+        id: gate
+        run: python3 scripts/trade_poll_gate.py --event "${{ github.event_name }}"
       - uses: astral-sh/setup-uv@v5
         if: steps.gate.outputs.run == 'true'
         with:

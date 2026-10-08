@@ -63,7 +63,11 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   decides what is new. The trigger id and fire token live only in the script's Script Properties (nothing in the repo).
   Backstop: `.github/workflows/trade-poll.yml` runs `ff incoming --new-since 6h` in season, dedupes by offer id via
   `actions/cache`, and fires the same routine. The cron asks for hourly but GitHub delivers roughly every 3h on a quiet
-  repo, so the window is deliberately wider than the cadence; overlap is free because ids are deduped.
+  repo, so the window is deliberately wider than the cadence; overlap is free because ids are deduped. Whether a
+  scheduled run polls is `scripts/trade_poll_gate.py` (stdlib, Denver time, `tests/test_trade_poll_gate.py`): Sep-Jan,
+  every weekday, every hour but 1-5 AM Denver, so an evening offer is seen within the cadence instead of waiting for
+  the briefing (the gate skipped Monday and UTC 0-11, every Denver evening, until 2026-10-08). `python3
+  scripts/trade_poll_gate.py --now <ISO>` answers "would it have polled then".
   GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
 - MLB pregame alerts (baseball, same env): step 0 of the briefing skill runs `python3 scripts/mlb_pregame.py`, which reads
   MLB's schedule and prints one one-shot spec (name, `run_once_at` = first pitch minus `LEAD_MIN`, prompt) per first pitch
