@@ -45,12 +45,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier C — operations
 
-- [ ] **C2 (S). The Gmail doorbell can miss a second proposal in the same thread.**
-  `scripts/gmail_trade_doorbell.gs:25` searches `-label:ff-alerted`, `:137` labels the thread, `:110` fires only
-  on the newest message. ESPN's subject is identical each time, so a second proposal threads under an already
-  labelled one and is never seen. Dedupe per message id (Script Properties or a message-level marker) and add a
-  two-messages-in-one-thread case to `gmail_trade_doorbell.test.js`.
-
 - [ ] **C3 (XS). The poller has blind spots.** `.github/workflows/trade-poll.yml:59-60` skips Monday and UTC
   hours 0-11 with a 6h window; evening offers (prime trade time in Denver) wait for the morning briefing.
 

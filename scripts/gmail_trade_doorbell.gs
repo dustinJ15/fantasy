@@ -13,6 +13,12 @@
  *   - a fire that keeps being rejected (rotated token, deleted routine) emails you directly,
  *     because nobody reads an Executions log
  *
+ * What has been handled is decided per *message id*, never by the label. ESPN's subject is the same
+ * for every proposal, so a second one threads under the first; Gmail labels are per thread, and a
+ * search that excluded the label would never see the second message. The search therefore finds
+ * every proposal thread of the last two hours, and the fired-id record (Script Properties, pruned
+ * after FIRED_IDS_TTL_MS) says which messages are new. The label is only a marker for you.
+ *
  * No secrets live in this file. Set two Script Properties (Project Settings > Script Properties):
  *   FF_TRADE_ROUTINE_ID   the routine's trigger id
  *   FF_ROUTINE_FIRE_TOKEN the routine's API fire token
@@ -21,8 +27,9 @@
 
 var LABEL_NAME = 'ff-alerted';
 var MAX_THREADS = 5;
-var SEARCH =
-  'from:fantasy@espnmail.com subject:"Trade Proposal" newer_than:2h -label:' + LABEL_NAME;
+// No `-label:` clause: the label is per thread, and a second proposal in a handled thread would
+// be invisible to it. Dedupe is per message id (firedIds_), so re-seeing a thread is free.
+var SEARCH = 'from:fantasy@espnmail.com subject:"Trade Proposal" newer_than:2h';
 
 // Retries for transient Google faults ("a server error occurred", Gmail backend hiccups).
 var RETRY_ATTEMPTS = 3;
@@ -36,8 +43,11 @@ var FAILED_RUNS_BEFORE_ALARM = 5;
 var FIRE_FAILURES_BEFORE_EMAIL = 3;
 var ESCALATION_COOLDOWN_MS = 60 * 60 * 1000;
 
-// Message ids already fired, kept so a failed label write cannot double-alert.
-var FIRED_IDS_KEPT = 50;
+// Message ids already fired: the dedupe record (a second proposal in the same thread is a new id)
+// and the guard that a failed label write cannot double-alert. Kept a few days, well past the
+// search window, and capped, so the Script Properties footprint stays bounded.
+var FIRED_IDS_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+var FIRED_IDS_KEPT = 200;
 
 var PROP_FAILED_RUNS = 'ff_failed_runs';
 var PROP_FIRE_FAILURES = 'ff_fire_failures';
@@ -101,43 +111,63 @@ function handleThread_(thread, label, props, routineId, token) {
   });
   if (messages.length === 0) {
     // Thread matched on an older message; nothing new to announce.
-    withRetry_('label write', function () {
-      thread.addLabel(label);
-      return true;
-    });
     return;
   }
-  var msg = messages[messages.length - 1];
-  var messageId = msg.getId();
-  var subject = msg.getSubject();
-  var date = msg.getDate().toISOString();
+  var fired = firedIds_(props);
+  var unseen = messages.filter(function (m) {
+    return !fired.hasOwnProperty(m.getId());
+  });
+  var subject = messages[messages.length - 1].getSubject();
+  var date = messages[messages.length - 1].getDate().toISOString();
 
-  if (alreadyFired_(props, messageId)) {
-    // Fired on an earlier run; only the label write was left undone.
-    withRetry_('label write', function () {
-      thread.addLabel(label);
-      return true;
-    });
-    console.log('Already fired for "' + subject + '" (' + date + '); label repaired.');
+  if (unseen.length === 0) {
+    // Every proposal here was fired on an earlier run. Only a label write that failed then is left.
+    if (!hasLabel_(thread, label)) {
+      withRetry_('label write', function () {
+        thread.addLabel(label);
+        return true;
+      });
+      console.log('Already fired for "' + subject + '" (' + date + '); label repaired.');
+    }
     return;
   }
 
-  var result = fireRoutine_(routineId, token, subject, date);
+  // One fire per thread per run: the routine re-reads every pending offer in ESPN, so two proposals
+  // that arrived in the same minute need one doorbell, not two emails saying the same thing.
+  var newest = unseen[unseen.length - 1];
+  var result = fireRoutine_(routineId, token, newest.getSubject(), newest.getDate().toISOString());
   if (!result.ok) {
     var inARow = recordFireOutcome_(props, false);
     console.log('Fire failed (' + inARow + ' in a row) for "' + subject + '": ' + result.detail);
     maybeEscalate_(props, inARow, subject, result.detail);
-    return; // No label, so the next run tries this proposal again.
+    return; // Nothing recorded, so the next run tries this proposal again.
   }
   recordFireOutcome_(props, true);
   // Recorded before the label write: if labeling throws, the next run repairs the label
   // instead of firing a second alert for the same proposal.
-  rememberFiredId_(props, messageId);
+  rememberFiredIds_(
+    props,
+    unseen.map(function (m) {
+      return m.getId();
+    })
+  );
   withRetry_('label write', function () {
     thread.addLabel(label);
     return true;
   });
-  console.log('Fired routine for "' + subject + '" (' + date + '); labeled ' + LABEL_NAME + '.');
+  console.log(
+    'Fired routine for "' + subject + '" (' + date + ', ' + unseen.length + ' new message' +
+      (unseen.length === 1 ? '' : 's') + '); labeled ' + LABEL_NAME + '.'
+  );
+}
+
+function hasLabel_(thread, label) {
+  var labels = withRetry_('label read', function () {
+    return thread.getLabels();
+  });
+  return labels.some(function (l) {
+    return l.getName() === label.getName();
+  });
 }
 
 function isProposal_(message) {
@@ -235,27 +265,60 @@ function bumpCounter_(props, key, ok) {
   return next;
 }
 
-function alreadyFired_(props, messageId) {
-  return firedIds_(props).indexOf(messageId) !== -1;
-}
-
+/**
+ * The fired-id record: {messageId: firedAtMs}. Entries older than FIRED_IDS_TTL_MS are dropped on
+ * read, and the newest FIRED_IDS_KEPT are kept on write. An older record (a plain array of ids)
+ * is read as fired just now, so an upgrade never re-alerts.
+ */
 function firedIds_(props) {
   var raw = props.getProperty(PROP_FIRED_IDS);
   if (!raw) {
-    return [];
+    return {};
   }
+  var parsed;
   try {
-    var ids = JSON.parse(raw);
-    return Array.isArray(ids) ? ids : [];
+    parsed = JSON.parse(raw);
   } catch (err) {
-    return [];
+    return {};
   }
+  var now = Date.now();
+  var ids = {};
+  if (Array.isArray(parsed)) {
+    parsed.forEach(function (id) {
+      ids[String(id)] = now;
+    });
+    return ids;
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return {};
+  }
+  Object.keys(parsed).forEach(function (id) {
+    var at = Number(parsed[id]);
+    if (at && now - at < FIRED_IDS_TTL_MS) {
+      ids[id] = at;
+    }
+  });
+  return ids;
 }
 
-function rememberFiredId_(props, messageId) {
+function rememberFiredIds_(props, messageIds) {
   var ids = firedIds_(props);
-  ids.push(messageId);
-  props.setProperty(PROP_FIRED_IDS, JSON.stringify(ids.slice(-FIRED_IDS_KEPT)));
+  var now = Date.now();
+  messageIds.forEach(function (id) {
+    ids[id] = now;
+  });
+  var keys = Object.keys(ids);
+  if (keys.length > FIRED_IDS_KEPT) {
+    keys
+      .sort(function (a, b) {
+        return ids[a] - ids[b];
+      })
+      .slice(0, keys.length - FIRED_IDS_KEPT)
+      .forEach(function (id) {
+        delete ids[id];
+      });
+  }
+  props.setProperty(PROP_FIRED_IDS, JSON.stringify(ids));
 }
 
 /**
