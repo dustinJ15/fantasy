@@ -1,6 +1,6 @@
 {
- "version": 4,
- "generated": "2026-09-18T18:16:07",
+ "version": 6,
+ "generated": "2026-10-08T19:53:34",
  "season": 2026,
  "demo": true,
  "shared": {
@@ -9,6 +9,44 @@
   "trending_adds": [],
   "usage_error": null,
   "unmatched_ids": [],
+  "injured": [
+   {
+    "name": "Malik Okafor",
+    "pos": "RB",
+    "team": "KC",
+    "league": "demo",
+    "espn_id": 104,
+    "espn_status": "OUT",
+    "sleeper_status": null,
+    "sleeper_roster_status": null,
+    "body_part": null,
+    "notes": null,
+    "weeks_out": 1.0,
+    "weeks_out_source": "default",
+    "return_week": 6,
+    "mu_ros_active": 2.44,
+    "slot": "BE",
+    "override_note": null
+   },
+   {
+    "name": "Grady Sorensen",
+    "pos": "WR",
+    "team": "DAL",
+    "league": "demo",
+    "espn_id": 109,
+    "espn_status": "INJURY_RESERVE",
+    "sleeper_status": "IR",
+    "sleeper_roster_status": "Injured Reserve",
+    "body_part": "Knee",
+    "notes": "Placed on IR (knee); eligible to return in four weeks",
+    "weeks_out": 4,
+    "weeks_out_source": "default",
+    "return_week": 9,
+    "mu_ros_active": 5.14,
+    "slot": "BE",
+    "override_note": null
+   }
+  ],
   "pending_trades_error": null,
   "incoming_trade_count": 1
  },
@@ -36,7 +74,31 @@
      15,
      16
     ],
-    "ppr": 1.0
+    "ppr": 1.0,
+    "reg_season_weeks": 14,
+    "ir_slots": 1,
+    "bench_slots": 6,
+    "trade_deadline_ms": 0,
+    "position_limits": {
+     "QB": 4,
+     "RB": 8,
+     "WR": 8,
+     "TE": 3,
+     "K": 3,
+     "D/ST": 3
+    },
+    "waiver_order": "rolling"
+   },
+   "trade_deadline_iso": null,
+   "trades_closed": false,
+   "playoff_weight": {
+    "weeks": [
+     15,
+     16
+    ],
+    "weight": 1.464,
+    "playoff_pct": 97.6,
+    "mult": 1.5
    },
    "my_team_id": 1,
    "my_record": "4-0",
@@ -70,8 +132,9 @@
    "opponent": {
     "team_id": 4,
     "name": "Bye Week Blues",
-    "mu": 70.0,
-    "sd": 14.5
+    "mu": 72.3,
+    "sd": 16.0,
+    "lineup": "projected"
    },
    "roster": [
     {
@@ -84,33 +147,52 @@
      ],
      "fantasy_team_id": 1,
      "slot": "BE",
-     "mu": 13.6,
-     "sigma": 4.2,
+     "mu": 16.0,
+     "sigma": 4.8,
      "p_zero": 0.02,
-     "mu_ros": 15.85,
+     "mu_ros": 16.0,
      "bye": false,
      "sources": {
       "fp_pts": null,
-      "espn_pts": 13.6,
+      "espn_pts": 16.0,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 16.0,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 2,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "ACTIVE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "fp:B"
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
-     "ev": 13.33,
-     "sd": 4.57,
+     "weeks_out": 0.0,
+     "avail_ros": 1.0,
+     "mu_ros_active": 16.0,
+     "return_week": null,
+     "bye_weeks": [
+      9
+     ],
+     "ev": 15.68,
+     "sd": 5.25,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -129,28 +211,47 @@
      "mu": 11.4,
      "sigma": 5.7,
      "p_zero": 0.02,
-     "mu_ros": 13.31,
+     "mu_ros": 11.41,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 11.4,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 11.41,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 1,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": null,
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "fp:B"
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.0,
+     "avail_ros": 1.0,
+     "mu_ros_active": 11.41,
+     "return_week": null,
+     "bye_weeks": [
+      7
+     ],
      "ev": 11.17,
      "sd": 5.86,
      "usage": null,
@@ -170,28 +271,47 @@
      "mu": 11.1,
      "sigma": 5.0,
      "p_zero": 0.02,
-     "mu_ros": 12.98,
+     "mu_ros": 11.12,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 11.1,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 11.12,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 1,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "ACTIVE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "fp:B"
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.0,
+     "avail_ros": 1.0,
+     "mu_ros_active": 11.12,
+     "return_week": null,
+     "bye_weeks": [
+      7
+     ],
      "ev": 10.88,
      "sd": 5.19,
      "usage": null,
@@ -212,21 +332,32 @@
      "mu": 14.7,
      "sigma": 6.62,
      "p_zero": 0.3,
-     "mu_ros": 17.14,
+     "mu_ros": 14.32,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 14.7,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 14.69,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 1,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "QUESTIONABLE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "espn:QUESTIONABLE",
@@ -234,7 +365,15 @@
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.3,
+     "avail_ros": 0.975,
+     "mu_ros_active": 14.69,
+     "return_week": null,
+     "bye_weeks": [
+      11
+     ],
      "ev": 10.29,
      "sd": 8.72,
      "usage": null,
@@ -254,21 +393,32 @@
      "mu": 19.4,
      "sigma": 5.82,
      "p_zero": 0.5,
-     "mu_ros": 22.62,
+     "mu_ros": 18.57,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 19.4,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 19.38,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 1,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "QUESTIONABLE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": "Q, DNP Friday; beat writer says game-time decision (demo)"
+      "waiver_status": null,
+      "override_note": "Q, DNP Friday; beat writer says game-time decision (demo)",
+      "weeks_out_source": "default"
      },
      "flags": [
       "espn:QUESTIONABLE",
@@ -277,7 +427,15 @@
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.5,
+     "avail_ros": 0.958,
+     "mu_ros_active": 19.38,
+     "return_week": null,
+     "bye_weeks": [
+      7
+     ],
      "ev": 9.7,
      "sd": 10.54,
      "usage": null,
@@ -298,21 +456,32 @@
      "mu": 13.5,
      "sigma": 6.75,
      "p_zero": 0.3,
-     "mu_ros": 15.73,
+     "mu_ros": 13.15,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 13.5,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 13.49,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 2,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "QUESTIONABLE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "espn:QUESTIONABLE",
@@ -320,52 +489,17 @@
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.3,
+     "avail_ros": 0.975,
+     "mu_ros_active": 13.49,
+     "return_week": null,
+     "bye_weeks": [
+      9
+     ],
      "ev": 9.45,
      "sd": 8.38,
-     "usage": null,
-     "market": null,
-     "odds_line": null
-    },
-    {
-     "espn_id": 110,
-     "name": "Reggie Lindqvist",
-     "pos": "TE",
-     "team": "GB",
-     "eligible": [
-      "TE",
-      "RB/WR/TE"
-     ],
-     "fantasy_team_id": 1,
-     "slot": "TE",
-     "mu": 12.3,
-     "sigma": 6.77,
-     "p_zero": 0.3,
-     "mu_ros": 14.35,
-     "bye": false,
-     "sources": {
-      "fp_pts": null,
-      "espn_pts": 12.3,
-      "sleeper_pts": null,
-      "implied_total": null,
-      "ecr": 10,
-      "fp_sd": 2.0,
-      "grade": "B",
-      "espn_status": "QUESTIONABLE",
-      "sleeper_status": null,
-      "sleeper_notes": null,
-      "percent_owned": 90.0,
-      "override_note": null
-     },
-     "flags": [
-      "espn:QUESTIONABLE",
-      "fp:B"
-     ],
-     "locked": false,
-     "actual": null,
-     "sigma_ros": null,
-     "ev": 8.61,
-     "sd": 7.99,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -384,21 +518,32 @@
      "mu": 9.89,
      "sigma": 4.94,
      "p_zero": 0.3,
-     "mu_ros": 10.05,
+     "mu_ros": 8.4,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 8.6,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 8.61,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 3,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "QUESTIONABLE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": "named the starter after the trade; expect a full workload (demo)"
+      "waiver_status": null,
+      "override_note": "named the starter after the trade; expect a full workload (demo)",
+      "weeks_out_source": "default"
      },
      "flags": [
       "espn:QUESTIONABLE",
@@ -407,51 +552,17 @@
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.3,
+     "avail_ros": 0.975,
+     "mu_ros_active": 8.61,
+     "return_week": null,
+     "bye_weeks": [
+      11
+     ],
      "ev": 6.92,
      "sd": 6.13,
-     "usage": null,
-     "market": null,
-     "odds_line": null
-    },
-    {
-     "espn_id": 109,
-     "name": "Grady Sorensen",
-     "pos": "WR",
-     "team": "DAL",
-     "eligible": [
-      "WR",
-      "RB/WR/TE"
-     ],
-     "fantasy_team_id": 1,
-     "slot": "BE",
-     "mu": 5.1,
-     "sigma": 3.9,
-     "p_zero": 0.02,
-     "mu_ros": 5.97,
-     "bye": false,
-     "sources": {
-      "fp_pts": null,
-      "espn_pts": 5.1,
-      "sleeper_pts": null,
-      "implied_total": null,
-      "ecr": 10,
-      "fp_sd": 2.0,
-      "grade": "B",
-      "espn_status": "ACTIVE",
-      "sleeper_status": null,
-      "sleeper_notes": null,
-      "percent_owned": 90.0,
-      "override_note": null
-     },
-     "flags": [
-      "fp:B"
-     ],
-     "locked": false,
-     "actual": null,
-     "sigma_ros": null,
-     "ev": 5.0,
-     "sd": 3.93,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -470,21 +581,32 @@
      "mu": 6.5,
      "sigma": 3.9,
      "p_zero": 0.3,
-     "mu_ros": 7.56,
+     "mu_ros": 6.32,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 6.5,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 6.49,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 2,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "QUESTIONABLE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "espn:QUESTIONABLE",
@@ -492,7 +614,15 @@
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.3,
+     "avail_ros": 0.975,
+     "mu_ros_active": 6.49,
+     "return_week": null,
+     "bye_weeks": [
+      7
+     ],
      "ev": 4.55,
      "sd": 4.42,
      "usage": null,
@@ -512,30 +642,111 @@
      "mu": 4.6,
      "sigma": 3.3,
      "p_zero": 0.02,
-     "mu_ros": 5.39,
+     "mu_ros": 4.62,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 4.6,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 4.62,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 1,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": null,
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "fp:B"
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.0,
+     "avail_ros": 1.0,
+     "mu_ros_active": 4.62,
+     "return_week": null,
+     "bye_weeks": [
+      11
+     ],
      "ev": 4.51,
      "sd": 3.33,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 110,
+     "name": "Reggie Lindqvist",
+     "pos": "TE",
+     "team": "GB",
+     "eligible": [
+      "TE",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "TE",
+     "mu": 6.0,
+     "sigma": 3.3,
+     "p_zero": 0.3,
+     "mu_ros": 5.85,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 6.0,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 6.0,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 1,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "QUESTIONABLE",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
+      "percent_owned": 90.0,
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
+     },
+     "flags": [
+      "espn:QUESTIONABLE",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "mu_pre": null,
+     "sigma_ros": null,
+     "weeks_out": 0.3,
+     "avail_ros": 0.975,
+     "mu_ros_active": 6.0,
+     "return_week": null,
+     "bye_weeks": [
+      7
+     ],
+     "ev": 4.2,
+     "sd": 3.9,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -554,21 +765,32 @@
      "mu": 4.5,
      "sigma": 3.9,
      "p_zero": 0.3,
-     "mu_ros": 5.28,
+     "mu_ros": 4.41,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 4.5,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 4.52,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 4,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "QUESTIONABLE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "espn:QUESTIONABLE",
@@ -576,51 +798,17 @@
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.3,
+     "avail_ros": 0.975,
+     "mu_ros_active": 4.52,
+     "return_week": null,
+     "bye_weeks": [
+      9
+     ],
      "ev": 3.15,
      "sd": 3.86,
-     "usage": null,
-     "market": null,
-     "odds_line": null
-    },
-    {
-     "espn_id": 104,
-     "name": "Malik Okafor",
-     "pos": "RB",
-     "team": "KC",
-     "eligible": [
-      "RB",
-      "RB/WR/TE"
-     ],
-     "fantasy_team_id": 1,
-     "slot": "BE",
-     "mu": 2.4,
-     "sigma": 3.9,
-     "p_zero": 0.02,
-     "mu_ros": 2.82,
-     "bye": false,
-     "sources": {
-      "fp_pts": null,
-      "espn_pts": 2.4,
-      "sleeper_pts": null,
-      "implied_total": null,
-      "ecr": 10,
-      "fp_sd": 2.0,
-      "grade": "B",
-      "espn_status": "ACTIVE",
-      "sleeper_status": null,
-      "sleeper_notes": null,
-      "percent_owned": 90.0,
-      "override_note": null
-     },
-     "flags": [
-      "fp:B"
-     ],
-     "locked": false,
-     "actual": null,
-     "sigma_ros": null,
-     "ev": 2.35,
-     "sd": 3.88,
      "usage": null,
      "market": null,
      "odds_line": null
@@ -639,36 +827,180 @@
      "mu": 1.0,
      "sigma": 3.0,
      "p_zero": 0.02,
-     "mu_ros": 1.17,
+     "mu_ros": 1.0,
      "bye": false,
      "sources": {
       "fp_pts": null,
       "espn_pts": 1.0,
       "sleeper_pts": null,
       "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 1.0,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 2,
       "ecr": 10,
       "fp_sd": 2.0,
       "grade": "B",
       "espn_status": "ACTIVE",
       "sleeper_status": null,
       "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
       "percent_owned": 90.0,
-      "override_note": null
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
      },
      "flags": [
       "fp:B"
      ],
      "locked": false,
      "actual": null,
+     "mu_pre": null,
      "sigma_ros": null,
+     "weeks_out": 0.0,
+     "avail_ros": 1.0,
+     "mu_ros_active": 1.0,
+     "return_week": null,
+     "bye_weeks": [
+      7
+     ],
      "ev": 0.98,
      "sd": 2.97,
      "usage": null,
      "market": null,
      "odds_line": null
+    },
+    {
+     "espn_id": 104,
+     "name": "Malik Okafor",
+     "pos": "RB",
+     "team": "KC",
+     "eligible": [
+      "RB",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 2.4,
+     "sigma": 3.9,
+     "p_zero": 1.0,
+     "mu_ros": 2.23,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 2.4,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 2.44,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 3,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "OUT",
+      "sleeper_status": null,
+      "sleeper_notes": null,
+      "sleeper_roster_status": null,
+      "body_part": null,
+      "percent_owned": 90.0,
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
+     },
+     "flags": [
+      "espn:OUT",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "mu_pre": null,
+     "sigma_ros": null,
+     "weeks_out": 1.0,
+     "avail_ros": 0.917,
+     "mu_ros_active": 2.44,
+     "return_week": 6,
+     "bye_weeks": [
+      9
+     ],
+     "ev": 0.0,
+     "sd": 0.0,
+     "usage": null,
+     "market": null,
+     "odds_line": null
+    },
+    {
+     "espn_id": 109,
+     "name": "Grady Sorensen",
+     "pos": "WR",
+     "team": "DAL",
+     "eligible": [
+      "WR",
+      "RB/WR/TE"
+     ],
+     "fantasy_team_id": 1,
+     "slot": "BE",
+     "mu": 0.0,
+     "sigma": 3.9,
+     "p_zero": 1.0,
+     "mu_ros": 3.43,
+     "bye": false,
+     "sources": {
+      "fp_pts": null,
+      "espn_pts": 0.0,
+      "sleeper_pts": null,
+      "implied_total": null,
+      "wind_mph": null,
+      "weather_mult": 1.0,
+      "espn_pg": 5.14,
+      "ytd_pg": null,
+      "games_played": 0,
+      "actual_prev": null,
+      "pos_rank": 4,
+      "ecr": 10,
+      "fp_sd": 2.0,
+      "grade": "B",
+      "espn_status": "INJURY_RESERVE",
+      "sleeper_status": "IR",
+      "sleeper_notes": "Placed on IR (knee); eligible to return in four weeks",
+      "sleeper_roster_status": "Injured Reserve",
+      "body_part": "Knee",
+      "percent_owned": 90.0,
+      "waiver_status": null,
+      "override_note": null,
+      "weeks_out_source": "default"
+     },
+     "flags": [
+      "espn:INJURY_RESERVE",
+      "sleeper:IR (Knee)",
+      "fp:B"
+     ],
+     "locked": false,
+     "actual": null,
+     "mu_pre": null,
+     "sigma_ros": null,
+     "weeks_out": 4,
+     "avail_ros": 0.667,
+     "mu_ros_active": 5.14,
+     "return_week": 9,
+     "bye_weeks": [
+      11
+     ],
+     "ev": 0.0,
+     "sd": 0.0,
+     "usage": null,
+     "market": null,
+     "odds_line": null
     }
    ],
-   "current_lineup_mu": 69.2,
+   "current_lineup_mu": 64.7,
    "lineup_ev": {
     "slots": {
      "K": [
@@ -686,18 +1018,19 @@
      ],
      "WR": [
       "Omar Lindqvist",
-      "Nico Vell"
+      "Silas Pennington"
      ],
      "D/ST": [
       "Packers D/ST"
      ],
      "RB/WR/TE": [
-      "Silas Pennington"
+      "Nico Vell"
      ]
     },
-    "mu": 79.71,
-    "sd": 18.99,
+    "mu": 77.65,
+    "sd": 17.85,
     "p_win": null,
+    "win_gain": null,
     "bench": [
      "Cole Ibarra",
      "Malik Okafor",
@@ -732,9 +1065,10 @@
       "Nico Vell"
      ]
     },
-    "mu": 79.71,
-    "sd": 18.99,
-    "p_win": 0.658,
+    "mu": 77.65,
+    "sd": 17.85,
+    "p_win": 0.588,
+    "win_gain": 0.0,
     "bench": [
      "Cole Ibarra",
      "Malik Okafor",
@@ -745,36 +1079,63 @@
    },
    "lineup_diff": [],
    "replacement": {
-    "QB": 15.85,
-    "RB": 8.88,
-    "WR": 5.8,
-    "TE": 8.9,
-    "K": 9.78,
-    "D/ST": 5.39
+    "QB": 15.6,
+    "RB": 7.42,
+    "WR": 4.77,
+    "TE": 7.62,
+    "K": 8.39,
+    "D/ST": 4.62
    },
    "waivers": [
+    {
+     "espn_id": 238,
+     "name": "Jermaine Vell",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 11.9,
+     "mu_ros": 11.88,
+     "delta_over_starter": 6.03,
+     "slot": "TE",
+     "delta_week": 7.46,
+     "week_slot": "TE",
+     "vorp": 4.26,
+     "bid": 29,
+     "score": 42.71,
+     "streamer": false,
+     "why": [
+      "START NOW: +7.5 this week at TE",
+      "+6.0/wk over your TE",
+      "VORP 4.3",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
     {
      "espn_id": 232,
      "name": "Jaxon Bassett",
      "pos": "RB",
      "team": "GB",
      "mu_week": 11.8,
-     "mu_ros": 13.78,
-     "delta_over_starter": 6.22,
+     "mu_ros": 11.81,
+     "delta_over_starter": 5.49,
      "slot": "RB",
      "delta_week": 7.01,
      "week_slot": "RB",
-     "vorp": 4.9,
+     "vorp": 4.39,
      "bid": 29,
-     "score": 43.88,
+     "score": 40.28,
      "streamer": false,
      "why": [
       "START NOW: +7.0 this week at RB",
-      "+6.2/wk over your RB",
-      "VORP 4.9",
+      "+5.5/wk over your RB",
+      "VORP 4.4",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 245,
@@ -782,91 +1143,24 @@
      "pos": "RB",
      "team": "GB",
      "mu_week": 11.1,
-     "mu_ros": 12.98,
-     "delta_over_starter": 5.42,
+     "mu_ros": 11.12,
+     "delta_over_starter": 4.8,
      "slot": "RB",
      "delta_week": 6.33,
      "week_slot": "RB",
-     "vorp": 4.1,
+     "vorp": 3.7,
      "bid": 29,
-     "score": 38.92,
+     "score": 35.82,
      "streamer": false,
      "why": [
       "START NOW: +6.3 this week at RB",
-      "+5.4/wk over your RB",
-      "VORP 4.1",
+      "+4.8/wk over your RB",
+      "VORP 3.7",
       "fp:B"
      ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 238,
-     "name": "Jermaine Vell",
-     "pos": "TE",
-     "team": "GB",
-     "mu_week": 11.9,
-     "mu_ros": 13.86,
-     "delta_over_starter": 0.55,
-     "slot": "RB/WR/TE",
-     "delta_week": 4.74,
-     "week_slot": "RB/WR/TE",
-     "vorp": 4.96,
-     "bid": 7,
-     "score": 22.43,
-     "streamer": false,
-     "why": [
-      "START NOW: +4.7 this week at RB/WR/TE",
-      "+0.6/wk over your RB/WR/TE",
-      "VORP 5.0",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 221,
-     "name": "Tyrek Stroud",
-     "pos": "RB",
-     "team": "GB",
-     "mu_week": 8.3,
-     "mu_ros": 9.68,
-     "delta_over_starter": 2.12,
-     "slot": "RB",
-     "delta_week": 3.58,
-     "week_slot": "RB",
-     "vorp": 0.8,
-     "bid": 19,
-     "score": 18.57,
-     "streamer": false,
-     "why": [
-      "START NOW: +3.6 this week at RB",
-      "+2.1/wk over your RB",
-      "VORP 0.8",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 224,
-     "name": "Darius Bassett",
-     "pos": "RB",
-     "team": "GB",
-     "mu_week": 8.2,
-     "mu_ros": 9.55,
-     "delta_over_starter": 1.99,
-     "slot": "RB",
-     "delta_week": 3.49,
-     "week_slot": "RB",
-     "vorp": 0.67,
-     "bid": 17,
-     "score": 17.81,
-     "streamer": false,
-     "why": [
-      "START NOW: +3.5 this week at RB",
-      "+2.0/wk over your RB",
-      "VORP 0.7",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 218,
@@ -874,66 +1168,24 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 9.8,
-     "mu_ros": 11.4,
-     "delta_over_starter": -1.91,
-     "slot": "RB/WR/TE",
-     "delta_week": 2.68,
-     "week_slot": "RB/WR/TE",
-     "vorp": 2.5,
-     "bid": 3,
-     "score": 12.98,
+     "mu_ros": 9.78,
+     "delta_over_starter": 3.93,
+     "slot": "TE",
+     "delta_week": 5.4,
+     "week_slot": "TE",
+     "vorp": 2.16,
+     "bid": 29,
+     "score": 29.14,
      "streamer": false,
      "why": [
-      "START NOW: +2.7 this week at RB/WR/TE",
-      "+10.2/wk over worst bench",
-      "VORP 2.5",
+      "START NOW: +5.4 this week at TE",
+      "+3.9/wk over your TE",
+      "VORP 2.2",
       "fp:B"
      ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 234,
-     "name": "Kwame Brandt",
-     "pos": "WR",
-     "team": "GB",
-     "mu_week": 8.4,
-     "mu_ros": 9.8,
-     "delta_over_starter": -0.25,
-     "slot": "WR",
-     "delta_week": 1.31,
-     "week_slot": "RB/WR/TE",
-     "vorp": 4.0,
-     "bid": 3,
-     "score": 10.94,
-     "streamer": false,
-     "why": [
-      "+8.6/wk over worst bench",
-      "VORP 4.0",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 227,
-     "name": "Xavier Duquesne",
-     "pos": "RB",
-     "team": "GB",
-     "mu_week": 6.6,
-     "mu_ros": 7.71,
-     "delta_over_starter": 0.15,
-     "slot": "RB",
-     "delta_week": 1.92,
-     "week_slot": "RB",
-     "vorp": -1.17,
-     "bid": 3,
-     "score": 7.56,
-     "streamer": false,
-     "why": [
-      "START NOW: +1.9 this week at RB",
-      "+0.1/wk over your RB",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 251,
@@ -941,64 +1193,74 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 8.1,
-     "mu_ros": 9.42,
-     "delta_over_starter": -3.89,
-     "slot": "RB/WR/TE",
-     "delta_week": 1.01,
-     "week_slot": "RB/WR/TE",
-     "vorp": 0.52,
-     "bid": 3,
-     "score": 6.66,
+     "mu_ros": 8.08,
+     "delta_over_starter": 2.23,
+     "slot": "TE",
+     "delta_week": 3.74,
+     "week_slot": "TE",
+     "vorp": 0.46,
+     "bid": 19,
+     "score": 18.17,
      "streamer": false,
      "why": [
-      "+8.2/wk over worst bench",
+      "START NOW: +3.7 this week at TE",
+      "+2.2/wk over your TE",
       "VORP 0.5",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
-     "espn_id": 242,
-     "name": "Rico Duquesne",
-     "pos": "WR",
-     "team": "GB",
-     "mu_week": 7.0,
-     "mu_ros": 8.17,
-     "delta_over_starter": -1.88,
-     "slot": "WR",
-     "delta_week": 0.0,
-     "week_slot": "",
-     "vorp": 2.37,
-     "bid": 3,
-     "score": 5.87,
-     "streamer": false,
-     "why": [
-      "+7.0/wk over worst bench",
-      "VORP 2.4",
-      "fp:B"
-     ],
-     "percent_owned": 20.0
-    },
-    {
-     "espn_id": 246,
-     "name": "Quincy Vanterpool",
+     "espn_id": 221,
+     "name": "Tyrek Stroud",
      "pos": "RB",
      "team": "GB",
-     "mu_week": 4.3,
-     "mu_ros": 5.04,
-     "delta_over_starter": -2.52,
+     "mu_week": 8.3,
+     "mu_ros": 8.3,
+     "delta_over_starter": 1.98,
      "slot": "RB",
-     "delta_week": 0.0,
-     "week_slot": "",
-     "vorp": -3.84,
-     "bid": 3,
-     "score": 1.94,
+     "delta_week": 3.58,
+     "week_slot": "RB",
+     "vorp": 0.88,
+     "bid": 17,
+     "score": 17.63,
      "streamer": false,
      "why": [
-      "+3.9/wk over worst bench",
+      "START NOW: +3.6 this week at RB",
+      "+2.0/wk over your RB",
+      "VORP 0.9",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 224,
+     "name": "Darius Bassett",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 8.2,
+     "mu_ros": 8.19,
+     "delta_over_starter": 1.87,
+     "slot": "RB",
+     "delta_week": 3.49,
+     "week_slot": "RB",
+     "vorp": 0.77,
+     "bid": 17,
+     "score": 16.95,
+     "streamer": false,
+     "why": [
+      "START NOW: +3.5 this week at RB",
+      "+1.9/wk over your RB",
+      "VORP 0.8",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 219,
@@ -1006,20 +1268,23 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 7.6,
-     "mu_ros": 8.9,
-     "delta_over_starter": -4.41,
-     "slot": "RB/WR/TE",
-     "delta_week": 0.52,
-     "week_slot": "RB/WR/TE",
+     "mu_ros": 7.62,
+     "delta_over_starter": 1.77,
+     "slot": "TE",
+     "delta_week": 3.25,
+     "week_slot": "TE",
      "vorp": 0.0,
-     "bid": 3,
-     "score": 1.04,
+     "bid": 17,
+     "score": 15.12,
      "streamer": false,
      "why": [
-      "+7.7/wk over worst bench",
+      "START NOW: +3.2 this week at TE",
+      "+1.8/wk over your TE",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 225,
@@ -1027,20 +1292,166 @@
      "pos": "TE",
      "team": "GB",
      "mu_week": 7.6,
-     "mu_ros": 8.86,
-     "delta_over_starter": -4.45,
-     "slot": "RB/WR/TE",
-     "delta_week": 0.52,
-     "week_slot": "RB/WR/TE",
-     "vorp": -0.04,
-     "bid": 3,
-     "score": 1.04,
+     "mu_ros": 7.6,
+     "delta_over_starter": 1.75,
+     "slot": "TE",
+     "delta_week": 3.25,
+     "week_slot": "TE",
+     "vorp": -0.02,
+     "bid": 15,
+     "score": 15.05,
      "streamer": false,
      "why": [
-      "+7.7/wk over worst bench",
+      "START NOW: +3.2 this week at TE",
+      "+1.8/wk over your TE",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 216,
+     "name": "Andre Rutherford",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 7.1,
+     "mu_ros": 7.12,
+     "delta_over_starter": 1.27,
+     "slot": "TE",
+     "delta_week": 2.76,
+     "week_slot": "TE",
+     "vorp": -0.5,
+     "bid": 13,
+     "score": 12.39,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.8 this week at TE",
+      "+1.3/wk over your TE",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 240,
+     "name": "Marcus Nakamura",
+     "pos": "TE",
+     "team": "GB",
+     "mu_week": 7.1,
+     "mu_ros": 7.08,
+     "delta_over_starter": 1.23,
+     "slot": "TE",
+     "delta_week": 2.76,
+     "week_slot": "TE",
+     "vorp": -0.54,
+     "bid": 11,
+     "score": 12.25,
+     "streamer": false,
+     "why": [
+      "START NOW: +2.8 this week at TE",
+      "+1.2/wk over your TE",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 234,
+     "name": "Kwame Brandt",
+     "pos": "WR",
+     "team": "GB",
+     "mu_week": 8.4,
+     "mu_ros": 8.4,
+     "delta_over_starter": 0.0,
+     "slot": "RB/WR/TE",
+     "delta_week": 1.31,
+     "week_slot": "RB/WR/TE",
+     "vorp": 3.63,
+     "bid": 3,
+     "score": 9.95,
+     "streamer": false,
+     "why": [
+      "+7.4/wk over worst bench",
+      "VORP 3.6",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 227,
+     "name": "Xavier Duquesne",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 6.6,
+     "mu_ros": 6.61,
+     "delta_over_starter": 0.29,
+     "slot": "RB",
+     "delta_week": 1.92,
+     "week_slot": "RB",
+     "vorp": -0.81,
+     "bid": 5,
+     "score": 7.51,
+     "streamer": false,
+     "why": [
+      "START NOW: +1.9 this week at RB",
+      "+0.3/wk over your RB",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 242,
+     "name": "Rico Duquesne",
+     "pos": "WR",
+     "team": "GB",
+     "mu_week": 7.0,
+     "mu_ros": 7.0,
+     "delta_over_starter": -1.4,
+     "slot": "RB/WR/TE",
+     "delta_week": 0.0,
+     "week_slot": "",
+     "vorp": 2.23,
+     "bid": 3,
+     "score": 5.23,
+     "streamer": false,
+     "why": [
+      "+6.0/wk over worst bench",
+      "VORP 2.2",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
+    },
+    {
+     "espn_id": 246,
+     "name": "Quincy Vanterpool",
+     "pos": "RB",
+     "team": "GB",
+     "mu_week": 4.3,
+     "mu_ros": 4.31,
+     "delta_over_starter": -2.01,
+     "slot": "RB",
+     "delta_week": 0.0,
+     "week_slot": "",
+     "vorp": -3.11,
+     "bid": 3,
+     "score": 1.65,
+     "streamer": false,
+     "why": [
+      "+3.3/wk over worst bench",
+      "fp:B"
+     ],
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 249,
@@ -1048,22 +1459,24 @@
      "pos": "D/ST",
      "team": "GB",
      "mu_week": 7.2,
-     "mu_ros": 8.41,
-     "delta_over_starter": 3.02,
+     "mu_ros": 7.21,
+     "delta_over_starter": 2.59,
      "slot": "D/ST",
      "delta_week": 2.55,
      "week_slot": "D/ST",
-     "vorp": 3.02,
+     "vorp": 2.59,
      "bid": 3,
-     "score": 3.02,
+     "score": 2.59,
      "streamer": true,
      "why": [
       "START NOW: +2.5 this week at D/ST",
-      "+3.0/wk over your D/ST",
-      "VORP 3.0",
+      "+2.6/wk over your D/ST",
+      "VORP 2.6",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 215,
@@ -1071,22 +1484,24 @@
      "pos": "D/ST",
      "team": "GB",
      "mu_week": 6.3,
-     "mu_ros": 7.34,
-     "delta_over_starter": 1.95,
+     "mu_ros": 6.29,
+     "delta_over_starter": 1.67,
      "slot": "D/ST",
      "delta_week": 1.67,
      "week_slot": "D/ST",
-     "vorp": 1.95,
+     "vorp": 1.67,
      "bid": 3,
-     "score": 1.95,
+     "score": 1.67,
      "streamer": true,
      "why": [
       "START NOW: +1.7 this week at D/ST",
-      "+1.9/wk over your D/ST",
-      "VORP 2.0",
+      "+1.7/wk over your D/ST",
+      "VORP 1.7",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     },
     {
      "espn_id": 241,
@@ -1094,22 +1509,24 @@
      "pos": "D/ST",
      "team": "GB",
      "mu_week": 6.3,
-     "mu_ros": 7.32,
-     "delta_over_starter": 1.93,
+     "mu_ros": 6.28,
+     "delta_over_starter": 1.66,
      "slot": "D/ST",
      "delta_week": 1.67,
      "week_slot": "D/ST",
-     "vorp": 1.93,
+     "vorp": 1.66,
      "bid": 3,
-     "score": 1.93,
+     "score": 1.67,
      "streamer": true,
      "why": [
       "START NOW: +1.7 this week at D/ST",
-      "+1.9/wk over your D/ST",
-      "VORP 1.9",
+      "+1.7/wk over your D/ST",
+      "VORP 1.7",
       "fp:B"
      ],
-     "percent_owned": 20.0
+     "percent_owned": 20.0,
+     "on_waivers": false,
+     "kickoff_day": null
     }
    ],
    "handcuffs": [
@@ -1117,7 +1534,7 @@
      "starter": "Deon Castellano",
      "handcuff": "Rico Pennington",
      "owner_team_id": 2,
-     "est_value": 0.48
+     "est_value": 0.4
     },
     {
      "starter": "Jalen Haggerty",
@@ -1131,247 +1548,568 @@
      "rival_team_id": 4,
      "rival": "Bye Week Blues",
      "give": [
-      "Omar Lindqvist",
-      "Grady Sorensen"
+      "Nico Vell"
      ],
      "get": [
-      "Dontae Rutherford"
+      "Darius Solano"
      ],
-     "my_delta_ppw": 0.81,
-     "their_delta_ppw": 2.18,
-     "market_give": 0,
-     "market_get": 0,
+     "my_delta_ppw": 2.08,
+     "their_delta_ppw": -0.53,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "TE"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
      "market_ratio": null,
-     "sendable": true,
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.458,
+     "accept_word": "coin flip",
+     "accept_why": [
+      "it starts for him",
+      "I ask for a player he starts today",
+      "he is out of it and sellers go quiet"
+     ],
+     "rival_after": [
+      {
+       "pos": "TE",
+       "starters": [
+        {
+         "name": "Jermaine Vell",
+         "wire": true,
+         "ppg": 11.9
+        }
+       ]
+      }
+     ],
+     "after_line": "he'd start Jermaine Vell (the wire) at TE after",
+     "sendable": false,
+     "must_try": false,
      "why": [
-      "fills my RB hole",
-      "fills their WR hole",
-      "consolidates value for them"
+      "they start Darius Solano today",
+      "fills my TE hole",
+      "fills their WR hole"
      ],
-     "score": 3.09,
-     "my_title_delta": 1.4,
-     "their_title_delta": 0.1
-    },
-    {
-     "rival_team_id": 6,
-     "rival": "Ctrl+Alt+Delete Kelce",
-     "give": [
-      "Cole Ibarra",
-      "Jalen Haggerty"
-     ],
-     "get": [
-      "Kai Tremblay"
-     ],
-     "my_delta_ppw": 1.11,
-     "their_delta_ppw": 2.72,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": true,
-     "why": [
-      "fills my RB hole",
-      "fills their QB hole",
-      "leaves me no backup QB",
-      "consolidates value for them"
-     ],
-     "score": 3.02,
-     "my_title_delta": 1.9,
-     "their_title_delta": 0.1
+     "score": 0.953,
+     "fallback": {
+      "give": [
+       "Beau Whitlock"
+      ],
+      "p_accept": 0.573,
+      "my_delta_ppw": 1.04,
+      "text": "if he says no, offer Beau Whitlock instead (coin flip)"
+     },
+     "my_title_delta": 7.3,
+     "their_title_delta": -0.1
     },
     {
      "rival_team_id": 4,
      "rival": "Bye Week Blues",
      "give": [
-      "Jalen Haggerty",
-      "Grady Sorensen"
-     ],
-     "get": [
-      "Xavier Vell"
-     ],
-     "my_delta_ppw": 1.7,
-     "their_delta_ppw": 1.29,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": true,
-     "why": [
-      "fills my RB hole",
-      "fills their RB hole",
-      "fills their WR hole",
-      "consolidates value for them"
-     ],
-     "score": 2.64,
-     "my_title_delta": 3.2,
-     "their_title_delta": 0.0
-    },
-    {
-     "rival_team_id": 6,
-     "rival": "Ctrl+Alt+Delete Kelce",
-     "give": [
-      "Cole Ibarra",
-      "Jalen Haggerty"
-     ],
-     "get": [
-      "Omar Duquesne"
-     ],
-     "my_delta_ppw": 2.59,
-     "their_delta_ppw": 1.24,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": true,
-     "why": [
-      "fills my RB hole",
-      "fills their QB hole",
-      "leaves me no backup QB",
-      "consolidates value for them"
-     ],
-     "score": 2.28
-    },
-    {
-     "rival_team_id": 3,
-     "rival": "Waiver Wire Widows",
-     "give": [
-      "Jalen Haggerty",
-      "Grady Sorensen"
-     ],
-     "get": [
-      "Tanner Pruitt"
-     ],
-     "my_delta_ppw": 2.23,
-     "their_delta_ppw": 0.0,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": true,
-     "why": [
-      "fills my RB hole",
-      "consolidates value for them"
-     ],
-     "score": 1.61
-    },
-    {
-     "rival_team_id": 8,
-     "rival": "Punt Return Policy",
-     "give": [
-      "Omar Lindqvist",
-      "Jalen Haggerty"
-     ],
-     "get": [
-      "Landon Farrow"
-     ],
-     "my_delta_ppw": 0.82,
-     "their_delta_ppw": 0.36,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": true,
-     "why": [
-      "fills their RB hole",
-      "consolidates value for them"
-     ],
-     "score": 1.27
-    },
-    {
-     "rival_team_id": 8,
-     "rival": "Punt Return Policy",
-     "give": [
-      "Cole Ibarra",
-      "Jalen Haggerty"
-     ],
-     "get": [
-      "Rico Sorensen"
-     ],
-     "my_delta_ppw": 1.24,
-     "their_delta_ppw": -0.06,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": false,
-     "why": [
-      "fills their RB hole",
-      "consolidates value for them"
-     ],
-     "score": 1.06
-    },
-    {
-     "rival_team_id": 3,
-     "rival": "Waiver Wire Widows",
-     "give": [
-      "Jalen Haggerty"
-     ],
-     "get": [
-      "Dontae Marchetti"
-     ],
-     "my_delta_ppw": 2.03,
-     "their_delta_ppw": 0.0,
-     "market_give": 0,
-     "market_get": 0,
-     "market_ratio": null,
-     "sendable": true,
-     "why": [
-      "fills my RB hole"
-     ],
-     "score": 1.02
-    },
-    {
-     "rival_team_id": 6,
-     "rival": "Ctrl+Alt+Delete Kelce",
-     "give": [
-      "Beau Whitlock",
       "Nico Vell"
      ],
      "get": [
-      "Tobias Osei"
+      "Dontae Rutherford",
+      "Tobias Farrow"
      ],
-     "my_delta_ppw": 4.08,
-     "their_delta_ppw": -0.25,
-     "market_give": 0,
-     "market_get": 0,
+     "my_delta_ppw": 1.85,
+     "their_delta_ppw": -0.46,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "RB",
+      "TE"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
      "market_ratio": null,
-     "sendable": false,
-     "why": [
-      "fills their QB hole",
-      "fills their WR hole",
-      "leaves me no backup QB",
-      "consolidates value for them"
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.458,
+     "accept_word": "coin flip",
+     "accept_why": [
+      "it starts for him",
+      "I ask for a player he starts today",
+      "he is out of it and sellers go quiet"
      ],
-     "score": 1.0
+     "rival_after": [
+      {
+       "pos": "RB",
+       "starters": [
+        {
+         "name": "Jaxon Bassett",
+         "wire": true,
+         "ppg": 11.8
+        },
+        {
+         "name": "Landon Marchetti",
+         "wire": true,
+         "ppg": 11.1
+        }
+       ]
+      },
+      {
+       "pos": "TE",
+       "starters": [
+        {
+         "name": "Darius Solano",
+         "wire": false,
+         "ppg": 13.0
+        },
+        {
+         "name": "Jermaine Vell",
+         "wire": true,
+         "ppg": 11.9
+        }
+       ]
+      }
+     ],
+     "after_line": "he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB; Darius Solano, Jermaine Vell (the wire) at TE after",
+     "sendable": false,
+     "must_try": false,
+     "why": [
+      "they start Dontae Rutherford today",
+      "fills my RB hole",
+      "fills my TE hole",
+      "fills their WR hole"
+     ],
+     "score": 0.849,
+     "fallback": {
+      "give": [
+       "Beau Whitlock"
+      ],
+      "p_accept": 0.573,
+      "my_delta_ppw": 0.81,
+      "text": "if he says no, offer Beau Whitlock instead (coin flip)"
+     },
+     "my_title_delta": 11.7,
+     "their_title_delta": -0.2
     },
     {
-     "rival_team_id": 5,
-     "rival": "Gronk's Ghost",
+     "rival_team_id": 4,
+     "rival": "Bye Week Blues",
      "give": [
-      "Silas Pennington",
-      "Grady Sorensen"
+      "Beau Whitlock"
      ],
      "get": [
-      "Dontae Castellano"
+      "Darius Solano",
+      "Dontae Rutherford"
      ],
-     "my_delta_ppw": 1.29,
-     "their_delta_ppw": -0.41,
-     "market_give": 0,
-     "market_get": 0,
+     "my_delta_ppw": 2.16,
+     "their_delta_ppw": 0.95,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "TE",
+      "RB"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
      "market_ratio": null,
-     "sendable": false,
-     "why": [
-      "fills my RB hole",
-      "rival is losing (motivated)",
-      "consolidates value for them"
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.43,
+     "accept_word": "coin flip",
+     "accept_why": [
+      "it starts for him",
+      "I ask for a player he starts today",
+      "it is his weakest slot",
+      "he is out of it and sellers go quiet"
      ],
-     "score": 0.74
+     "rival_after": [
+      {
+       "pos": "TE",
+       "starters": [
+        {
+         "name": "Jermaine Vell",
+         "wire": true,
+         "ppg": 11.9
+        },
+        {
+         "name": "Beau Bassett",
+         "wire": true,
+         "ppg": 9.8
+        }
+       ]
+      },
+      {
+       "pos": "RB",
+       "starters": [
+        {
+         "name": "Jaxon Bassett",
+         "wire": true,
+         "ppg": 11.8
+        },
+        {
+         "name": "Landon Marchetti",
+         "wire": true,
+         "ppg": 11.1
+        }
+       ]
+      }
+     ],
+     "after_line": "he'd start Jermaine Vell (the wire), Beau Bassett (the wire) at TE; Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after",
+     "sendable": true,
+     "must_try": false,
+     "why": [
+      "they start Darius Solano today",
+      "they start Dontae Rutherford today",
+      "fills my TE hole",
+      "fills my RB hole",
+      "fills their QB hole",
+      "leaves me no backup QB"
+     ],
+     "score": 0.604,
+     "my_title_delta": 20.5,
+     "their_title_delta": -0.2
+    },
+    {
+     "rival_team_id": 7,
+     "rival": "Sunday Scaries",
+     "give": [
+      "Silas Pennington"
+     ],
+     "get": [
+      "Tobias Ruiz-Hollis",
+      "Tyrek Grantham"
+     ],
+     "my_delta_ppw": 0.93,
+     "their_delta_ppw": -0.69,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "WR",
+      "WR"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
+     "market_ratio": null,
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.539,
+     "accept_word": "coin flip",
+     "accept_why": [
+      "it starts for him",
+      "I ask for a player he starts today"
+     ],
+     "rival_after": [
+      {
+       "pos": "WR",
+       "starters": [
+        {
+         "name": "Elias Delacroix",
+         "wire": false,
+         "ppg": 13.9
+        },
+        {
+         "name": "Silas Pennington",
+         "wire": false,
+         "ppg": 13.5
+        }
+       ]
+      }
+     ],
+     "after_line": null,
+     "sendable": false,
+     "must_try": false,
+     "why": [
+      "they start Tobias Ruiz-Hollis today"
+     ],
+     "score": 0.503
+    },
+    {
+     "rival_team_id": 7,
+     "rival": "Sunday Scaries",
+     "give": [
+      "Deon Castellano",
+      "Nico Vell"
+     ],
+     "get": [
+      "Elias Delacroix",
+      "Quincy Brandt"
+     ],
+     "my_delta_ppw": 0.77,
+     "their_delta_ppw": -0.38,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "WR",
+      "TE"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
+     "market_ratio": null,
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.505,
+     "accept_word": "coin flip",
+     "accept_why": [
+      "it starts for him",
+      "I ask for a player he starts today",
+      "it is his weakest slot"
+     ],
+     "rival_after": [
+      {
+       "pos": "WR",
+       "starters": [
+        {
+         "name": "Tobias Ruiz-Hollis",
+         "wire": false,
+         "ppg": 13.2
+        },
+        {
+         "name": "Tyrek Grantham",
+         "wire": false,
+         "ppg": 11.7
+        }
+       ]
+      },
+      {
+       "pos": "TE",
+       "starters": [
+        {
+         "name": "Jermaine Vell",
+         "wire": true,
+         "ppg": 11.9
+        }
+       ]
+      }
+     ],
+     "after_line": "he'd start Jermaine Vell (the wire) at TE after",
+     "sendable": false,
+     "must_try": false,
+     "why": [
+      "they start Elias Delacroix today",
+      "they start Quincy Brandt today",
+      "fills my TE hole"
+     ],
+     "score": 0.388
+    },
+    {
+     "rival_team_id": 6,
+     "rival": "Ctrl+Alt+Delete Kelce",
+     "give": [
+      "Omar Lindqvist",
+      "Nico Vell"
+     ],
+     "get": [
+      "Tobias Osei",
+      "Josiah Brandt"
+     ],
+     "my_delta_ppw": 0.84,
+     "their_delta_ppw": -0.62,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "WR",
+      "TE"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
+     "market_ratio": null,
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.395,
+     "accept_word": "coin flip",
+     "accept_why": [
+      "it starts for him",
+      "I ask for a player he starts today",
+      "he is out of it and sellers go quiet",
+      "he has traded this season"
+     ],
+     "rival_after": [
+      {
+       "pos": "WR",
+       "starters": [
+        {
+         "name": "Omar Lindqvist",
+         "wire": false,
+         "ppg": 11.4
+        },
+        {
+         "name": "Kwame Brandt",
+         "wire": true,
+         "ppg": 8.4
+        }
+       ]
+      },
+      {
+       "pos": "TE",
+       "starters": [
+        {
+         "name": "Jermaine Vell",
+         "wire": true,
+         "ppg": 11.9
+        }
+       ]
+      }
+     ],
+     "after_line": "he'd start Omar Lindqvist, Kwame Brandt (the wire) at WR; Jermaine Vell (the wire) at TE after",
+     "sendable": false,
+     "must_try": false,
+     "why": [
+      "they start Tobias Osei today",
+      "they start Josiah Brandt today",
+      "fills my TE hole",
+      "fills their WR hole"
+     ],
+     "score": 0.332
+    },
+    {
+     "rival_team_id": 7,
+     "rival": "Sunday Scaries",
+     "give": [
+      "Nico Vell"
+     ],
+     "get": [
+      "Tyrek Grantham"
+     ],
+     "my_delta_ppw": 0.95,
+     "their_delta_ppw": -0.64,
+     "drops": [],
+     "their_drops": [],
+     "get_pos": [
+      "WR"
+     ],
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
+     "market_ratio": null,
+     "fair_his": null,
+     "best_side": null,
+     "p_accept": 0.297,
+     "accept_word": null,
+     "accept_why": [
+      "his app grades the piece below what he has at the position",
+      "bench for bench"
+     ],
+     "rival_after": [
+      {
+       "pos": "WR",
+       "starters": [
+        {
+         "name": "Elias Delacroix",
+         "wire": false,
+         "ppg": 13.9
+        },
+        {
+         "name": "Tobias Ruiz-Hollis",
+         "wire": false,
+         "ppg": 13.2
+        }
+       ]
+      }
+     ],
+     "after_line": null,
+     "sendable": false,
+     "must_try": false,
+     "why": [],
+     "score": 0.281
     }
    ],
+   "injuries": [
+    {
+     "espn_id": 109,
+     "name": "Grady Sorensen",
+     "pos": "WR",
+     "slot": "BE",
+     "weeks_out": 4,
+     "return_week": 9,
+     "avail_ros": 0.667,
+     "mu_ros_active": 5.14,
+     "hold_ppw": 0.09,
+     "hold_value": 0.8,
+     "drop_value": 11.7,
+     "back_eff": 8.9,
+     "w_eff": 12.9,
+     "ir_eligible": true,
+     "ir_open": 1,
+     "ir_occupant": null,
+     "best_fa": {
+      "name": "Kwame Brandt",
+      "pos": "WR",
+      "delta_over_starter": 0.0,
+      "ppw": 0.91
+     },
+     "trades": [],
+     "market": null,
+     "stash": null,
+     "why": [
+      "IR slot open, the stash is free"
+     ],
+     "espn_status": "INJURY_RESERVE",
+     "verdict": "ir",
+     "add": {
+      "name": "Kwame Brandt",
+      "pos": "WR",
+      "kind": "upgrade",
+      "why": "+0.9/wk"
+     }
+    },
+    {
+     "espn_id": 104,
+     "name": "Malik Okafor",
+     "pos": "RB",
+     "slot": "BE",
+     "weeks_out": 1.0,
+     "return_week": 6,
+     "avail_ros": 0.917,
+     "mu_ros_active": 2.44,
+     "hold_ppw": 0.0,
+     "hold_value": 0.0,
+     "drop_value": 85.2,
+     "back_eff": 11.9,
+     "w_eff": 12.9,
+     "ir_eligible": true,
+     "ir_open": 1,
+     "ir_occupant": null,
+     "best_fa": {
+      "name": "Jaxon Bassett",
+      "pos": "RB",
+      "delta_over_starter": 5.49,
+      "ppw": 6.59
+     },
+     "trades": [],
+     "market": null,
+     "stash": null,
+     "why": [
+      "no better than the wire when he is back, dead roster spot, but Rico Achebe is the cheaper drop"
+     ],
+     "espn_status": "OUT",
+     "verdict": "hold",
+     "add": null
+    }
+   ],
+   "open_spots": 1,
+   "open_spot_adds": [
+    {
+     "name": "Jermaine Vell",
+     "pos": "TE",
+     "kind": "upgrade",
+     "why": "+7.1/wk"
+    }
+   ],
+   "ir_events": [],
    "incoming_trades": [
     {
      "id": "in-1",
      "rival_team_id": 2,
      "rival": "The Tuesday Regrets",
-     "proposed_iso": "2026-09-18T15:16",
-     "expires_iso": "2026-09-19T15:16",
+     "proposed_iso": "2026-10-08T16:53",
+     "expires_iso": "2026-10-09T16:53",
      "hours_left": 21.0,
-     "proposed_ts": 1789744563362,
+     "proposed_ts": 1791478411704,
+     "expires_ts": 1791564811704,
      "unmatched_ids": [],
+     "counter": null,
      "give": [
       "Jalen Haggerty",
       "Silas Pennington"
@@ -1379,17 +2117,58 @@
      "get": [
       "Dontae Kowalczyk"
      ],
-     "my_delta_ppw": -6.4,
-     "their_delta_ppw": 5.82,
-     "market_give": 0,
-     "market_get": 0,
+     "my_delta_ppw": -4.49,
+     "their_delta_ppw": 4.46,
+     "market_give": 0.0,
+     "market_give_eff": 0.0,
+     "market_get": 0.0,
+     "market_get_eff": 0.0,
+     "market_ratio": null,
      "why": [
       "fills my RB hole",
       "2-for-1: I consolidate, they get depth"
      ],
      "verdict": "decline",
-     "my_title_delta": -8.1,
-     "their_title_delta": 4.3
+     "drops": [],
+     "my_after": [
+      {
+       "pos": "RB",
+       "starters": [
+        {
+         "name": "Deon Castellano",
+         "wire": false,
+         "ppg": 14.7
+        },
+        {
+         "name": "Jaxon Bassett",
+         "wire": true,
+         "ppg": 11.8
+        },
+        {
+         "name": "Landon Marchetti",
+         "wire": true,
+         "ppg": 11.1
+        }
+       ]
+      },
+      {
+       "pos": "WR",
+       "starters": [
+        {
+         "name": "Omar Lindqvist",
+         "wire": false,
+         "ppg": 11.4
+        },
+        {
+         "name": "Kwame Brandt",
+         "wire": true,
+         "ppg": 8.4
+        }
+       ]
+      }
+     ],
+     "my_title_delta": -11.6,
+     "their_title_delta": 6.4
     }
    ],
    "outgoing_trades": [
@@ -1397,10 +2176,11 @@
      "id": "out-1",
      "rival_team_id": 3,
      "rival": "Waiver Wire Widows",
-     "proposed_iso": "2026-09-18T15:16",
-     "expires_iso": "2026-09-19T15:16",
+     "proposed_iso": "2026-10-08T16:53",
+     "expires_iso": "2026-10-09T16:53",
      "hours_left": 21.0,
-     "proposed_ts": 1789744563362,
+     "proposed_ts": 1791478411704,
+     "expires_ts": 1791564811704,
      "unmatched_ids": [],
      "give": [
       "Rico Achebe"
@@ -1411,67 +2191,69 @@
     }
    ],
    "pending_trades_error": null,
+   "trade_resolutions": {},
+   "trade_resolutions_error": null,
    "odds": {
     "1": {
-     "playoff_pct": 98.3,
-     "title_pct": 20.0,
-     "exp_wins": 10.42,
+     "playoff_pct": 97.6,
+     "title_pct": 21.4,
+     "exp_wins": 10.01,
      "name": "Regression to the Mean",
      "record": "4-0",
      "is_me": true
     },
     "2": {
-     "playoff_pct": 19.9,
-     "title_pct": 0.8,
-     "exp_wins": 6.49,
+     "playoff_pct": 21.8,
+     "title_pct": 1.7,
+     "exp_wins": 5.96,
      "name": "The Tuesday Regrets",
-     "record": "3-1",
-     "is_me": false
-    },
-    "3": {
-     "playoff_pct": 88.7,
-     "title_pct": 14.1,
-     "exp_wins": 8.57,
-     "name": "Waiver Wire Widows",
      "record": "2-2",
      "is_me": false
     },
+    "3": {
+     "playoff_pct": 69.5,
+     "title_pct": 13.8,
+     "exp_wins": 7.37,
+     "name": "Waiver Wire Widows",
+     "record": "1-3",
+     "is_me": false
+    },
     "4": {
-     "playoff_pct": 0.9,
-     "title_pct": 0.0,
-     "exp_wins": 4.2,
+     "playoff_pct": 4.9,
+     "title_pct": 0.2,
+     "exp_wins": 4.83,
      "name": "Bye Week Blues",
      "record": "2-2",
      "is_me": false
     },
     "5": {
-     "playoff_pct": 21.1,
-     "title_pct": 1.6,
-     "exp_wins": 6.01,
+     "playoff_pct": 55.4,
+     "title_pct": 5.1,
+     "exp_wins": 7.3,
      "name": "Gronk's Ghost",
-     "record": "1-3",
+     "record": "2-2",
      "is_me": false
     },
     "6": {
-     "playoff_pct": 0.9,
-     "title_pct": 0.0,
-     "exp_wins": 3.91,
+     "playoff_pct": 2.0,
+     "title_pct": 0.1,
+     "exp_wins": 4.32,
      "name": "Ctrl+Alt+Delete Kelce",
      "record": "2-2",
      "is_me": false
     },
     "7": {
-     "playoff_pct": 98.5,
-     "title_pct": 55.0,
-     "exp_wins": 9.5,
+     "playoff_pct": 99.0,
+     "title_pct": 51.4,
+     "exp_wins": 10.02,
      "name": "Sunday Scaries",
-     "record": "1-3",
+     "record": "2-2",
      "is_me": false
     },
     "8": {
-     "playoff_pct": 71.6,
-     "title_pct": 8.6,
-     "exp_wins": 7.9,
+     "playoff_pct": 50.0,
+     "title_pct": 6.3,
+     "exp_wins": 7.19,
      "name": "Punt Return Policy",
      "record": "2-2",
      "is_me": false
@@ -1479,7 +2261,7 @@
    },
    "rival_needs": {
     "2": {
-     "QB": "surplus",
+     "QB": "",
      "RB": "",
      "WR": "",
      "TE": "hole"
@@ -1487,12 +2269,12 @@
     "3": {
      "QB": "",
      "RB": "",
-     "WR": "surplus",
+     "WR": "",
      "TE": "hole"
     },
     "4": {
      "QB": "hole",
-     "RB": "hole",
+     "RB": "",
      "WR": "hole",
      "TE": ""
     },
@@ -1531,59 +2313,59 @@
      "is_me": true
     },
     {
-     "name": "Gronk's Ghost",
-     "record": "1-3",
-     "pf": 119.1,
-     "faab_left": 86,
-     "waiver_rank": 5,
-     "is_me": false
-    },
-    {
      "name": "Sunday Scaries",
-     "record": "1-3",
-     "pf": 115.0,
-     "faab_left": 71,
+     "record": "2-2",
+     "pf": 117.6,
+     "faab_left": 77,
      "waiver_rank": 7,
      "is_me": false
     },
     {
-     "name": "Punt Return Policy",
+     "name": "Gronk's Ghost",
      "record": "2-2",
      "pf": 114.8,
      "faab_left": 80,
-     "waiver_rank": 8,
+     "waiver_rank": 5,
+     "is_me": false
+    },
+    {
+     "name": "The Tuesday Regrets",
+     "record": "2-2",
+     "pf": 110.4,
+     "faab_left": 92,
+     "waiver_rank": 2,
      "is_me": false
     },
     {
      "name": "Waiver Wire Widows",
-     "record": "2-2",
-     "pf": 110.4,
-     "faab_left": 92,
+     "record": "1-3",
+     "pf": 110.2,
+     "faab_left": 99,
      "waiver_rank": 3,
      "is_me": false
     },
     {
      "name": "Bye Week Blues",
      "record": "2-2",
-     "pf": 95.5,
-     "faab_left": 81,
+     "pf": 91.6,
+     "faab_left": 86,
      "waiver_rank": 4,
-     "is_me": false
-    },
-    {
-     "name": "The Tuesday Regrets",
-     "record": "3-1",
-     "pf": 95.1,
-     "faab_left": 76,
-     "waiver_rank": 2,
      "is_me": false
     },
     {
      "name": "Ctrl+Alt+Delete Kelce",
      "record": "2-2",
-     "pf": 91.6,
-     "faab_left": 86,
+     "pf": 82.7,
+     "faab_left": 97,
      "waiver_rank": 6,
+     "is_me": false
+    },
+    {
+     "name": "Punt Return Policy",
+     "record": "2-2",
+     "pf": 80.7,
+     "faab_left": 90,
+     "waiver_rank": 8,
      "is_me": false
     }
    ]
