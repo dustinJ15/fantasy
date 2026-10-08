@@ -75,8 +75,13 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
   No credentials at all: `uv run ff briefing --demo` (synthetic league from `src/ff/demo.py`).
 - Code changes take effect on the next cloud run only after `git push` to main (the VM clones fresh each time).
-- Projection logs: the routine pushes `data/projlog/` to the `projlog` branch, never main. To run `ff accuracy` locally:
-  `git fetch origin projlog && git checkout origin/projlog -- data/projlog`. The log (`src/ff/projlog.py`) keeps the
+- Projection logs: the routine pushes `data/projlog/` to the `projlog` branch, never main, through
+  `scripts/projlog_push.sh "<message>"` (step 9 of the briefing skill): it fetches the remote tip, builds the commit in a
+  temporary index (`data/projlog` additions and edits only, never a deletion), parents it on that tip and pushes a plain
+  fast-forward, so the checkout, main and the branch's history are never touched; a rejected push refetches and rebuilds,
+  up to three times. `scripts/projlog_push.sh --restore` is the other direction (`git archive` of the tip's
+  `data/projlog` into the working tree as untracked files; cloud_setup.sh runs it when the directory is missing), and
+  is also how to get the logs locally before `ff accuracy`. The log (`src/ff/projlog.py`) keeps the
   pre-clock projection (`mu_pre`) and ESPN's actual in league scoring (`actual` once his game is `post`, `actual_prev`
   in the next week's first log for Monday night); the scorer takes each player's last pre-kickoff row per league, so K
   and D/ST are scored and half-PPR is scored as half-PPR. No nflverse, no crosswalk; it runs offline.
@@ -126,6 +131,7 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
 | Card says "activate" on a stash still listed Out, or names one drop on two rows (a Drop row that adds X, then a waiver row that drops the same player for Y) | old checklist logic (fixed 2026-09-23; the Drop-row case 2026-10-08, B1; the activate row printed after the Drop row it should have folded in, B2) | activation keys off `ir_eligible`; drops come from `report._Spots`; `_injury_items` takes every activation's drop before any row prints, so the folded Drop row is skipped whatever order `injuries.decide` put them in, and a Drop row with its own add is `reserved` once the injury rows are built |
 | Card says activate, then "move to IR" three days later, then activate again (Daniels, Sep 30 to Oct 7: a four-day McGowan rental) | ESPN's tag bounced Questionable → Out → Questionable and the stash rule had no memory of the activation | fixed 2026-10-07: `ir_moves.json` remembers the exit; a short Out inside `IR_REENTRY_DAYS` holds instead. If it still churns, check the projlog branch restored the file and that `weeks_out` in overrides.json is not inflating a one-week Out |
 | Same trade package returns the morning after a `skip` | `data/projlog/skipped_trades.json` missing (projlog branch not restored) | check cloud_setup.sh fetched `origin/projlog`; the key is `<league>|<get names>` |
+| Yesterday's rulings are gone this morning (a skipped package is back, a push restarts at "asked 1 morning", an offer outcome or IR move never closed) although the run log says the projlog was pushed, or the log says the push was rejected non-fast-forward | step 9 used to `git checkout -B projlog FETCH_HEAD` over the restored untracked files: with `data/projlog/` ignored (HEAD on main) git silently overwrote them with yesterday's copy before the commit, and when it refused instead the fallback branched off main and the push was rejected | fixed 2026-10-08 (C1): `scripts/projlog_push.sh` commits from a temporary index onto the fetched tip and never checks out a branch (`tests/test_projlog_push.py` runs it against a scratch remote). If a ruling still goes missing, the run log shows the script's one line ("pushed", "nothing to commit", or the failure) |
 | Email card says do it and Claude's read says don't | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
 | Email says hold a player who is done for the year, or trade/drop one who is back Sunday | `weeks_out` still at its designation default (IR = 4, Out = 1) | the player is in `shared.injured`; write `weeks_out` (or `"season"`) in overrides.json and re-run step 5 |

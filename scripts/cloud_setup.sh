@@ -26,9 +26,10 @@ if [ ! -f leagues.toml ]; then
   echo "leagues.toml missing: set the LEAGUES_TOML environment variable (contents of the file) or copy leagues.example.toml" >&2
   exit 2
 fi
-# Memory that lives on the projlog branch (projection logs, skipped trade rulings): restore it so the packet can read
-# it. Best-effort; a fresh repo with no projlog branch is fine.
+# Memory that lives on the projlog branch (projection logs, trade rulings, IR moves): restore it so the packet can read
+# it. The files land untracked; scripts/projlog_push.sh (step 9 of the briefing) commits them back onto the remote tip
+# without touching this checkout. Best-effort; a fresh repo with no projlog branch is fine.
 if [ ! -d data/projlog ]; then
-  (git fetch --quiet origin projlog && git checkout --quiet origin/projlog -- data/projlog && git reset --quiet -- data/projlog) || true
+  bash scripts/projlog_push.sh --restore || echo "projlog: restore failed, the packet starts without its memory" >&2
 fi
 uv run ff doctor

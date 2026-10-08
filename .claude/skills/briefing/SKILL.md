@@ -105,11 +105,14 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    If Gmail is unavailable, fall back to `uv run ff email briefing.md --html briefing.html` (needs GMAIL_USER/GMAIL_APP_PASSWORD),
    and if that also fails, print the full briefing.md so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
-9. Record projections for accuracy tracking: `uv run ff log-projections`, then commit and push ONLY that directory to the
-   `projlog` branch (never main) with exactly this sequence (the clone may be on a detached HEAD; this handles it):
-   `git fetch origin projlog && git checkout -B projlog FETCH_HEAD || git checkout -B projlog ; git add -f data/projlog && git -c user.name=ff-routine -c user.email=routine@ff.local commit -m "projlog: week <N> <date>" ; git push origin projlog`
-   If there is nothing to commit, or the push fails, say so in one line and move on. This is the single exception to the
-   no-commit rule. Never commit anything else; delete generated files (briefing.html, reads.json) rather than committing them.
+9. Record projections for accuracy tracking: `uv run ff log-projections`, then
+   `bash scripts/projlog_push.sh "projlog: week <N> <date>"`. The script commits ONLY `data/projlog` on top of the
+   remote `projlog` tip and pushes it as a fast-forward; it never checks out a branch, never touches main, the index or
+   the working tree, and never rewrites history (the clone may be on main or a detached HEAD; both are fine). Do not
+   replace it with inline git: `git checkout projlog` either refuses because of the restored untracked files or silently
+   overwrites them with yesterday's copy, which is how a morning's rulings used to get lost. If the script prints
+   "nothing to commit" or fails, say so in one line and move on. This is the single exception to the no-commit rule.
+   Never commit anything else; delete generated files (briefing.html, reads.json) rather than committing them.
 10. Scope: do not audit Gmail history, git history, or other routines. Earlier emails with the same subject are expected
     (tests, re-runs); commits already on origin are not your concern. Send at most one push notification, and only for a
     same-day action item (e.g. a starter ruled out) or a failure.

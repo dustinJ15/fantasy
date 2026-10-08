@@ -45,13 +45,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier C — operations
 
-- [ ] **C1 (S). The projlog push step fails as written.** `scripts/cloud_setup.sh:31-33` restores
-  `data/projlog` as untracked files; `.claude/skills/briefing/SKILL.md:110` then runs
-  `git checkout -B projlog FETCH_HEAD`, which git refuses when those files differ, and the fallback branches off
-  main and is rejected non-fast-forward. The agent has been improvising each morning (`origin/projlog` has
-  commits through 2026-10-07), which is how a day's rulings get lost. Make it a worktree or a stash-free
-  copy-and-commit; test it in CI with a scratch remote.
-
 - [ ] **C2 (S). The Gmail doorbell can miss a second proposal in the same thread.**
   `scripts/gmail_trade_doorbell.gs:25` searches `-label:ff-alerted`, `:137` labels the thread, `:110` fires only
   on the newest message. ESPN's subject is identical each time, so a second proposal threads under an already
@@ -71,6 +64,14 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 - [ ] **C6 (XS). Sleeper's week can differ from ESPN's on Monday and Tuesday.** `packet.py:313` fetches
   Sleeper projections for `sleeper.state().week`; ESPN's `current_week` rolls Tuesday. Use the league's week.
+
+- [ ] **C7 (XS, needs Dustin). `leagues.toml` is committed on the `projlog` branch.** Found while fixing C1
+  (2026-10-08): `origin/projlog` commit `850834e` (2026-09-14) added the whole working tree, `leagues.toml` included,
+  and every projlog commit since carries it (`git show origin/projlog:leagues.toml`). `scripts/projlog_push.sh`
+  only adds `data/projlog` and never rewrites history, so it stays until removed on purpose. The file holds league
+  and team ids, not cookies; still, CLAUDE.md says never commit it. A commit on `projlog` that deletes it (and
+  drops the branch's `!data/projlog/` `.gitignore` line, which is why git refused the old checkout on a second run)
+  is the cheap fix; purging it from history is Dustin's call, since it rewrites the branch.
 
 ## Tier D — where real edge would come from (after Tier A)
 
