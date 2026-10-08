@@ -37,18 +37,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B12 (M). Split `report.todos` before the next fix lands in it.** `report.py` is 961 lines and `todos` is
-  124 of them: the roster-spot ledger (`_Spots`), the per-kind row builders (`_injury_items`, `_cover_items`, waiver,
-  open-spot, trade), the push selection, the row ordering and the id scheme (`_unique_ids`) all run in one pass over
-  one `out` list. Eleven of the 2026-10-08 fixes (B1, B2, B3, B6, B6b, B7, B9, B11 and the E tests) each added a
-  special case to that pass, and the next bug there will be an interaction between two of them, which is the kind a
-  per-item test does not catch. Split it into three seams with no behaviour change: the ledger (`_Spots`, drop cost,
-  caps) as its own module; one builder per row kind that takes the ledger and returns rows; and `todos` reduced to
-  ordering, push selection and `_unique_ids` over the builders' output. `trades.scan` (202 lines) has the same shape
-  and can follow in a second item. Done when: every existing test in `tests/test_card.py` and
-  `tests/test_review_fixes.py` passes unchanged, `ff briefing --demo` renders byte-identical markdown before and
-  after, and no function in `report.py` is over 60 lines. This is a refactor, so the playbook's reproduce step is
-  the byte-identical demo output, not a failing test.
+(none open)
 
 ## Tier C — operations
 

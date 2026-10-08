@@ -56,7 +56,7 @@ def market_value(m: dict | None) -> float | None:
 def drop_cost(mu_ros: float, *, market: dict | None = None, handcuff_value: float = 0.0, sit_this_week: float = 0.0,
               weeks_out: float = 0.0, mu_ros_active: float | None = None, weeks_remaining: int = 1) -> float:
     """What cutting a bench body costs me, in points a week; the one number the Drop row (`cheapest` in `decide`) and
-    the checklist ledger (`report._drop_order`) both rank by, so they agree on who goes.
+    the checklist ledger (`ledger.drop_order`) both rank by, so they agree on who goes.
 
     `mu_ros` (what the roster spot yields per remaining week) plus `MARKET_DROP_PPW` per 1000 of market value (B6:
     a player someone would trade for is trade bait, not a cut), plus `handcuff_value` (`waivers.handcuffs`

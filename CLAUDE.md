@@ -37,8 +37,10 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 rule; `mu_ros` is availability-weighted, `mu_ros_active` is per game played; `season.py` prices a roster week by week with
 byes, return dates and the wire as the fallback body; `acceptance.py` is the would-he-say-yes scorecard behind every trade
 row, `trades.py` the scan and the hard rules), `packet.py` builds the DecisionPacket,
-`report.py` renders markdown (plain-text body) and owns the checklist itself (`todos` builds the rows and their ids,
-`apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id or an unruled trade),
+`ledger.py` is the roster-spot ledger behind the checklist (`Spots` hands out open spots and drops, counts bodies against
+ESPN's position caps; `drop_order` / `drop_note` rank and explain a cut), `report.py` renders markdown (plain-text body)
+and owns the checklist itself (one `_*_items` builder per row kind over the shared ledger, `todos` is the order, the push
+selection and the ids, `apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id or an unruled trade),
 `email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
 `demo.py` is the synthetic league (fictional, seeded names); `scripts/screenshots.sh` regenerates `examples/` including the README images.
 The Gmail doorbell is Apps Script, so pytest cannot see it: `node scripts/gmail_trade_doorbell.test.js` runs it against a stubbed
@@ -119,7 +121,7 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   who left the slot in the last `IR_REENTRY_DAYS` (10) is not stashed again unless he is out `IR_REENTRY_WEEKS` (3) or more;
   the hold row says the tag is bouncing. The activate row names the drop as "added when he was stashed <date>" when it is
   the body that stash brought in. Rides the `projlog` branch.
-- Checklist ledger: `report._Spots` hands out roster spots (open bench spot first, then the cheapest drop not already
+- Checklist ledger: `ledger.Spots` (re-exported as `report._Spots`) hands out roster spots (open bench spot first, then the cheapest drop not already
   named), so an activation and a pickup never spend the same drop. It also counts bodies per position against ESPN's
   caps (`settings.position_limits`): a trade row that brings in a WR at the cap says which WR to drop in the trade
   screen, and skips that when a pickup above it already dropped one. Waiver rows say `claim` (still on waivers, with the
