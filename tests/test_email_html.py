@@ -1,4 +1,5 @@
 """HTML email renderer over the synthetic league: structure, reads, no leaked jargon, size."""
+import re
 from html import escape
 
 from ff import report
@@ -119,9 +120,26 @@ def test_the_paste_message_rides_on_the_trade_it_belongs_to(monkeypatch):
 
 
 def test_title_odds_are_not_in_the_action_card(monkeypatch):
+    """The league header reads record · opponent · win · playoffs; the title odds cell was cut from it (two decimals
+    of noise in September) and the standings table that carries the Title column is `--full` only. The check is on
+    those two elements, not on the word: a rival called "Title Town" is not a leak, and a lowercase cell would be."""
     p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    me = lg["odds"][str(lg["my_team_id"])]
+    me["playoff_pct"], me["title_pct"] = 41.0, 7.0  # distinct numbers, so the header can be read cell by cell
+    lg["opponent"]["name"] = "Title Town"
     html = render_email(p, {})
-    assert "Playoffs" in html and "Title" not in html
+    at = html.index("vs Title Town")
+    header = html[html.rindex("<div", 0, at):html.index("</div>", at)]
+    cells = [c.strip() for c in header.split("&nbsp;·&nbsp;")]
+    assert any(c.startswith("Playoffs") and "41%" in c for c in cells), header
+    odds_cells = [c for c in cells if "Title Town" not in c]
+    assert not any(re.search("title", c, re.I) for c in odds_cells), header  # no title cell, whatever its case
+    assert not any(re.search(r"(?<![\d.])7%", c) for c in odds_cells), header  # nor the number under another label
+    # the standings table (with its Title column) is appended only by --full
+    assert "League odds" not in html and ">Title</th>" not in html
+    full = render_email(p, {}, full=True)
+    assert "League odds" in full and ">Title</th>" in full and ">7%</td>" in full  # the markers are the real ones
 
 
 def test_a_skipped_hold_is_struck_through_in_the_html(monkeypatch):

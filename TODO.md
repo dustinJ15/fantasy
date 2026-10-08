@@ -97,7 +97,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier E — tests that would catch model errors
 
-- [ ] **E4.** `tests/test_email_html.py:124` `assert "Title" not in html` breaks on any name containing "Title".
 - [ ] **E5.** `tests/test_season.py:616` accepts any `accept_word`; `test_sim.py` has no symmetry check (four
   equal teams should each sit near 25%).
 - [ ] **E6.** `tests/test_waivers.py` pins FAAB constants for a feature no league uses; waiver priority has none.
