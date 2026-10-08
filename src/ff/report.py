@@ -428,7 +428,8 @@ def todos(lg: dict) -> list[dict]:
     trade | hold. Holds come last and the renderers print them as a footnote, not a step. Shared by both renderers.
 
     `id` is stable for a given packet, so reads.json can rule on one row by name instead of arguing with the
-    whole card in prose. Player names make the ids readable and are unique within a league.
+    whole card in prose. Player names make the ids readable; `_unique_ids` keeps them unique within a league
+    (two packages for the same player read `trade:<get>-for-<give>`, an Open-spot row is `open:<name>`).
     """
     out = []
     for t in lg.get("incoming_trades") or []:
@@ -483,7 +484,7 @@ def todos(lg: dict) -> list[dict]:
         spots.note(add_pos=a["pos"])
         added.add(a["name"])
         w = next((w for w in lg["waivers"] if w["name"] == a["name"]), None)
-        out.append({"kind": "waiver", "id": f"waiver:{slug(a['name'])}", "label": "Open spot",
+        out.append({"kind": "waiver", "id": f"open:{slug(a['name'])}", "label": "Open spot",
                     "text": f"{_add_verb(lg, w) if w else 'add'} {a['name']} ({a['pos']}, {a['why']}) to the open bench spot"})
     if lg.get("trades_closed"):
         out.append({"kind": "sent", "id": "deadline", "label": "Trades",
@@ -541,6 +542,31 @@ def todos(lg: dict) -> list[dict]:
                     "drops": drops, "text": text, "thin_after": thin_after, "p_accept": t.get("p_accept")})
     out += [i for i in inj if i["verdict"] == "trade"]
     out += [i for i in inj if i["kind"] == "hold"]
+    return _unique_ids(out)
+
+
+def _unique_ids(out: list[dict]) -> list[dict]:
+    """One id per row, in place. `trade:<get>` says nothing about what I send, so two packages for the same player
+    would share it and a `skip` in reads.json would strike both; those grow `-for-<give>`. Anything else still shared
+    (two bodies whose names slug alike) gets a counter. A lone row keeps its short id, which is what reads.json and the
+    rulings memory already use. Injury rows name the trade rows that ship the player by id, so they follow the rename.
+    """
+    shared = {k for k, n in Counter(x["id"] for x in out).items() if n > 1}
+    for x in out:
+        if x["id"] in shared and x["kind"] == "trade":
+            x["id"] = f"{x['id']}-for-{slug('-'.join(x['give'])) or 'nothing'}"
+    seen: Counter = Counter()
+    for x in out:
+        seen[x["id"]] += 1
+        if seen[x["id"]] > 1:
+            x["id"] = f"{x['id']}-{seen[x['id']]}"
+    by_get: dict[str, list[str]] = {}
+    for x in out:
+        if x["kind"] == "trade":
+            by_get.setdefault(f"trade:{slug('-'.join(x['get']))}", []).append(x["id"])
+    for x in out:
+        if x.get("trade_ids"):
+            x["trade_ids"] = [i for tid in x["trade_ids"] for i in by_get.get(tid) or [tid]]
     return out
 
 

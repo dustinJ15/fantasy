@@ -43,9 +43,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   `docs/plans/trade-acceptance.md` open question 3: probe `mTransactions2` (or the activity feed) for a terminal
   status on a cancelled proposal; if one is readable, close the entry as `withdrawn` from it.
 
-- [ ] **B9 (XS). Row ids can collide.** `trade:<get>` (`report.py:446`) ignores `give`; `waiver:<name>` is shared
-  by the Waiver and Open-spot rows. Latent today; `apply_reads` would rule both with one key.
-
 ## Tier C — operations
 
 - [ ] **C1 (S). The projlog push step fails as written.** `scripts/cloud_setup.sh:31-33` restores

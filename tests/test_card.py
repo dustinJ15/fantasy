@@ -315,7 +315,7 @@ def test_the_checklist_runs_in_espn_click_order_with_holds_last():
                           injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0)],
                 trades=[{"rival": "Them", "give": ["A"], "get": ["Kai"], "my_delta_ppw": 1.0, "their_delta_ppw": 0.5, "why": [], "sendable": True}])
     lg["open_spot_adds"] = [{"name": "Body", "pos": "WR", "kind": "depth", "why": "best body on the wire, depth only"}]
-    assert ids(lg) == ["lineup", "injury:knee-guy", "injury:done-guy", "waiver:body", "trade:kai", "injury:ankle-guy"]
+    assert ids(lg) == ["lineup", "injury:knee-guy", "injury:done-guy", "open:body", "trade:kai", "injury:ankle-guy"]
 
 
 def test_a_one_game_hold_is_not_a_row():
@@ -440,7 +440,7 @@ def test_an_open_bench_spot_is_a_row_naming_who_fills_it():
     lg = league()
     lg["open_spots"] = 1
     lg["open_spot_adds"] = [{"name": "Seth McGowan", "pos": "RB", "kind": "handcuff", "why": "handcuff for Jonathan Taylor"}]
-    row = by_id(lg)["waiver:seth-mcgowan"]
+    row = by_id(lg)["open:seth-mcgowan"]
     assert row["label"] == "Open spot" and row["text"] == "add Seth McGowan (RB, handcuff for Jonathan Taylor) to the open bench spot"
 
 
@@ -506,3 +506,30 @@ def test_an_activation_names_the_body_the_stash_added_when_it_is_the_drop():
     # a different drop, or a stash nobody came in on, says nothing extra
     row["stash"] = {"left_days": None, "stashed": "2026-10-03", "added": ["Someone Else"]}
     assert by_id(league(injuries=[row]))["injury:back-guy"]["text"].endswith("; drop Bench WR to make room")
+
+
+# ---------- ids never collide (B9) ----------
+
+def test_two_packages_for_the_same_player_get_distinct_ids_and_one_ruling_strikes_one_row():
+    """`trade:<get>` ignored `give`, so two asks for Kai shared an id and a skip on one struck both. The suffix only
+    appears when it is needed; a lone ask keeps the short id the rulings memory and reads.json already use."""
+    lg = league(trades=[trade(["Kai"], ["A"]), trade(["Kai"], ["B"])])
+    rows = ids(lg)
+    assert rows.count("trade:kai") == 0 and "trade:kai-for-a" in rows and "trade:kai-for-b" in rows
+    assert len(rows) == len(set(rows))
+    ruled = by_id(lg, {"items": {"trade:kai-for-a": {"verdict": "skip", "note": "A stays"}}})
+    assert ruled["trade:kai-for-a"].get("ruling") == "skip" and ruled["trade:kai-for-b"].get("ruling") is None
+    assert by_id(league(trades=[trade(["Kai"], ["A"])]))["trade:kai"]["give"] == ["A"]
+
+
+def test_an_injury_trade_row_follows_the_trade_ids_it_names_once_they_grow_a_suffix():
+    lg = league(trades=[trade(["Star"], ["A"]), trade(["Star"], ["B"])],
+                injuries=[injury("Sell Guy", "trade", trades=[{"rival": "Rival", "get": ["Star"]}])])
+    rows = by_id(lg)
+    assert rows["injury:sell-guy"]["trade_ids"] == ["trade:star-for-a", "trade:star-for-b"]
+
+
+def test_an_open_spot_row_has_its_own_prefix_so_it_never_shares_an_id_with_a_waiver_row():
+    lg = league(open_spots=1, open_spot_adds=[{"name": "Body", "pos": "WR", "kind": "depth", "why": "depth"}])
+    rows = by_id(lg)
+    assert "open:body" in rows and "waiver:body" not in rows and rows["open:body"]["label"] == "Open spot"
