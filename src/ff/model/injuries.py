@@ -34,6 +34,48 @@ IR_MIN_WEEKS = 2
 # bench body for days); only a real one, IR_REENTRY_WEEKS or more, is worth sending him back.
 IR_REENTRY_DAYS = 10
 IR_REENTRY_WEEKS = 3
+# What cutting a player the market would pay for costs, in points a week per 1000 of FantasyCalc redraft value.
+# A bench body the market prices at 2500 (about overall rank 50) is trade bait, so he carries +2.5 a week over his
+# `mu_ros`; a WR4 nobody would trade for sits near 300 (+0.3) or is not listed at all (+0). It is a thumb on the
+# scale, not a veto: a market number cannot save a player who is several points a week behind the next body.
+MARKET_DROP_PPW = 1.0
+# The 30-day trend rides on the value at half weight: the market pays more next week for a player it is warming to,
+# and a player it is cooling on is the easier cut of two priced the same today.
+MARKET_TREND_WEIGHT = 0.5
+
+
+def market_value(m: dict | None) -> float | None:
+    """FantasyCalc redraft value with the 30-day trend folded in, or None when the market does not list him.
+    `m` is the `market` block on a roster row or a `fantasycalc.by_espn_id` entry (`redraft_value`, `trend_30d`)."""
+    v = (m or {}).get("redraft_value")
+    if v is None:
+        return None
+    return float(v) + MARKET_TREND_WEIGHT * float(m.get("trend_30d") or 0)
+
+
+def drop_cost(mu_ros: float, *, market: dict | None = None, handcuff_value: float = 0.0, sit_this_week: float = 0.0,
+              weeks_out: float = 0.0, mu_ros_active: float | None = None, weeks_remaining: int = 1) -> float:
+    """What cutting a bench body costs me, in points a week; the one number the Drop row (`cheapest` in `decide`) and
+    the checklist ledger (`report._drop_order`) both rank by, so they agree on who goes.
+
+    `mu_ros` (what the roster spot yields per remaining week) plus `MARKET_DROP_PPW` per 1000 of market value (B6:
+    a player someone would trade for is trade bait, not a cut), plus `handcuff_value` (`waivers.handcuffs`
+    `est_value`: the insurance a backup to one of my RB starters carries, which a cut throws away too), minus the
+    share of this week he gives a Sunday pickup nothing for. `sit_this_week` is 1 on a bye, else his `p_zero`; it
+    is counted only past what `weeks_out` already netted out of `mu_ros` (an Out has his game out of `mu_ros`
+    already, a bye never is), and it is worth one week in `weeks_remaining`, so it is a tie-breaker in September
+    and a quarter of his value with four weeks left."""
+    cost = mu_ros + MARKET_DROP_PPW * (market_value(market) or 0.0) / 1000.0 + max(handcuff_value or 0.0, 0.0)
+    unused = max(min(sit_this_week, 1.0) - min(weeks_out or 0.0, 1.0), 0.0)
+    per_game = mu_ros_active if mu_ros_active is not None else mu_ros
+    return cost - unused * per_game / max(int(weeks_remaining or 1), 1)
+
+
+def player_drop_cost(p: PlayerProj, weeks_remaining: int, market: dict | None = None, handcuffs: list[dict] = ()) -> float:
+    """`drop_cost` for a `PlayerProj`: his bye and `p_zero` are this week's, the handcuff list names him by name."""
+    cuff = sum(h.get("est_value") or 0.0 for h in handcuffs if h.get("handcuff") == p.name)
+    return drop_cost(p.mu_ros, market=market, handcuff_value=cuff, sit_this_week=1.0 if p.bye else p.p_zero,
+                     weeks_out=p.weeks_out, mu_ros_active=p.mu_ros_active, weeks_remaining=weeks_remaining)
 
 
 def week_weights(week: int, weeks_remaining: int, reg_season_weeks: int, playoff_pct: float | None) -> dict[int, float]:
@@ -136,9 +178,12 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
     stash_ids = {p.espn_id for p in stashable}
     swappable = list(on_ir)  # occupants not yet promised to someone
     # The cheapest cut, for the drop rows: not this week's starters, not K/DST, not anyone in or headed to the IR slot.
+    # Ranked by `drop_cost`, the same number the checklist ledger uses, so a Drop row never names a body the ledger
+    # would keep (the market's rookie, my RB1's handcuff) and never holds one the ledger is about to cut.
     droppable = [p for p in mine if p.espn_id not in starters_week and p.pos not in NOT_DROPPABLE and p.slot != "IR"
                  and p.espn_id not in to_ir]
-    cheapest = min(droppable, key=lambda p: p.mu_ros) if droppable else None
+    cost = lambda p: player_drop_cost(p, weeks_remaining, values.get(str(p.espn_id)), handcuffs)  # noqa: E731
+    cheapest = min(droppable, key=cost) if droppable else None
 
     out = []
     for p in sorted(hurt, key=lambda q: -(q.mu_ros_active or 0)):

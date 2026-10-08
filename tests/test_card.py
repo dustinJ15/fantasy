@@ -316,6 +316,44 @@ def test_a_rising_market_counts_for_more_than_a_falling_one():
     assert report._drop_order(lg) == ["Falling", "Rising"]
 
 
+def test_a_handcuff_for_my_rb1_is_not_the_cheapest_cut():
+    """The backup to my RB1 is the cheaper body by ROS points; cutting him also cuts the insurance, so the WR4 goes
+    first and the row says why he was passed over (B6b)."""
+    lg = league(roster=[player("Starter RB", pos="RB", slot="RB", ros=15.0), player("Starter WR", slot="WR"),
+                        player("Backup RB", pos="RB", ros=3.0), player("WR Four", ros=4.0)],
+                lineup_win={"slots": {"RB": ["Starter RB"], "WR": ["Starter WR"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                handcuffs=[{"starter": "Starter RB", "handcuff": "Backup RB", "owner_team_id": 1, "est_value": 2.0}],
+                waivers=[{"name": "Now Guy", "pos": "WR", "streamer": False, "delta_week": 3.0, "delta_over_starter": 0.5, "week_slot": "WR", "on_waivers": False}])
+    assert report._drop_order(lg) == ["WR Four", "Backup RB"]
+    text = by_id(lg)["waiver:now-guy"]["text"]
+    assert "drop WR Four" in text and "Backup RB (3.0/wk; handcuff for Starter RB, not a cut)" in text
+
+
+def test_a_body_on_bye_this_week_is_the_cheaper_cut():
+    """Two bench bodies, the one on bye a shade better the rest of the way: he gives the Sunday pickup's week nothing,
+    so with four weeks left that week is a quarter of his value and he goes first (B6b)."""
+    lg = league(week=14, weeks_remaining=4,
+                roster=[player("Starter WR", slot="WR"), player("Bye Guy", ros=3.2, bye=True, p0=1.0), player("Plays", ros=3.0)])
+    assert report._drop_order(lg) == ["Bye Guy", "Plays"]
+    assert report._drop_note(lg, "Bye Guy") == " (not priced by the market, 3.2/wk, on bye this week)"
+
+
+def test_a_bench_player_likely_to_sit_this_week_is_the_cheaper_cut():
+    """A 90% sit risk on a bench body with no games netted out of his `mu_ros` yet counts this week as spent (B6b)."""
+    lg = league(week=14, weeks_remaining=4,
+                roster=[player("Starter WR", slot="WR"), player("Doubtful", ros=3.2, p0=0.9), player("Plays", ros=3.0)])
+    assert report._drop_order(lg) == ["Doubtful", "Plays"]
+    assert report._drop_note(lg, "Doubtful").endswith(", 90% to sit this week)")
+
+
+def test_a_sit_risk_already_netted_out_of_mu_ros_is_not_counted_twice():
+    """An Out (p_zero 1, weeks_out 1) already has the game out of his `mu_ros`; the cost is `mu_ros`, not less."""
+    lg = league(week=14, weeks_remaining=4,
+                roster=[player("Starter WR", slot="WR"), {**player("Out Guy", ros=3.0, p0=1.0), "weeks_out": 1.0, "mu_ros_active": 4.0},
+                        player("Plays", ros=2.9)])
+    assert report._drop_order(lg) == ["Plays", "Out Guy"]
+
+
 def test_a_drop_without_a_market_price_prints_plain():
     lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Bench B", ros=5.0)],
                 waivers=[{"name": "Now Guy", "pos": "WR", "streamer": False, "delta_week": 3.0, "delta_over_starter": 0.5, "week_slot": "WR", "on_waivers": False}])

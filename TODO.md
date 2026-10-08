@@ -37,13 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B6b (S). The drop criterion still ignores handcuff status, bye timing and this week's `p_zero`.**
-  B6 (2026-10-08) folded `market.redraft_value` and `trend_30d` into `report._drop_cost`; the rest of the
-  item is open: a handcuff for my RB1 (`lg["handcuffs"]`) should not be the cheapest cut, a body on bye this
-  week is worth less to a Sunday pickup than his `mu_ros` says, and a `p_zero` near 1 on a bench player is a
-  reason to cut him this week. `model/injuries.py` `cheapest` (the Drop row) still ranks by `mu_ros` alone;
-  it should share `_drop_cost` or the two rows will disagree about who goes.
-
 - [ ] **B7 (S). The cover row is not executable.** `report.py:232-234` takes the first waiver at the position
   regardless of `on_waivers` ("add Backup K before kickoff" for a claim that lands Wednesday) and takes no
   spot from the ledger, so no drop is named.

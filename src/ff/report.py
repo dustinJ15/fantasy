@@ -5,6 +5,8 @@ import re
 from collections import Counter
 from datetime import date
 
+from .model.injuries import drop_cost, market_value
+
 
 def slug(text: str) -> str:
     """Stable, typeable id fragment: 'Jameson Williams' -> 'jameson-williams'."""
@@ -48,29 +50,37 @@ def _lineup_changes(lg: dict) -> list[str]:
     return moves
 
 
-# What cutting a player the market would pay for costs, in points a week per 1000 of FantasyCalc redraft value.
-# A bench body the market prices at 2500 (about overall rank 50) is trade bait, so he carries +2.5 a week over his
-# `mu_ros`; a WR4 nobody would trade for sits near 300 (+0.3) or is not listed at all (+0). It is a thumb on the
-# scale, not a veto: a market number cannot save a player who is several points a week behind the next body.
-MARKET_DROP_PPW = 1.0
-# The 30-day trend rides on the value at half weight: the market pays more next week for a player it is warming to,
-# and a player it is cooling on is the easier cut of two priced the same today.
-MARKET_TREND_WEIGHT = 0.5
-
-
 def _market_value(p: dict) -> float | None:
     """FantasyCalc redraft value with the 30-day trend folded in, or None when the market does not list him."""
-    m = p.get("market") or {}
-    v = m.get("redraft_value")
-    if v is None:
-        return None
-    return float(v) + MARKET_TREND_WEIGHT * float(m.get("trend_30d") or 0)
+    return market_value(p.get("market"))
 
 
-def _drop_cost(p: dict) -> float:
-    """What a cut costs me: rest-of-season points a week plus the market penalty for cutting a player someone
-    would trade for."""
-    return p["mu_ros"] + MARKET_DROP_PPW * (_market_value(p) or 0.0) / 1000.0
+def _weeks_left(lg: dict) -> int:
+    return int(lg.get("weeks_remaining") or max(18 - int(lg.get("week") or 1), 1))
+
+
+def _handcuff_for(lg: dict, name: str) -> str | None:
+    """The RB starter of mine this bench player backs up, per `lg["handcuffs"]`, or None."""
+    return next((h["starter"] for h in lg.get("handcuffs") or [] if h.get("handcuff") == name), None)
+
+
+def _drop_cost(p: dict, lg: dict) -> float:
+    """What a cut costs me, from `model.injuries.drop_cost`: rest-of-season points a week, the market penalty for
+    cutting a player someone would trade for, the insurance a handcuff to my RB1 carries, less the week a body on
+    bye or likely to sit gives the Sunday pickup nothing for. The Drop row ranks by the same number."""
+    cuff = sum(h.get("est_value") or 0.0 for h in lg.get("handcuffs") or [] if h.get("handcuff") == p["name"])
+    return drop_cost(p["mu_ros"], market=p.get("market"), handcuff_value=cuff,
+                     sit_this_week=1.0 if p.get("bye") else (p.get("p_zero") or 0.0), weeks_out=p.get("weeks_out") or 0.0,
+                     mu_ros_active=p.get("mu_ros_active"), weeks_remaining=_weeks_left(lg))
+
+
+def _sit_note(p: dict) -> str:
+    """"on bye this week" / "90% to sit this week" when this week is the reason he is cheap; empty otherwise."""
+    if p.get("bye"):
+        return "on bye this week"
+    if (p.get("p_zero") or 0.0) >= RISKY_TO_SIT:
+        return f"{p['p_zero']:.0%} to sit this week"
+    return ""
 
 
 def _bench(lg: dict, exclude: set[str] = frozenset()) -> list[dict]:
@@ -88,7 +98,7 @@ def _drop_order(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
     market term is the B6 fix: by `mu_ros` alone a rookie RB the market priced like a starter was cut before a WR4
     nobody would trade for; he is trade bait (see the `trade` verdict), not a cut.
     """
-    return [p["name"] for p in sorted(_bench(lg, exclude), key=_drop_cost)]
+    return [p["name"] for p in sorted(_bench(lg, exclude), key=lambda p: _drop_cost(p, lg))]
 
 
 def _drop_candidate(lg: dict) -> str | None:
@@ -97,21 +107,28 @@ def _drop_candidate(lg: dict) -> str | None:
 
 
 def _drop_note(lg: dict, name: str, exclude: set[str] = frozenset()) -> str:
-    """The numbers behind a named drop: " (market 300, 3.0/wk)", and when a body cheaper by `mu_ros` alone was
-    passed over for his market price, who he is and his two numbers, so the card shows them side by side.
-    Empty when the market does not list the drop and nobody was passed over."""
+    """The numbers behind a named drop: " (market 300, 3.0/wk)", the bye or sit risk that made him the cut this
+    week, and when a body cheaper by `mu_ros` alone was passed over (for his market price, or because he backs up
+    my RB1), who he is and his numbers, so the card shows them side by side. Empty when the market does not list
+    the drop, this week is not the reason, and nobody was passed over."""
     bench = {p["name"]: p for p in _bench(lg, exclude)}
     p = bench.get(name)
     if p is None:
         return ""
-    cheaper = [q for q in bench.values() if q["name"] != name and q["mu_ros"] < p["mu_ros"] and _drop_cost(q) > _drop_cost(p)]
-    mv = _market_value(p)
-    if mv is None and not cheaper:
+    # Passed over for a reason of his own (priced, or my RB1's backup); a body outranked only by this drop's bye or
+    # sit risk is not "kept", and the note on the drop already says why he goes.
+    cheaper = [q for q in bench.values() if q["name"] != name and q["mu_ros"] < p["mu_ros"] and _drop_cost(q, lg) > _drop_cost(p, lg)
+               and (_market_value(q) is not None or _handcuff_for(lg, q["name"]))]
+    mv, sit = _market_value(p), _sit_note(p)
+    if mv is None and not cheaper and not sit:
         return ""
-    out = f" (market {mv:.0f}, {p['mu_ros']:.1f}/wk)" if mv is not None else f" (not priced by the market, {p['mu_ros']:.1f}/wk)"
+    out = f" (market {mv:.0f}, {p['mu_ros']:.1f}/wk" if mv is not None else f" (not priced by the market, {p['mu_ros']:.1f}/wk"
+    out += f", {sit})" if sit else ")"
     if cheaper:
         q = min(cheaper, key=lambda q: q["mu_ros"])
-        out += f" over {q['name']} (market {_market_value(q):.0f}, {q['mu_ros']:.1f}/wk; trade bait, not a cut)"
+        qv, cuff = _market_value(q), _handcuff_for(lg, q["name"])
+        nums = (f"market {qv:.0f}, " if qv is not None else "") + f"{q['mu_ros']:.1f}/wk"
+        out += f" over {q['name']} ({nums}; {f'handcuff for {cuff}' if cuff else 'trade bait'}, not a cut)"
     return out
 
 

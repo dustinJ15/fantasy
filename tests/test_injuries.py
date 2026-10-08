@@ -28,11 +28,11 @@ def fa(delta, name="FA", pos="RB", slot="RB"):
     return [{"name": name, "pos": pos, "slot": slot, "delta_over_starter": delta, "streamer": False}]
 
 
-def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=None, repl=None, handcuffs=(), memory=None):
+def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=None, repl=None, handcuffs=(), memory=None, values=None):
     wr = 17 - week + 1
     starters = starters if starters is not None else {p.espn_id for p in mine if p.weeks_out < 1 and p.name not in ("RB4", "TE2")}
     return decide(mine, {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}, week, wr, REG, playoff_pct,
-                  ir_slots, list(waivers), list(trades), {}, starters, repl, list(handcuffs), memory)
+                  ir_slots, list(waivers), list(trades), values or {}, starters, repl, list(handcuffs), memory)
 
 
 def test_week_weights_count_playoff_weeks_by_my_odds():
@@ -177,6 +177,27 @@ def test_a_dead_spot_that_is_not_the_cheapest_cut_holds_and_names_the_cheaper_on
     starters = {p.espn_id for p in mine if p.name not in ("RB4", "TE2")}
     (row,) = run(mine, 3, 60, starters=starters, repl={"RB": 8.0})
     assert row["verdict"] == "hold" and "TE2 is the cheaper drop" in row["why"][0]
+
+
+def test_the_drop_row_ranks_the_cut_by_the_ledger_cost_not_mu_ros_alone():
+    """The dead RB4 holds by `mu_ros` alone because TE2 is a hair cheaper; the market prices TE2 like a starter, so
+    the checklist ledger would never cut him. The Drop row has to agree with the ledger (B6b)."""
+    mine = roster(); mine[4].mu = mine[4].mu_ros = 5.0; hurt(mine[4], 4, 15, 3)   # RB4 dead weight, 3.67/wk netted
+    mine[9].mu = mine[9].mu_ros = 3.0                                             # TE2 cheaper by mu_ros alone
+    starters = {p.espn_id for p in mine if p.name not in ("RB4", "TE2")}
+    (row,) = run(mine, 3, 60, starters=starters, repl={"RB": 8.0}, values={"10": {"redraft_value": 2400, "trend_30d": 0}})
+    assert row["verdict"] == "drop" and "dead roster spot" in row["why"][0]
+
+
+def test_the_drop_row_keeps_my_rb1_handcuff_over_a_dead_spot():
+    mine = roster(); mine[4].mu = mine[4].mu_ros = 5.0; hurt(mine[4], 4, 15, 3)   # RB4 dead weight
+    mine[3].mu = mine[3].mu_ros = 3.0                                             # RB3 cheaper by mu_ros, but he backs up RB1
+    starters = {p.espn_id for p in mine if p.name not in ("RB3", "RB4", "TE2")}
+    cuffs = [{"starter": "RB1", "handcuff": "RB3", "owner_team_id": 1, "est_value": 2.0}]
+    (row,) = run(mine, 3, 60, starters=starters, repl={"RB": 8.0}, handcuffs=cuffs)
+    assert row["verdict"] == "drop"
+    (row,) = run(mine, 3, 60, starters=starters, repl={"RB": 8.0})
+    assert row["verdict"] == "hold" and "RB3 is the cheaper drop" in row["why"][0]
 
 
 # ---------- who fills the freed spot ----------
