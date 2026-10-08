@@ -169,3 +169,70 @@ def test_a_skipped_hold_is_struck_through_in_the_html(monkeypatch):
     plain = render_email(p, {})
     at = plain.index("Holding:")
     assert "line-through" not in plain[at:plain.index("</div>", at)]
+
+
+# ---------- game context (D7): opponent, implied total, kickoff day, usage, p(accept) ----------
+
+THU, SUN = "2027-09-10T00:15Z", "2027-09-12T17:00Z"  # 8:15 PM ET Thursday, 1 PM ET Sunday (far enough out that the clock never locks anyone)
+
+
+def _line(opp, kickoff, implied, home=True):
+    return {"opp": opp, "home": home, "spread": -4.0 if home else 4.0, "total": 51.0, "implied": implied, "kickoff": kickoff,
+            "venue": "Somewhere", "indoor": False, "state": "pre"}
+
+
+def _packet_with_lines(monkeypatch):
+    """The synthetic league with the star's team on Thursday night (against a team nobody in the demo plays for) and
+    the other two teams playing each other on Sunday, plus a usage row for the star."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    snap = make_snapshot()
+    base = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=100)
+    star = base["roster"][0]
+    others = [t for t in ("GB", "KC", "DAL") if t != star["team"]]
+    lines = {star["team"]: _line("BUF", THU, 27.5), others[0]: _line(others[1], SUN, 21.0),
+             others[1]: _line(others[0], SUN, 23.5, home=False)}
+    usage = {f"g{star['espn_id']}": {"flags": [], "ppg": 14.0, "xfp_pg": 13.0, "tgt_share": 0.262, "tgt_pg": 8.1, "carry_pg": 0.0}}
+    blk = analyze_league(snap, FakeXW(), {}, {}, {}, usage, overrides=None, sims=100, lines=lines)
+    blk["name"] = "L9"
+    return {"version": 3, "generated": "2026-09-10T07:00:00", "season": 2026,
+            "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": []},
+            "leagues": [blk]}, star
+
+
+def test_packet_carries_the_game_and_the_kickoff_day(monkeypatch):
+    p, star = _packet_with_lines(monkeypatch)
+    lg = p["leagues"][0]
+    me = next(q for q in lg["roster"] if q["espn_id"] == star["espn_id"])
+    assert me["odds_line"]["implied"] == 27.5 and me["odds_line"]["day"] == "Thu" and me["odds_line"]["home"] is True
+    assert all((q["odds_line"] or {}).get("day") in ("Thu", "Sun") for q in lg["roster"])
+    assert all(w.get("kickoff_day") in ("Thu", "Sun") for w in lg["waivers"])  # the wire is on the same clock
+
+
+def test_the_card_says_set_by_thu_and_the_number_behind_the_accept_word(monkeypatch):
+    p, star = _packet_with_lines(monkeypatch)
+    lg = p["leagues"][0]
+    rows = {x["id"]: x for x in report.todos(lg)}
+    assert f"{star['name']}: bench → QB, set by Thu" in rows["lineup"]["moves"]  # the demo benches the star; he plays Thursday
+    assert not any("set by" in m for m in rows["lineup"]["moves"] if star["name"] not in m)
+    trade_rows = [x for x in rows.values() if x["kind"] == "trade"]
+    assert trade_rows and all(f"p(accept) {x['p_accept']:.2f}" in x["text"] for x in trade_rows)
+    html = render_email(p)
+    assert escape(f"{star['name']}: bench → QB, set by Thu").replace(" → ", "") in html.replace(' <span style="color:#6b7280">→</span> ', "")
+    assert "p(accept) 0." in html
+    md = report.render(p)
+    assert "set by Thu" in md and "p(accept) 0." in md
+
+
+def test_the_detail_shows_opponent_implied_total_and_usage_next_to_the_projection(monkeypatch):
+    p, star = _packet_with_lines(monkeypatch)
+    opp = p["leagues"][0]["roster"][0]["odds_line"]["opp"]
+    html = render_email(p, full=True)
+    assert f"vs {opp} 27.5 Thu" in html and "tgt 26%" in html
+    md = report.render(p)
+    assert f"| {star['name']} | QB | " in md and f"| vs {opp} 27.5 Thu | tgt 26% |" in md
+    assert f"- QB: {star['name']} (vs {opp} 27.5 Thu)" in md
+    # no lines, no usage: nothing invented, the rows read as before
+    bare = _packet(monkeypatch)
+    plain = render_email(bare, full=True)
+    assert "set by" not in plain and " 27.5 " not in plain and "tgt " not in plain and "mkt " not in plain
+    assert "set by" not in report.render(bare)

@@ -57,8 +57,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 - [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
   (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
 - [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.
-- [ ] **D7 (S). Email context.** Per-player opponent and implied total (`sources.implied_total`), kickoff day
-  (Thursday players need their moves first), usage trend, and p(accept) on the trade row, not only the word.
 - [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.
 
 ## Tier E — tests that would catch model errors

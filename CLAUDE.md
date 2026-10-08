@@ -41,7 +41,10 @@ row, `trades.py` the scan and the hard rules), `packet.py` builds the DecisionPa
 ESPN's position caps; `drop_order` / `drop_note` rank and explain a cut), `report.py` renders markdown (plain-text body)
 and owns the checklist itself (one `_*_items` builder per row kind over the shared ledger, `todos` is the order, the push
 selection and the ids, `apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id or an unruled trade),
-`email_html.py` renders the HTML email from the packet. Tests: `uv run pytest`.
+`email_html.py` renders the HTML email from the packet. Game context on a row is a packet field put into words by one
+`report` helper both renderers call (`game_note` reads `odds_line`, which `packet.enrich` fills with the opponent, implied total
+and Eastern kickoff `day`; `usage_note` reads `usage` then `market.trend_30d`; `due_note` says "set by Thu" from a kickoff day,
+on roster players' `odds_line.day` and waiver rows' `kickoff_day`; `accept_note` prints the bucket word with `p_accept`). Tests: `uv run pytest`.
 `demo.py` is the synthetic league (fictional, seeded names); `scripts/screenshots.sh` regenerates `examples/` including the README images.
 The Gmail doorbell is Apps Script, so pytest cannot see it: `node scripts/gmail_trade_doorbell.test.js` runs it against a stubbed
 Apps Script runtime (retries, escalation, no-double-fire). Run it after editing the `.gs`, before pasting into the editor.

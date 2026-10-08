@@ -550,3 +550,85 @@ def test_offer_card_prints_ids_before_reads_and_folds_the_ruling_in():
     assert "~~ACCEPT~~" in ruled and "**skip:** decline, he is in a boot" in ruled and "`[offer:" not in ruled
     amended = report.offer_card(packet, {"L1": {"items": {"offer:garrett-wilson": {"verdict": "amend", "note": "only if he practices Friday"}}}})
     assert "**ACCEPT:**" in amended and "**note:** only if he practices Friday" in amended
+
+
+# ---------- game context on the rows (D7) ----------
+
+def line(opp="KC", implied=27.5, day="Thu", home=True):
+    return {"opp": opp, "implied": implied, "spread": -4.0, "total": 51.0, "kickoff": None, "home": home, "day": day}
+
+
+def test_game_note_reads_opponent_implied_total_and_day():
+    assert report.game_note({**player("A"), "odds_line": line()}) == "vs KC 27.5 Thu"
+    assert report.game_note({**player("A"), "odds_line": line("DET", 21.0, "Sun", home=False)}) == "@DET 21.0 Sun"
+    assert report.game_note({**player("A"), "odds_line": line(implied=None, day=None)}) == "vs KC"
+    assert report.game_note(player("A")) == ""
+
+
+def test_usage_note_prefers_usage_and_falls_back_to_the_market_move():
+    assert report.usage_note({**player("A"), "usage": {"tgt_share": 0.262, "tgt_pg": 8.1, "carry_pg": 0.0}}) == "tgt 26%"
+    assert report.usage_note({**player("A", pos="RB"), "usage": {"tgt_share": 0.08, "tgt_pg": 2.0, "carry_pg": 15.4}}) == "15 car/g"
+    assert report.usage_note({**player("A"), "usage": {"tgt_share": None, "tgt_pg": 5.2, "carry_pg": 0.0}}) == "5 tgt/g"
+    assert report.usage_note({**player("A"), "usage": None, "market": market(1500, trend=+320)}) == "mkt +320/30d"
+    assert report.usage_note({**player("A"), "usage": None, "market": market(1500, trend=0)}) == ""
+    assert report.usage_note(player("A")) == ""
+
+
+def test_lineup_moves_for_a_thursday_player_say_set_by_thu_and_go_first_in_their_group():
+    """Two bench players coming in: the Thursday one reads "set by Thu" and prints before the Sunday one, while the
+    slot freed stays first (the app order). A Monday player is marked too; a Sunday player is not."""
+    lg = league(roster=[{**player("Sun Out", slot="WR"), "odds_line": line(day="Sun")},
+                        {**player("Sun In"), "odds_line": line("DET", 21.0, "Sun", home=False)},
+                        {**player("Thu In"), "odds_line": line()},
+                        {**player("Mon In"), "odds_line": line("BUF", 24.0, "Mon")}],
+                lineup_win={"slots": {"WR": ["Sun In", "Thu In"], "RB/WR/TE": ["Mon In"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []})
+    moves = by_id(lg)["lineup"]["moves"]
+    assert moves == ["Sun Out: WR → bench", "Thu In: bench → WR, set by Thu", "Sun In: bench → WR", "Mon In: bench → RB/WR/TE (Mon)"]
+
+
+def test_lineup_moves_without_kickoff_data_read_as_before():
+    lg = league(roster=[player("Out Guy", slot="WR"), player("In Guy")],
+                lineup_win={"slots": {"WR": ["In Guy"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []})
+    assert by_id(lg)["lineup"]["moves"] == ["Out Guy: WR → bench", "In Guy: bench → WR"]
+
+
+def waiver(name="Now Guy", **kw):
+    w = {"name": name, "pos": "WR", "team": "KC", "streamer": False, "delta_week": 3.0, "delta_over_starter": 0.5, "week_slot": "WR",
+         "slot": "WR", "on_waivers": False, "why": [], "mu_week": 12.0, "mu_ros": 9.0}
+    w.update(kw)
+    return w
+
+
+def test_waiver_row_carries_the_kickoff_day():
+    lg = league(open_spots=1, waivers=[waiver(kickoff_day="Thu")])
+    assert by_id(lg)["waiver:now-guy"]["text"] == "add Now Guy (WR) and start him at WR (+3 pts this week), set by Thu (there is an open bench spot)"
+    lg = league(open_spots=1, waivers=[waiver(delta_week=0.5, delta_over_starter=1.2, kickoff_day="Thu")])
+    assert by_id(lg)["waiver:now-guy"]["text"] == "add Now Guy (WR), +1.2/wk over your WR, set by Thu (there is an open bench spot)"
+    lg = league(waivers=[waiver("Texans D/ST", pos="D/ST", streamer=True, delta_over_starter=2.6, kickoff_day="Thu")])
+    assert by_id(lg)["stream:texans-d-st"]["text"] == "swap in Texans D/ST at D/ST (+2.6 this week), set by Thu"
+
+
+def test_waiver_row_without_a_kickoff_day_reads_as_before():
+    lg = league(open_spots=1, waivers=[waiver()])
+    assert by_id(lg)["waiver:now-guy"]["text"] == "add Now Guy (WR) and start him at WR (+3 pts this week) (there is an open bench spot)"
+    lg = league(open_spots=1, waivers=[waiver(kickoff_day="Sun")])
+    assert by_id(lg)["waiver:now-guy"]["text"] == "add Now Guy (WR) and start him at WR (+3 pts this week) (there is an open bench spot)"
+
+
+def test_trade_row_prints_p_accept_next_to_the_word():
+    t = {**trade(["Kai"], ["Maye"]), "p_accept": 0.62, "accept_word": "he'd likely take it"}
+    assert "(+1.5 pts/wk for you, +0.5 for them, he'd likely take it, p(accept) 0.62)" in by_id(league(trades=[t]))["trade:kai"]["text"]
+    bare = by_id(league(trades=[trade(["Kai"], ["Maye"])]))["trade:kai"]["text"]
+    assert bare.startswith("offer Rival your Maye for Kai (+1.5 pts/wk for you, +0.5 for them)") and "p(accept)" not in bare
+
+
+def test_detail_tables_show_the_game_and_the_usage_next_to_the_projection():
+    lg = league(roster=[{**player("Starter WR", slot="WR"), "odds_line": line(), "usage": {"tgt_share": 0.262, "tgt_pg": 8.1, "carry_pg": 0.0}},
+                        player("Bench WR", ros=3.0)],
+                lineup_win={"slots": {"WR": ["Starter WR"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": ["Bench WR"]},
+                lineup_ev={"mu": 100.0}, odds={}, current_lineup_mu=100.0, opponent={"name": "Them", "mu": 90.0, "sd": 20.0}, handcuffs=[], weeks_remaining=12)
+    roster = "\n".join(report._detail_roster(lg))
+    assert "| Starter WR | WR | 10.0 | 10.0 | vs KC 27.5 Thu | tgt 26% |" in roster
+    assert "| Bench WR | WR | 10.0 | 3.0 |  |  |" in roster  # no data: empty cells, nothing invented
+    matchup = "\n".join(report._detail_matchup(lg))
+    assert "- WR: Starter WR (vs KC 27.5 Thu)" in matchup

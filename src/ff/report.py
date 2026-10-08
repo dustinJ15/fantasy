@@ -25,25 +25,65 @@ def _flags(p: dict) -> str:
 
 NON_STARTER = {"BE", "IR", "", "FA"}
 
+# Kickoff days in the order the moves fall due; a day the packet does not know reads as Sunday.
+DAY_ORDER = {"Thu": 0, "Fri": 1, "Sat": 2, "Sun": 3, "Mon": 4}
+
+
+def game_note(p: dict) -> str:
+    """"vs KC 27.5 Thu" / "@DET 21.0 Sun": the opponent, Vegas implied team total and kickoff day from `odds_line`
+    (the packet's copy of the scoreboard line); empty when the packet has no line for his team."""
+    ln = p.get("odds_line") or {}
+    if not ln.get("opp"):
+        return ""
+    out = f"{'@' if ln.get('home') is False else 'vs '}{ln['opp']}"
+    if ln.get("implied") is not None:
+        out += f" {ln['implied']:.1f}"
+    if ln.get("day"):
+        out += f" {ln['day']}"
+    return out
+
+
+def usage_note(p: dict) -> str:
+    """The one usage figure worth a cell: target share for a receiver, carries a game for a back (`model/usage.py`,
+    season to date), targets a game when the share column is blank, and the 30-day market move when nflverse has
+    nothing on him. Empty when there is no number; nothing is invented."""
+    u = p.get("usage") or {}
+    if p.get("pos") == "RB" and (u.get("carry_pg") or 0) >= 1:
+        return f"{u['carry_pg']:.0f} car/g"
+    if u.get("tgt_share") is not None:
+        return f"tgt {u['tgt_share']:.0%}"
+    if (u.get("tgt_pg") or 0) >= 1:
+        return f"{u['tgt_pg']:.0f} tgt/g"
+    trend = (p.get("market") or {}).get("trend_30d")
+    return f"mkt {trend:+.0f}/30d" if trend else ""
+
+
+def due_note(day: str | None) -> str:
+    """", set by Thu" on a move for a player whose game is before Sunday, " (Mon)" for a Monday one, nothing for
+    Sunday or an unknown day: the lineup locks player by player at kickoff, so a Thursday move is today's."""
+    if day in ("Thu", "Fri", "Sat"):
+        return f", set by {day}"
+    return " (Mon)" if day == "Mon" else ""
+
 
 def _lineup_changes(lg: dict) -> list[str]:
     """Explicit moves to get from the current ESPN slots to the recommended lineup, as an ordered chain:
-    'X: bench -> FLEX' or 'Y: WR -> FLEX', with slots freed in an order that works in the app."""
+    'X: bench -> FLEX' or 'Y: WR -> FLEX', with slots freed in an order that works in the app. Inside each group the
+    earliest kickoff goes first and a Thursday player's move says so (`due_note`); the groups keep the app order."""
     cur = {p["name"]: p["slot"] for p in lg["roster"]}
+    day = {p["name"]: (p.get("odds_line") or {}).get("day") for p in lg["roster"]}
     rec = {n: s for s, names in lg["lineup_win"]["slots"].items() for n in names if not n.startswith("(")}
+    by_day = lambda n: DAY_ORDER.get(day.get(n), DAY_ORDER["Sun"])  # noqa: E731
     moves = []
     # starters who are dropped entirely
-    for n, s in cur.items():
-        if s not in NON_STARTER and n not in rec:
-            moves.append(f"{n}: {s} → bench")
+    for n in sorted((n for n, s in cur.items() if s not in NON_STARTER and n not in rec), key=by_day):
+        moves.append(f"{n}: {cur[n]} → bench{due_note(day.get(n))}")
     # starters changing slot
-    for n, s in rec.items():
-        if cur.get(n) not in NON_STARTER and cur.get(n) != s:
-            moves.append(f"{n}: {cur[n]} → {s}")
+    for n in sorted((n for n, s in rec.items() if cur.get(n) not in NON_STARTER and cur.get(n) != s), key=by_day):
+        moves.append(f"{n}: {cur[n]} → {rec[n]}{due_note(day.get(n))}")
     # bench players coming in
-    for n, s in rec.items():
-        if cur.get(n) in NON_STARTER:
-            moves.append(f"{n}: bench → {s}")
+    for n in sorted((n for n in rec if cur.get(n) in NON_STARTER), key=by_day):
+        moves.append(f"{n}: bench → {rec[n]}{due_note(day.get(n))}")
     empties = [s for s, names in lg["lineup_win"]["slots"].items() if any(n.startswith("(") for n in names)]
     if empties:
         moves.append("EMPTY SLOT: " + ", ".join(empties) + " (no healthy player; pick one up)")
@@ -304,19 +344,21 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
-                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week){suffix}"})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)"
+                            f"{due_note(w.get('kickoff_day'))}{suffix}"})
     for w in ups[:1]:
         _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
-                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}{suffix}"})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}"
+                            f"{due_note(w.get('kickoff_day'))}{suffix}"})
     return out
 
 
 def _stream_items(lg: dict) -> list[dict]:
     """The one streamer (K, D/ST, a bye-week QB) worth swapping in this week; a swap spends no spot."""
     return [{"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
-             "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)" + _claim_note(lg, w)}
+             "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week){due_note(w.get('kickoff_day'))}" + _claim_note(lg, w)}
             for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]]
 
 
@@ -376,6 +418,13 @@ TRADE_WARN_PREFIXES = ("leaves me", "leaves them", "market says I", "they start"
                        "he reads it as a lowball", "I get the best player")
 
 
+def accept_note(t: dict) -> str:
+    """", coin flip, p(accept) 0.42": the bucket word and the number behind it (`model/acceptance.py`); the word alone
+    on an older packet, nothing when the scan did not score it."""
+    word = f", {t['accept_word']}" if t.get("accept_word") else ""
+    return word + (f", p(accept) {t['p_accept']:.2f}" if t.get("p_accept") is not None else "")
+
+
 def _trade_item(t: dict, spots: Spots, push: bool) -> dict:
     """One package to go send: the offer, what it does for each side, the cut ESPN's position cap forces in the trade
     screen (without it the paste goes out and the screen answers "Too many players with default position WR"), what
@@ -383,7 +432,7 @@ def _trade_item(t: dict, spots: Spots, push: bool) -> dict:
     warn = [_to_dustin(w) for w in t["why"] if w.startswith(TRADE_WARN_PREFIXES)]
     them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
     drops, cut = spots.cut(t)
-    odds = f", {t['accept_word']}" if t.get("accept_word") else ""
+    odds = accept_note(t)
     text = (f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])} "
             f"(+{t['my_delta_ppw']:.1f} pts/wk for you, {them}{odds}){cut}")
     if t.get("after_line"):
@@ -817,8 +866,9 @@ def _detail_matchup(lg: dict) -> list[str]:
     lw, le = lg["lineup_win"], lg["lineup_ev"]
     L.append(f"Recommended lineup (max P(win){' = ' + str(lw['p_win']) if lw.get('p_win') is not None else ''}), proj {lw['mu']} ± {lw['sd']}; current ESPN lineup proj {lg['current_lineup_mu']}")
     L.append("")
+    by_name = {p["name"]: p for p in lg["roster"]}
     for slot, names in lw["slots"].items():
-        L.append(f"- {slot}: {', '.join(names)}")
+        L.append(f"- {slot}: " + ", ".join(n + (f" ({game_note(by_name[n])})" if n in by_name and game_note(by_name[n]) else "") for n in names))
     if lg["lineup_diff"]:
         L.append(f"Differs from the pure-points lineup ({le['mu']}){win_gain_note(lw)}: " + "; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"]))
     L.append("")
@@ -828,9 +878,9 @@ def _detail_matchup(lg: dict) -> list[str]:
 
 def _detail_roster(lg: dict) -> list[str]:
     """The roster table, the waiver table and the handcuffs."""
-    L = ["\n## My roster (this week μ · ROS/g · flags)", "| player | pos | wk μ | ROS/g | flags |", "|---|---|---|---|---|"]
+    L = ["\n## My roster (this week μ · ROS/g · game · usage · flags)", "| player | pos | wk μ | ROS/g | game | usage | flags |", "|---|---|---|---|---|---|---|"]
     for p in lg["roster"]:
-        L.append(f"| {p['name']} | {p['pos']} | {p['mu']} | {p['mu_ros']} | {_flags(p)} |")
+        L.append(f"| {p['name']} | {p['pos']} | {p['mu']} | {p['mu_ros']} | {game_note(p)} | {usage_note(p)} | {_flags(p)} |")
 
     L.append("\n## Waivers")
     if lg["waivers"]:

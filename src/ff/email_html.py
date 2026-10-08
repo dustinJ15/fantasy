@@ -285,9 +285,17 @@ def _lineup_table(lg: dict) -> str:
             if p and p.get("locked"):
                 cells.append(_e(n) + f" <span style='color:{MUTED}'>{p.get('actual') or 0:.1f} pts, played</span>")
                 continue
-            cells.append(_e(n) + (f" {_badge(SHORT.get(st[0], st[0]), st[1])}" if st else "") + (f" <span style='color:{MUTED}'>{p['mu']:.1f}</span>" if p else ""))
+            game = f" · {_e(report.game_note(p))}" if p and report.game_note(p) else ""
+            cells.append(_e(n) + (f" {_badge(SHORT.get(st[0], st[0]), st[1])}" if st else "") + (f" <span style='color:{MUTED}'>{p['mu']:.1f}{game}</span>" if p else ""))
         rows.append([f"<b>{_e(slot)}</b>", ", ".join(cells)])
     return _table(["Slot", "Start"], rows, "ll")
+
+
+def _player_cell(p: dict) -> str:
+    """The name, and under it the game and the usage figure when the packet has them (D7): one muted line, not two
+    more columns, so the table still fits a phone."""
+    sub = " · ".join(x for x in (report.game_note(p), report.usage_note(p)) if x)
+    return _e(p["name"]) + (f"<div style='color:{MUTED};font-size:11px'>{_e(sub)}</div>" if sub else "")
 
 
 def _offers_table(lg: dict, rulings: list[dict] | None = None) -> str:
@@ -327,8 +335,9 @@ def _league_detail(lg: dict) -> str:
         body += _muted(f"Pure-points lineup differs{_e(report.win_gain_note(lw))}: " + _e("; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"])), 12)
     body += _muted("Bench: " + _e(", ".join(lw["bench"])), 12)
 
-    body += _h("Roster") + _muted("Wk = projected points this week · ROS = rest-of-season per game · Q/D = questionable/doubtful", 11)
-    rows = [[_e(p["name"]), _e(p["pos"]), f"{p['mu']:.1f}", f"{p['mu_ros']:.1f}", _status_cell(p)] for p in lg["roster"]]
+    body += _h("Roster") + _muted("Wk = projected points this week · ROS = rest-of-season per game · Q/D = questionable/doubtful · "
+                                  "under the name: opponent, Vegas implied total, kickoff day, usage (target share, carries/g) or the 30-day market move", 11)
+    rows = [[_player_cell(p), _e(p["pos"]), f"{p['mu']:.1f}", f"{p['mu_ros']:.1f}", _status_cell(p)] for p in lg["roster"]]
     body += _table(["Player", "Pos", "Wk", "ROS", "Status"], rows, "llrrl", 12)
 
     body += _h("Waivers")
@@ -357,7 +366,7 @@ def _league_detail(lg: dict) -> str:
         for t in lg["trades"][:3]:
             worth = t.get("sendable", t["their_delta_ppw"] >= 0)
             td = f" · title odds you {t['my_title_delta']:+.1f} / them {t['their_title_delta']:+.1f}" if "my_title_delta" in t else ""
-            odds = f" · {t['accept_word']}" if t.get("accept_word") else ""
+            odds = report.accept_note(t).replace(", ", " · ", 1).replace(", p(accept)", " · p(accept)")
             after = f" · {t['after_line']}" if t.get("after_line") else ""
             rows.append([_badge("SEND" if worth else "REACH", "good" if worth else "grey"),
                          f"Give <b>{_e(', '.join(t['give']))}</b> → get <b>{_e(', '.join(t['get']))}</b> from {_e(t['rival'])}"

@@ -7,8 +7,13 @@ in/post, or they already have points."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from .projections import PlayerProj
+
+# The NFL schedule is an Eastern-time schedule: Thursday night's 8:15 kickoff is Friday in UTC and Thursday in every US
+# zone, so the day a game belongs to is its Eastern day.
+SCHEDULE_TZ = ZoneInfo("America/New_York")
 
 
 def _kickoff(line: dict | None) -> datetime | None:
@@ -19,6 +24,12 @@ def _kickoff(line: dict | None) -> datetime | None:
         return datetime.fromisoformat(k.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def kickoff_day(line: dict | None) -> str | None:
+    """'Thu' / 'Sun' / 'Mon': the Eastern weekday of the kickoff on a scoreboard line, None without one."""
+    ko = _kickoff(line)
+    return ko.astimezone(SCHEDULE_TZ).strftime("%a") if ko is not None else None
 
 
 def game_phase(line: dict | None, actual: float, now: datetime) -> str:

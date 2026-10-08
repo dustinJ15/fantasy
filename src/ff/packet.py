@@ -9,7 +9,7 @@ from .cache import HOUR, cached_json
 from .config import PACKET_DIR, LeagueRef, env, leagues
 from .ids import Crosswalk
 from .model import usage as usage_mod
-from .model.clock import apply_clock, week_state
+from .model.clock import apply_clock, kickoff_day, week_state
 from .model.injuries import decide as decide_injuries
 from .model.injuries import fill_spot
 from .model.lineup import as_set, compare, is_complete, optimize
@@ -186,6 +186,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         budget, rival_max = 0, None
     waivers = rank_free_agents(fas, my_lineup, my_bench, repl, weeks_remaining, budget, trending, rival_max,
                                week_lineup=win_lu.assignment)
+    for w in waivers:
+        w["kickoff_day"] = kickoff_day((lines or {}).get(w["team"]))  # a Thursday pickup has to be in before Thursday
     my_rbs = [p for p in my_lineup.get("RB", [])]
     cuffs = handcuffs(my_rbs, pool)
 
@@ -267,7 +269,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         incoming.append({**base, **ev})
     incoming.sort(key=lambda t: t.get("proposed_ts") or 0, reverse=True)
 
-    # usage signals + market values on my roster
+    # usage signals, market values and the game (opponent, implied total, kickoff day) on my roster
     def enrich(p: PlayerProj) -> dict:
         d = p.to_dict()
         x = xw.lookup(p.espn_id, p.name, p.pos) or {}
@@ -275,7 +277,9 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         d["usage"] = usage_sig.get(g) if g else None
         v = values.get(str(p.espn_id))
         d["market"] = {"redraft_value": v["redraft_value"], "rank": v["overall_rank"], "trend_30d": v["trend_30d"]} if v else None
-        d["odds_line"] = None
+        ln = (lines or {}).get(p.team)
+        d["odds_line"] = {"opp": ln["opp"], "home": ln.get("home"), "implied": ln["implied"], "spread": ln["spread"], "total": ln["total"],
+                          "kickoff": ln["kickoff"], "day": kickoff_day(ln)} if ln else None
         return d
 
     rival_needs = {tid: needs(ps, slots, repl) for tid, ps in by_team.items() if tid != my_id}
@@ -368,10 +372,8 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
             if p.get("weeks_out", 0) >= 1 or p.get("slot") == "IR":
                 injured.append(injured_entry(p, ref.name))
             ln = lines.get(p["team"])
-            if ln:
-                p["odds_line"] = {"opp": ln["opp"], "implied": ln["implied"], "spread": ln["spread"], "total": ln["total"], "kickoff": ln["kickoff"]}
-                if not ln["indoor"]:
-                    p["weather"] = wx.get(p["team"])
+            if ln and not ln["indoor"]:
+                p["weather"] = wx.get(p["team"])
         league_blocks.append(blk)
 
     packet = {

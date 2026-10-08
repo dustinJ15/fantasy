@@ -104,7 +104,7 @@ def test_card_lists_every_worth_sending_trade(monkeypatch):
     assert [r["label"] for r in rows] == ["Trade (do this one)", "Trade (worth sending)"]
     assert [r["push"] for r in rows] == [True, False] and all(r["worth"] for r in rows)
     assert rows[0]["rival"] == "Ctrl+Alt+Delete Kelce" and rows[0]["give"] == ["Cy Big"] and rows[0]["get"] == ["Dee Star"]
-    assert rows[0]["text"] == ("offer Ctrl+Alt+Delete Kelce your Cy Big for Dee Star (+2.6 pts/wk for you, +0.1 for them, he'd likely take it) "
+    assert rows[0]["text"] == ("offer Ctrl+Alt+Delete Kelce your Cy Big for Dee Star (+2.6 pts/wk for you, +0.1 for them, he'd likely take it, p(accept) 0.70) "
                                "— too good to let slide (+2.6 pts/wk is a big lineup gain by the math); first ask. "
                                "Send it, or skip it with a reason and it stops")
     assert rows[1]["text"] == "offer Sunday Scaries your Al Fair for Bo Swap (+1.1 pts/wk for you, +0.3 for them)"
