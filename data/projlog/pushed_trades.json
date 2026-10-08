@@ -66,5 +66,21 @@
   "note": null,
   "closed": "2026-10-07",
   "skip_note": "two mid WRs for the WR1 overall reads 0.77 on his chart after the 2-for-1 tax; the scan no longer proposes it"
+ },
+ "L3|Brock Purdy+Michael Wilson": {
+  "status": "open",
+  "since": "2026-10-08",
+  "last": "2026-10-08",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Brock Bowers"
+  ],
+  "get": [
+   "Brock Purdy",
+   "Michael Wilson"
+  ],
+  "source": "math",
+  "note": null
  }
 }

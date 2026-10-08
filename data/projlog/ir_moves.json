@@ -1,0 +1,78 @@
+{
+ "rosters": {
+  "L1": {
+   "date": "2026-10-08",
+   "names": {
+    "4374302": "Amon-Ra St. Brown",
+    "4890973": "Ashton Jeanty",
+    "4361370": "Chris Olave",
+    "4882093": "Bhayshul Tuten",
+    "4432710": "TreVeyon Henderson",
+    "3040151": "George Kittle",
+    "4569587": "Wan'Dale Robinson",
+    "4038941": "Justin Herbert",
+    "4608686": "Kyle Monangai",
+    "4695883": "Jalen Coker",
+    "4430834": "Jalen McMillan",
+    "3054850": "Alvin Kamara",
+    "3051909": "Daniel Carlson",
+    "-16016": "Vikings D/ST",
+    "4360310": "Trevor Lawrence",
+    "4686658": "Mike Washington Jr.",
+    "4362619": "Chris Rodriguez Jr."
+   },
+   "ir": [
+    "4430834"
+   ]
+  },
+  "L2": {
+   "date": "2026-10-08",
+   "names": {
+    "4242335": "Jonathan Taylor",
+    "4685382": "Omarion Hampton",
+    "4361307": "Trey McBride",
+    "4685472": "Tetairoa McMillan",
+    "4426348": "Jayden Daniels",
+    "4431452": "Drake Maye",
+    "4430027": "Sam LaPorta",
+    "4373678": "Khalil Shakir",
+    "4432620": "Parker Washington",
+    "16737": "Mike Evans",
+    "4241416": "Chuba Hubbard",
+    "4429205": "Jordan Addison",
+    "3917315": "Kyler Murray",
+    "4034949": "Eddy Pineiro",
+    "4695883": "Jalen Coker",
+    "4239934": "AJ Dillon",
+    "-16030": "Jaguars D/ST"
+   },
+   "ir": []
+  },
+  "L3": {
+   "date": "2026-10-08",
+   "names": {
+    "4431611": "Caleb Williams",
+    "4242335": "Jonathan Taylor",
+    "4685702": "Quinshon Judkins",
+    "4374302": "Amon-Ra St. Brown",
+    "4428331": "Rashee Rice",
+    "4432665": "Brock Bowers",
+    "4361370": "Chris Olave",
+    "4035538": "David Montgomery",
+    "4685278": "Luther Burden III",
+    "4426388": "Jameson Williams",
+    "3116165": "Chris Godwin Jr.",
+    "3917315": "Kyler Murray",
+    "3929645": "Juwan Johnson",
+    "4036133": "T.J. Hockenson",
+    "4574716": "Harrison Mevis",
+    "2578570": "Jacoby Brissett",
+    "-16020": "Jets D/ST"
+   },
+   "ir": [
+    "4431611"
+   ]
+  }
+ },
+ "moves": {}
+}
