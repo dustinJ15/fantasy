@@ -145,3 +145,88 @@ def test_this_weeks_matchup_stays_out_of_the_rest_of_season_number():
     shoot = blend(row(proj_week=12.0, proj_season=204.0), None, None, 10, None, implied_total=30.0)
     assert shoot.mu > flat.mu
     assert shoot.mu_ros_active == pytest.approx(flat.mu_ros_active, abs=0.01)
+
+
+# ---------- D5: wind into this week's number ----------
+
+WINDY = {"dome": False, "temp_f": 41.0, "wind_mph": 20.0, "precip_pct": 10, "precip_in": 0.0}
+
+
+def test_wind_over_15_discounts_passing_game_and_kicker_this_week_only():
+    """20 mph at kickoff: halfway up the ramp from WIND_MPH_START (15) to WIND_MPH_CAP (25), so QB and WR take half of
+    their cap penalty (0.95), the kicker half of his (0.925); the RB is untouched and no rest-of-season number moves."""
+    from ff.model.projections import WIND_PENALTY_AT_CAP
+    for pos, elig in (("QB", ["QB"]), ("WR", ["WR", "RB/WR/TE"]), ("K", ["K"]), ("RB", ["RB", "RB/WR/TE"])):
+        calm = blend(row(pos=pos, eligible=elig), None, None, W, None)
+        windy = blend(row(pos=pos, eligible=elig), None, None, W, None, weather=WINDY)
+        mult = 1 - 0.5 * WIND_PENALTY_AT_CAP.get(pos, 0.0)
+        assert windy.mu == pytest.approx(calm.mu * mult, abs=0.01), pos
+        assert windy.sources["weather_mult"] == pytest.approx(mult, abs=0.001) and windy.sources["wind_mph"] == 20.0
+        assert windy.mu_ros == calm.mu_ros and windy.mu_ros_active == calm.mu_ros_active, pos
+    assert blend(row(pos="QB", eligible=["QB"]), None, None, W, None, weather=WINDY).mu == pytest.approx(12.0 * 0.95, abs=0.01)
+    assert blend(row(pos="K", eligible=["K"]), None, None, W, None, weather=WINDY).mu == pytest.approx(12.0 * 0.925, abs=0.01)
+
+
+def test_wind_penalty_is_capped_and_starts_at_the_threshold():
+    from ff.model.projections import WIND_PENALTY_AT_CAP, wind_mult
+    assert wind_mult("QB", {**WINDY, "wind_mph": 15.0}) == 1.0           # the threshold itself is calm
+    assert wind_mult("QB", {**WINDY, "wind_mph": 40.0}) == pytest.approx(1 - WIND_PENALTY_AT_CAP["QB"])  # capped at 25
+    assert wind_mult("K", {**WINDY, "wind_mph": 40.0}) == pytest.approx(1 - WIND_PENALTY_AT_CAP["K"])
+    assert wind_mult("RB", {**WINDY, "wind_mph": 40.0}) == 1.0 and wind_mult("D/ST", {**WINDY, "wind_mph": 40.0}) == 1.0
+    windy = blend(row(pos="QB", eligible=["QB"]), None, None, W, None, weather={**WINDY, "wind_mph": 40.0})
+    assert "wind:40mph x0.90" in windy.flags
+
+
+def test_a_dome_or_missing_forecast_leaves_the_number_alone():
+    calm = blend(row(pos="QB", eligible=["QB"]), None, None, W, None)
+    for wx in ({"dome": True}, {"dome": False, "unavailable": True}, None, {"dome": False}):
+        p = blend(row(pos="QB", eligible=["QB"]), None, None, W, None, weather=wx)
+        assert p.mu == calm.mu and p.sources["weather_mult"] == 1.0, wx
+        assert not any(f.startswith("wind:") for f in p.flags)
+    assert calm.sources["weather_mult"] == 1.0 and calm.sources["wind_mph"] is None
+
+
+def test_weather_lookup_is_one_forecast_per_game_and_honours_espn_indoor(monkeypatch):
+    """`weather.by_team` maps both teams of a game to the home stadium's forecast, fetched once; ESPN's `indoor` flag
+    makes a dome without a fetch, and a team with no kickoff reads None (calm)."""
+    from ff.sources import weather
+    calls = []
+
+    def fake_forecast(home, kick, force=False):
+        calls.append((home, kick))
+        return {"dome": False, "wind_mph": 22.0}
+    monkeypatch.setattr(weather, "forecast", fake_forecast)
+    k = "2026-10-11T17:00Z"
+    lines = {"BUF": {"home": True, "opp": "NYJ", "kickoff": k, "indoor": False},
+             "NYJ": {"home": False, "opp": "BUF", "kickoff": k, "indoor": False},
+             "DET": {"home": True, "opp": "GB", "kickoff": k, "indoor": True},
+             "GB": {"home": False, "opp": "DET", "kickoff": k, "indoor": True},
+             "KC": {"home": True, "opp": "LV", "kickoff": None, "indoor": False}}
+    wx = weather.by_team(lines)
+    assert calls == [("BUF", k)]
+    assert wx["BUF"] == wx["NYJ"] == {"dome": False, "wind_mph": 22.0}
+    assert wx["DET"] == wx["GB"] == {"dome": True} and wx["KC"] is None
+
+
+def test_wind_reaches_the_packet_through_analyze_league(monkeypatch):
+    """Wiring: a windy forecast for the demo QB's team shows on his packet row as `sources.weather_mult`, the dome
+    teams and the no-forecast run read 1.0, and the card still renders."""
+    from ff import demo, report
+    from ff.packet import analyze_league
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    snap = demo.make_snapshot()
+    qb = next(r for r in snap["roster"] if r["fantasy_team_id"] == snap["my_team_id"] and r["pos"] == "QB")
+    calm = analyze_league(snap, demo.FakeCrosswalk(), {}, {}, {}, {}, sims=100)
+    wx = {t: {"dome": True} for t in {r["team"] for r in snap["roster"]}}
+    wx[qb["team"]] = {"dome": False, "wind_mph": 25.0}
+    windy = analyze_league(snap, demo.FakeCrosswalk(), {}, {}, {}, {}, sims=100, wx=wx)
+    row_calm = next(p for p in calm["roster"] if p["espn_id"] == qb["espn_id"])
+    row_wind = next(p for p in windy["roster"] if p["espn_id"] == qb["espn_id"])
+    assert row_calm["sources"]["weather_mult"] == 1.0 and row_wind["sources"]["weather_mult"] == 0.9
+    assert row_wind["mu"] == pytest.approx(row_calm["mu"] * 0.9, abs=0.02) and row_wind["mu_ros"] == row_calm["mu_ros"]
+    assert all(p["sources"]["weather_mult"] == 1.0 for p in windy["roster"] if p["team"] != qb["team"])
+    assert "wind:25mph x0.90" in row_wind["flags"]
+    packet = {"version": 6, "generated": "2026-10-11T07:00:00", "season": 2026, "leagues": [windy],
+              "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": []}}
+    md = report.render(packet)
+    assert "Demo League" in md and "wind:25mph x0.90" in md   # the roster table's flags column says why he reads low

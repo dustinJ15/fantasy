@@ -57,8 +57,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 - [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
   (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
 - [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.
-- [ ] **D5 (S). Weather into projections.** Fetched per game (`sources/weather.py`), applied nowhere. Wind over
-  15 mph: penalty on passing and K.
 - [ ] **D6 (S). Research prompt upgrades.** `briefing/SKILL.md:23` budgets ~10 searches for three leagues;
   `:39` says Questionable plus limited Friday is 0.25 while the code's Friday default is 0.30; no guidance on
   `mu_mult`; snap share, route share, depth-chart changes and weather are never asked for. `trade-offer/SKILL.md:17`

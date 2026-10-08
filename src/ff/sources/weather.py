@@ -23,6 +23,25 @@ STADIUMS = {
 }
 
 
+def by_team(lines: dict[str, dict], force: bool = False) -> dict[str, dict | None]:
+    """team abbrev -> kickoff forecast for its game this week, one lookup per game, from `vegas.implied_totals`.
+    ESPN's `indoor` flag on the venue wins over the stadium table (a retractable roof reads closed); a game with no
+    kickoff, or a team with no line, maps to None, which the blend reads as calm."""
+    out: dict[str, dict | None] = {}
+    games: dict[tuple[str, str], dict | None] = {}
+    for team, ln in lines.items():
+        home = team if ln.get("home") else ln.get("opp")
+        kick = ln.get("kickoff")
+        if not home or not kick:
+            out[team] = None
+            continue
+        key = (home, kick)
+        if key not in games:
+            games[key] = {"dome": True} if ln.get("indoor") else forecast(home, kick, force)
+        out[team] = games[key]
+    return out
+
+
 def forecast(home_team: str, kickoff_iso: str, force: bool = False) -> dict | None:
     st = STADIUMS.get(home_team)
     if not st:

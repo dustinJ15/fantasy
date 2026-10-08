@@ -111,6 +111,32 @@ def _sigma(pos: str, mu: float, fp_sd: float | None) -> float:
 VEGAS_K = {"QB": 0.35, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}
 LEAGUE_AVG_IMPLIED = 23.0
 
+# Wind at kickoff (`sources/weather.py`, Open-Meteo 10 m wind in mph) discounts this week's number for the players
+# the ball has to fly for. The public play-by-play studies (FiveThirtyEight's and 4for4's wind pieces, the Fantasy
+# Points weather reviews) agree on the shape and roughly on the size: passing yards, completion rate and field-goal
+# rate are flat up to the mid-teens and fall from there; at 20+ mph a QB's fantasy output lands about 10-15% under
+# projection, and kickers lose more because the long attempts stop being tried. The ramp is linear from
+# WIND_MPH_START to WIND_MPH_CAP and flat after it; the cap penalty is the small end of those figures, since every
+# projection source already glances at the forecast by Sunday morning and the cost of a wrong number is a benching.
+# Domes and retractable roofs are exempt (`dome` in the forecast), a missing or unavailable forecast is calm, and
+# the rest-of-season numbers never see it: wind is a matchup, not a level.
+WIND_MPH_START = 15.0
+WIND_MPH_CAP = 25.0
+WIND_PENALTY_AT_CAP = {"QB": 0.10, "WR": 0.10, "TE": 0.10, "K": 0.15}   # RB and D/ST: no penalty
+
+
+def wind_mult(pos: str, weather: dict | None) -> float:
+    """This week's multiplier for the kickoff forecast: 1.0 for a dome, a missing forecast, a calm day or a position the
+    wind does not touch; 1 - penalty at WIND_MPH_CAP and above, linear in between."""
+    if not weather or weather.get("dome") or weather.get("unavailable"):
+        return 1.0
+    wind = _num(weather.get("wind_mph"))
+    pen = WIND_PENALTY_AT_CAP.get(pos, 0.0)
+    if wind is None or wind <= WIND_MPH_START or not pen:
+        return 1.0
+    frac = min((wind - WIND_MPH_START) / (WIND_MPH_CAP - WIND_MPH_START), 1.0)
+    return 1.0 - pen * frac
+
 
 def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None) -> float | None:
     """A player's healthy per-game level from the season so far: his own points per game played, with ESPN's
@@ -147,12 +173,13 @@ def _num(x) -> float | None:
 
 def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None,
           sleeper_pts: float | None = None, implied_total: float | None = None, week: int | None = None,
-          weekday: int | None = None) -> PlayerProj:
+          weekday: int | None = None, weather: dict | None = None) -> PlayerProj:
     """
     row: PlayerRow dict from sources.espn. fp: matched fp_latest_weekly row. sleeper: injury_table row.
     sleeper_pts: Sleeper/Rotowire stat projection in this league's scoring. implied_total: Vegas implied team total.
     week: the current matchup week, used only to date `return_week`. weekday: today (Monday = 0), which scales a
-    Questionable early in the week; None means the Friday number.
+    Questionable early in the week; None means the Friday number. weather: the kickoff forecast for his game
+    (`sources.weather.forecast`), None when unknown; only its wind moves a number (`wind_mult`), this week only.
 
     Overrides (Claude's parameters, never decisions): `p_zero` and `mu_mult` are this week only; `weeks_out` (a number,
     or "season") and `ros_mult` are the rest of the season. Code owns the arithmetic between them.
@@ -179,6 +206,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     mu_neutral = mu   # the blend before this week's matchup (Vegas, the opponent) is applied: the rest of the season's input
     if implied_total and mu and VEGAS_K.get(pos, 0):
         mu *= 1 + VEGAS_K[pos] * (implied_total / LEAGUE_AVG_IMPLIED - 1)
+    wx_mult = wind_mult(pos, weather)
+    mu *= wx_mult
 
     status = (row.get("injury_status") or "").upper() or None
     sl_status = ((sleeper or {}).get("status") or "").upper() or None
@@ -198,6 +227,9 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         flags.append(f"sleeper:{sl_status}" + (f" ({sleeper.get('body_part')})" if sleeper and sleeper.get("body_part") else ""))
     if fp and fp.get("start_sit_grade"):
         flags.append(f"fp:{fp['start_sit_grade']}")
+    wind_mph = _num((weather or {}).get("wind_mph"))
+    if wx_mult < 1.0:
+        flags.append(f"wind:{wind_mph:.0f}mph x{wx_mult:.2f}")
 
     sl_roster = (sleeper or {}).get("roster_status") or ""
     designated = (status not in ACTIVE_STATUSES or sl_status not in ACTIVE_STATUSES or sl_roster in SLEEPER_ROSTER_MULTI_WEEK
@@ -242,6 +274,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         weeks_out=round(weeks_out, 2), avail_ros=round(avail_ros, 3), mu_ros_active=round(mu_ros_active, 2), return_week=return_week,
         bye_weeks=sorted({int(w) for w in (row.get("bye_weeks") or [])} | ({week} if row.get("bye") and week else set())),
         sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "sleeper_pts": sleeper_pts, "implied_total": implied_total,
+                 # kickoff wind and the this-week multiplier it earned (1.0 for a dome, calm air or no forecast)
+                 "wind_mph": wind_mph, "weather_mult": round(wx_mult, 3),
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
