@@ -97,4 +97,4 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier E — tests that would catch model errors
 
-- [ ] **E6.** `tests/test_waivers.py` pins FAAB constants for a feature no league uses; waiver priority has none.
+(none open)
