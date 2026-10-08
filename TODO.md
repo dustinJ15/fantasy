@@ -97,8 +97,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier E — tests that would catch model errors
 
-- [ ] **E1.** `tests/test_lineup.py:69-77` "underdog prefers variance" passes with variance ignored (the WR also
-  wins on EV). Give the high-variance player a lower EV.
 - [ ] **E2.** `tests/test_packet_synthetic.py:155-170` reconstructs the expected rows from the block it tests
   and branches on the output; `:155`'s `or any(p_zero == 1.0)` is always true.
 - [ ] **E3.** Regression tests for B1, B2, B3, B4 and `_Spots.cut` reaching the `stuck` branch.
