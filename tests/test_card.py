@@ -287,6 +287,41 @@ def test_a_season_ender_on_the_bench_is_the_drop_candidate():
     assert report._drop_candidate(lg) == "Done"
 
 
+def market(value, trend=0):
+    return {"redraft_value": value, "rank": None, "trend_30d": trend}
+
+
+def test_the_market_keeps_a_rookie_the_market_would_pay_for_off_the_drop_list():
+    """The rookie RB is the cheaper body by ROS points but the market prices him like a startable piece; the WR4
+    nobody would trade for goes first, and the row shows the two numbers side by side (B6)."""
+    lg = league(roster=[player("Starter WR", slot="WR"), {**player("Rookie RB", pos="RB", ros=2.0), "market": market(2400)},
+                        {**player("WR Four", ros=3.0), "market": market(300)}],
+                waivers=[{"name": "Now Guy", "pos": "WR", "streamer": False, "delta_week": 3.0, "delta_over_starter": 0.5, "week_slot": "WR", "on_waivers": False}])
+    assert report._drop_order(lg) == ["WR Four", "Rookie RB"]
+    text = by_id(lg)["waiver:now-guy"]["text"]
+    assert "drop WR Four (market 300, 3.0/wk)" in text and "Rookie RB (market 2400, 2.0/wk" in text
+
+
+def test_the_market_penalty_does_not_save_a_buried_player():
+    """A big market number is a tie-breaker-plus, not a veto: half a point a week behind a 7-a-week body is still the cut."""
+    lg = league(roster=[player("Starter WR", slot="WR"), {**player("Rookie RB", pos="RB", ros=0.5), "market": market(2400)},
+                        {**player("WR Four", ros=7.0), "market": market(300)}])
+    assert report._drop_order(lg) == ["Rookie RB", "WR Four"]
+
+
+def test_a_rising_market_counts_for_more_than_a_falling_one():
+    """Same value today, opposite 30-day trends: the one the market is souring on is the cut."""
+    lg = league(roster=[player("Starter WR", slot="WR"), {**player("Rising", ros=3.0), "market": market(1500, trend=+800)},
+                        {**player("Falling", ros=3.0), "market": market(1500, trend=-800)}])
+    assert report._drop_order(lg) == ["Falling", "Rising"]
+
+
+def test_a_drop_without_a_market_price_prints_plain():
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Bench B", ros=5.0)],
+                waivers=[{"name": "Now Guy", "pos": "WR", "streamer": False, "delta_week": 3.0, "delta_over_starter": 0.5, "week_slot": "WR", "on_waivers": False}])
+    assert by_id(lg)["waiver:now-guy"]["text"].endswith("; drop Bench WR")
+
+
 def test_read_lint_wants_a_ruling_on_a_drop_but_not_a_hold():
     p = packet(league(injuries=[injury("Done Guy", "drop"), injury("Ankle Guy", "hold")]))
     warns = report.read_lint(p, {})

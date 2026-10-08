@@ -48,21 +48,71 @@ def _lineup_changes(lg: dict) -> list[str]:
     return moves
 
 
+# What cutting a player the market would pay for costs, in points a week per 1000 of FantasyCalc redraft value.
+# A bench body the market prices at 2500 (about overall rank 50) is trade bait, so he carries +2.5 a week over his
+# `mu_ros`; a WR4 nobody would trade for sits near 300 (+0.3) or is not listed at all (+0). It is a thumb on the
+# scale, not a veto: a market number cannot save a player who is several points a week behind the next body.
+MARKET_DROP_PPW = 1.0
+# The 30-day trend rides on the value at half weight: the market pays more next week for a player it is warming to,
+# and a player it is cooling on is the easier cut of two priced the same today.
+MARKET_TREND_WEIGHT = 0.5
+
+
+def _market_value(p: dict) -> float | None:
+    """FantasyCalc redraft value with the 30-day trend folded in, or None when the market does not list him."""
+    m = p.get("market") or {}
+    v = m.get("redraft_value")
+    if v is None:
+        return None
+    return float(v) + MARKET_TREND_WEIGHT * float(m.get("trend_30d") or 0)
+
+
+def _drop_cost(p: dict) -> float:
+    """What a cut costs me: rest-of-season points a week plus the market penalty for cutting a player someone
+    would trade for."""
+    return p["mu_ros"] + MARKET_DROP_PPW * (_market_value(p) or 0.0) / 1000.0
+
+
+def _bench(lg: dict, exclude: set[str] = frozenset()) -> list[dict]:
+    starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
+    return [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"
+            and p["name"] not in exclude]
+
+
 def _drop_order(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
-    """Bench players cheapest first by rest-of-season value, skipping K/DST, the IR slot and `exclude`.
+    """Bench players cheapest first by `_drop_cost` (rest-of-season value plus the market penalty), skipping K/DST,
+    the IR slot and `exclude`.
 
     `mu_ros` already nets out the games a hurt player will miss, so a season-ender is the cheapest cut and a
-    four-week stash is not. The IR occupant is skipped because dropping him frees an IR slot, not a bench spot.
+    four-week stash is not. The IR occupant is skipped because dropping him frees an IR slot, not a bench spot. The
+    market term is the B6 fix: by `mu_ros` alone a rookie RB the market priced like a starter was cut before a WR4
+    nobody would trade for; he is trade bait (see the `trade` verdict), not a cut.
     """
-    starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
-    bench = [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"
-             and p["name"] not in exclude]
-    return [p["name"] for p in sorted(bench, key=lambda p: p["mu_ros"])]
+    return [p["name"] for p in sorted(_bench(lg, exclude), key=_drop_cost)]
 
 
 def _drop_candidate(lg: dict) -> str | None:
     order = _drop_order(lg)
     return order[0] if order else None
+
+
+def _drop_note(lg: dict, name: str, exclude: set[str] = frozenset()) -> str:
+    """The numbers behind a named drop: " (market 300, 3.0/wk)", and when a body cheaper by `mu_ros` alone was
+    passed over for his market price, who he is and his two numbers, so the card shows them side by side.
+    Empty when the market does not list the drop and nobody was passed over."""
+    bench = {p["name"]: p for p in _bench(lg, exclude)}
+    p = bench.get(name)
+    if p is None:
+        return ""
+    cheaper = [q for q in bench.values() if q["name"] != name and q["mu_ros"] < p["mu_ros"] and _drop_cost(q) > _drop_cost(p)]
+    mv = _market_value(p)
+    if mv is None and not cheaper:
+        return ""
+    out = f" (market {mv:.0f}, {p['mu_ros']:.1f}/wk)" if mv is not None else f" (not priced by the market, {p['mu_ros']:.1f}/wk)"
+    if cheaper:
+        q = min(cheaper, key=lambda q: q["mu_ros"])
+        out += f" over {q['name']} (market {_market_value(q):.0f}, {q['mu_ros']:.1f}/wk; trade bait, not a cut)"
+    return out
 
 
 class _Spots:
@@ -95,12 +145,13 @@ class _Spots:
         if self.open > 0:
             self.open -= 1
             return None, " (there is an open bench spot)"
-        order = _drop_order(self.lg, self.reserved | set(self.dropped) | ({for_whom} if for_whom else set()))
+        excl = self.reserved | set(self.dropped) | ({for_whom} if for_whom else set())
+        order = _drop_order(self.lg, excl)
         if not order:
             return None, " (no obvious drop, your call who goes)"
         self.dropped.append(order[0])
         self.note(drop=order[0])
-        return order[0], f"; drop {order[0]}"
+        return order[0], f"; drop {order[0]}{_drop_note(self.lg, order[0], excl)}"
 
     def cut(self, t: dict) -> tuple[list[str], str]:
         """(drops, suffix): the cuts ESPN demands inside the trade screen for a position the trade pushes over its
