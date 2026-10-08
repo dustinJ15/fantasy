@@ -64,3 +64,20 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 ## Tier E — tests that would catch model errors
 
 (none open)
+
+## Docs
+
+- [ ] **R1 (S). Bring README.md up to date.** Last touched 2026-09-23 (commit `1f7d98f`), before the 2026-10-08
+  backlog run that landed 30 commits. Stale or missing as of 2026-10-08: "How it's built" says `uv run pytest` runs
+  40 tests (it is 317); "What the math does" and the Commands table describe waivers as FAAB bids while all three
+  leagues use priority (`claim` / `add` rows, D3 still open), and say nothing about the wind penalty (D5), the
+  opponent's set lineup on Sat–Mon (A4), the P(win) floor on the lineup row (A5), market-, handcuff- and bye-aware
+  drops (B6, B6b), or the title-odds delta being common-random-numbers (A3); the Architecture diagram does not show
+  `src/ff/ledger.py` (B12), `src/ff/rulings.py` and the four memories that ride the `projlog` branch
+  (`skipped_trades`, `pushed_trades`, `offer_outcomes`, `ir_moves`), `scripts/projlog_push.sh`, or the alert paths
+  (Gmail doorbell, GitHub poller gate, the Sunday 9:45 routine). Rewrite those sections from CLAUDE.md's Layout and
+  Operations paragraphs (which are current), keep "The one rule" and "Honest limits" as they are unless a limit was
+  closed, and regenerate `examples/` with `scripts/screenshots.sh` so the email screenshot shows the current card.
+  Done when: every file, command and number the README names exists in the tree (a test in `tests/` that greps the
+  README for backticked `src/ff/*.py` and `scripts/*` paths and asserts each exists is cheap and keeps it honest),
+  and the test count it quotes is read from, or no longer stated as, a fixed number.
