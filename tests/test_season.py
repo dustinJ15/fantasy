@@ -112,7 +112,9 @@ def test_scan_reports_what_he_is_left_with(slots):
         row = next(r for r in c["rival_after"] if r["pos"] == "QB")
         assert row["starters"] and row["starters"][0]["name"] == "TheirQB2" and not row["starters"][0]["wire"]
         assert "he'd start TheirQB2 at QB after" in c["after_line"]
-        assert 0 < c["p_accept"] <= acc.P_MAX and c["accept_word"] in (None, "coin flip", "he'd likely take it")
+        # 0.878 here: he starts it, it is his weakest slot, he has traded. The word is the top bucket, not "any word".
+        assert acc.BUCKETS[0][0] <= c["p_accept"] <= acc.P_MAX
+        assert c["accept_word"] == acc.BUCKETS[0][1] == "he'd likely take it"
 
 
 def test_evaluate_prices_my_side_week_by_week(slots):
