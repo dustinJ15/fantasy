@@ -50,12 +50,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   after, and no function in `report.py` is over 60 lines. This is a refactor, so the playbook's reproduce step is
   the byte-identical demo output, not a failing test.
 
-- [ ] **B10 (XS, needs a live ESPN pull). An in-app withdrawal still reads `declined`.** `rulings.record_outcomes`
-  (B5, 2026-10-08) tells a counter, a voided proposal and a lapse from a decline by the roster, the pending list and
-  the clock, but an offer I cancel in the app with my roster unchanged leaves no trace in `mPendingTransactions`.
-  `docs/plans/trade-acceptance.md` open question 3: probe `mTransactions2` (or the activity feed) for a terminal
-  status on a cancelled proposal; if one is readable, close the entry as `withdrawn` from it.
-
 ## Tier C — operations
 
 - [ ] **C5 (S). The email body is assembled by the LLM.** `briefing/SKILL.md:99-103` has the model paste the

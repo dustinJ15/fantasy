@@ -204,7 +204,8 @@ def pending_trades(league: League, my_team_id: int | None) -> list[dict[str, Any
     """Trade proposals still open on ESPN that involve my team, parsed from the raw `mPendingTransactions` view.
 
     espn-api's Transaction wrapper drops the item direction and the proposal id, so this reads the JSON directly.
-    Use this view, not mTransactions2: the history view keeps showing a proposal as PENDING after it was declined.
+    Use this view, not mTransactions2: the history view keeps showing a proposal as PENDING after it was declined
+    (what it does expose about a closed proposal is read by `trade_resolutions`).
     Each entry: {id, proposer_team_id, proposed_ts, expires_ts, status, team_actions, direction, give, get} where
     `give` are espn player ids leaving my roster and `get` are ids joining it (direction is from my point of view).
     """
@@ -231,6 +232,44 @@ def pending_trades(league: League, my_team_id: int | None) -> list[dict[str, Any
             "direction": "outgoing" if proposer == my_team_id else "incoming",
             "give": give, "get": get,
         })
+    return out
+
+
+def trade_resolutions(league: League, my_team_id: int | None) -> dict[str, dict[str, Any]]:
+    """How ESPN closed each trade proposal, from the `mTransactions2` history view: {proposal id: {status, by, ts}}.
+
+    Probed live 2026-10-08 (three leagues). The proposal itself stays PENDING in that view forever, which is why
+    `pending_trades` reads mPendingTransactions; the terminal state is a separate record pointing back at it through
+    `relatedTransactionId`. A decline is a `TRADE_DECLINE` (teamId and memberId the rival's) plus a copy of the
+    proposal with `executionType: CANCEL`, `status: CANCELED` carrying his member id, same millisecond. A lapse is the
+    CANCEL copy alone under a member id that owns no team (ESPN's job, 51 s after `expirationDate`). A proposal I
+    withdraw in the app has not been observed (this code never writes); by the same pattern it is the CANCEL copy with
+    my member id and no decline. `status` is declined / withdrawn / expired, `by` the team id of the member who did it
+    (None for ESPN), `ts` the record's clock. Every proposal the view relates to is listed; the caller looks up its own.
+    """
+    if my_team_id is None:
+        return {}
+    owners: dict[str, int] = {}
+    for t in league.teams:
+        for o in t.owners:
+            oid = str(o.get("id", "")) if isinstance(o, dict) else str(o)
+            if oid:
+                owners[oid.upper()] = t.team_id
+    swid = (env().swid or "").strip().upper()
+    if swid:
+        owners.setdefault(swid, my_team_id)
+    raw = league.espn_request.league_get(params={"view": "mTransactions2"})
+    out: dict[str, dict[str, Any]] = {}
+    for tx in raw.get("transactions") or []:
+        rel = tx.get("relatedTransactionId")
+        if not rel:
+            continue
+        by = owners.get(str(tx.get("memberId") or "").upper())
+        if tx.get("type") == "TRADE_DECLINE":
+            out[rel] = {"status": "declined", "by": by, "ts": tx.get("proposedDate")}   # his answer, whatever the copy says
+        elif tx.get("type") == "TRADE_PROPOSAL" and tx.get("executionType") == "CANCEL" and rel not in out:
+            status = "withdrawn" if by == my_team_id else "declined" if by is not None else "expired"
+            out[rel] = {"status": status, "by": by, "ts": tx.get("proposedDate")}
     return out
 
 
@@ -273,6 +312,13 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
         pending = pending_trades(league, me.team_id if me else None)
     except Exception as exc:
         pending_err = f"{type(exc).__name__}: {exc}"
+    # How ESPN closed the proposals that are gone (declined / withdrawn / expired): the outcome log's first choice,
+    # with the roster and the clock as the fallback when this view cannot be read.
+    resolutions, resolutions_err = {}, None
+    try:
+        resolutions = trade_resolutions(league, me.team_id if me else None)
+    except Exception as exc:
+        resolutions_err = f"{type(exc).__name__}: {exc}"
     return {
         "ref": asdict(ref), "week": week, "settings": asdict(settings(ref, league)),
         "my_team_id": me.team_id if me else None,
@@ -281,4 +327,5 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
         "free_agents": [asdict(r) for r in free_agent_rows(league, week)],
         "faab_bids": bids,
         "pending_trades": pending, "pending_trades_error": pending_err,
+        "trade_resolutions": resolutions, "trade_resolutions_error": resolutions_err,
     }

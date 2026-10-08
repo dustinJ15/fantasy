@@ -164,8 +164,10 @@ def record_rulings(packet: dict, reads: dict, skips_path: Path = SKIPS_PATH, pus
 # withdrawn when a piece I offered left my roster with nothing coming back (ESPN voids the proposal, his answer was
 # never given); expired when its expiry passed before the run; declined otherwise. The scan reads it for a per-rival
 # prior (accepted / declined / expired: the offers he actually had in front of him until the end) and a recency factor
-# (declined only). An offer I withdrew in the app with my roster unchanged still reads declined: ESPN's pending view
-# has no terminal status, and nothing else here can tell the two apart.
+# (declined only). ESPN's history view (`trade_resolutions` on the league block, from mTransactions2: a TRADE_DECLINE
+# from him, or a CANCEL copy of the proposal naming who cancelled it) is asked first for the three it can tell apart,
+# so an offer I withdrew in the app with my roster unchanged reads withdrawn, not declined; the roster and the clock
+# are the fallback when that view could not be read.
 
 OUTCOMES_PATH = DATA_DIR / "projlog" / "offer_outcomes.json"
 RECENT_DAYS = 7
@@ -224,15 +226,20 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
             continue
         roster_names = {p["name"] for p in lg.get("roster") or []}
         incoming = lg.get("incoming_trades") or []
+        resolved = lg.get("trade_resolutions") or {}
         for key, o in outs.items():
-            if o.get("league") != league or o.get("status") != "open" or key.split("|", 1)[1] in pending:
+            oid = key.split("|", 1)[1]
+            if o.get("league") != league or o.get("status") != "open" or oid in pending:
                 continue
             got = [n for n in o.get("get") or [] if n in roster_names]
             kept = [n for n in o.get("give") or [] if n in roster_names]
+            espn_says = (resolved.get(oid) or {}).get("status")
             if got and not kept:
                 status = "accepted"
             elif got or _countered(o, incoming):
                 status = "countered"      # a different package with him went through, or his counter is on the table
+            elif espn_says in ("declined", "withdrawn", "expired"):
+                status = espn_says        # ESPN's history says who closed it (B10); his decline before the expiry is still his
             elif _expired(o, now):
                 status = "expired"
             elif len(kept) < len(o.get("give") or []):

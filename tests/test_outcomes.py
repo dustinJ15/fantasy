@@ -172,3 +172,33 @@ def test_ir_moves_survive_a_round_trip_through_the_file(tmp_path):
     assert again["moves"]["L1|5"]["added"] == ["Brissett"] and again["rosters"]["L1"]["ir"] == ["5"]
     # a drop straight off IR (not on the roster any more) is not an activation
     assert note_ir_roster(again, "L1", _ir_roster((6, "Brissett", "BE")), date(2026, 10, 7)) == []
+
+
+def test_an_offer_i_withdrew_in_the_app_closes_as_withdrawn_from_espn_history(tmp_path):
+    """B10: a cancel with my roster unchanged left no trace in the pending view and read as his decline. ESPN's
+    history view (`trade_resolutions` on the league block, from mTransactions2) says who closed it."""
+    path = tmp_path / "o.json"
+    d1 = date(2026, 10, 7)
+    record_outcomes(_packet([offer("a", ["Coker"], ["Rice"]), offer("b", ["Evans"], ["London"], rid=5),
+                             offer("c", ["Mixon"], ["Henry"], rid=6, expires="2026-10-08T14:00")]), path, d1)
+    res = {"a": {"status": "withdrawn", "by": 1, "ts": 1}, "b": {"status": "declined", "by": 5, "ts": 2},
+           "c": {"status": "declined", "by": 6, "ts": 3}}
+    pk = _packet([], roster_names=("Coker", "Evans", "Mixon"))
+    pk["leagues"][0]["trade_resolutions"] = res
+    # a: I cancelled it. b: he declined (the history says so, the roster could not). c: he declined before it lapsed and
+    # the run is after the expiry: his answer, not a lapse.
+    events = record_outcomes(pk, path, now=datetime(2026, 10, 8, 16, 0, tzinfo=UTC))
+    assert sorted(events) == ["L1|a: withdrawn", "L1|b: declined", "L1|c: declined"]
+    h = history(load_outcomes(path), "L1", date(2026, 10, 8))
+    assert 4 not in h and h[5]["recent_decline"] and h[6]["recent_decline"]
+
+
+def test_the_history_view_does_not_overrule_a_counter_or_an_acceptance(tmp_path):
+    path = tmp_path / "o.json"
+    record_outcomes(_packet([offer("a", ["Coker"], ["Rice"]), offer("b", ["Pollard"], ["Hall"], rid=6)]), path, date(2026, 10, 7))
+    his_counter = {"id": "x", "rival_team_id": 4, "proposed_ts": _ms("2026-10-07T20:00"), "give": ["Coker", "TE2"], "get": ["Rice"]}
+    pk = _packet([], roster_names=("Coker", "Hall"), incoming=[his_counter])
+    # ESPN declines the original when he counters; the counter on the table is what matters. And a roster that
+    # shows the swap is an acceptance whatever the history says.
+    pk["leagues"][0]["trade_resolutions"] = {"a": {"status": "declined", "by": 4, "ts": 1}, "b": {"status": "declined", "by": 6, "ts": 1}}
+    assert sorted(record_outcomes(pk, path, date(2026, 10, 8))) == ["L1|a: countered", "L1|b: accepted"]

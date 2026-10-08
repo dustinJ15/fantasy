@@ -231,8 +231,9 @@ a `paste` names a position the row says he is thin at as "set".
 
 `rulings.py` already records skips and pushes. Add `data/projlog/offer_outcomes.json`: every outgoing pending offer
 ESPN reports (`pending_trades`, direction outgoing) is recorded when first seen, and closed when it leaves the pending
-list, with the status from `mTransactions2` where readable (accepted / declined / expired / cancelled;
-**needs live pull** to confirm the history view exposes the terminal status). The scan reads it for the recency
+list, with the status from `mTransactions2` where readable (declined / withdrawn / expired, from the record that
+points back at the proposal: `espn.trade_resolutions`, B10, 2026-10-08) and the roster and the clock as the
+fallback (accepted / countered / expired / withdrawn / declined). The scan reads it for the recency
 factor and for a per-rival prior (a rival who declined three offers has a lower base). This is the first real
 acceptance data the repo will have; it rides the projlog branch like the rest.
 
@@ -298,9 +299,13 @@ changes; `transactionCounter` in the snapshot. Tests: the full 3.7 bench and the
 2. **Tax or convex weight?** Both refuse the Chase package. The tax (10% / 25%) is a published convention; the convex
    weight (rest at 0.6) tracks FantasyCalc's own curve more closely at the top. Recommendation: the tax now, because
    the row can say "he'd want 10% over on a 2-for-1 and this is 23% under", and revisit after twenty logged outcomes.
-3. **Does ESPN's history view expose a terminal trade status?** `mTransactions2` keeps showing PENDING after a decline
-   (noted in `espn.pending_trades`). If no status is readable, the outcome log records expired-or-declined as one
-   class and accepted as the other (a roster change proves acceptance). Still enough to calibrate.
+3. **Does ESPN's history view expose a terminal trade status?** Answered 2026-10-08 (B10, live probe of all three
+   leagues): the proposal itself stays PENDING in `mTransactions2`, but ESPN appends records that point back at it
+   through `relatedTransactionId`. A decline is a `TRADE_DECLINE` from the rival plus a `CANCELED` copy of the
+   proposal under his member id, same millisecond; a lapse is the `CANCELED` copy alone under a member id that owns
+   no team, 51 s after `expirationDate`. A withdrawal by me was not observed (the repo never writes to ESPN); by the
+   same pattern it is the `CANCELED` copy under my member id with no decline, and that is what
+   `espn.trade_resolutions` reads as `withdrawn`. The activity feed (`kona_league_communication`) was not needed.
 4. **Should the sim's title odds replace points per week as `my_gain`?** They are the honest objective (an underdog
    should buy variance and a favorite should buy floor, and only the sim sees that; the research cites Skinner's
    result that an underdog must accept a lower mean for a higher variance), but at 1500 sims the delta is noise of

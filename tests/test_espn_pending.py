@@ -55,3 +55,71 @@ def test_position_limits_come_from_default_position_ids_and_skip_unlimited():
     raw = {"positionLimits": {"0": 0, "1": 4, "2": 6, "3": 6, "4": 3, "5": 3, "6": -1, "16": 3, "17": -1}}
     assert position_limits(raw) == {"QB": 4, "RB": 6, "WR": 6, "TE": 3, "K": 3, "D/ST": 3}
     assert position_limits({}) == {}
+
+
+# ---- the history view: how ESPN closed a proposal (captured 2026-10-08, ids shortened, player ids redacted) ----
+# The proposal itself stays PENDING in mTransactions2 forever; the terminal state is a separate record pointing back
+# at it through relatedTransactionId. A decline is a TRADE_DECLINE from the rival plus a CANCELED copy of the proposal
+# carrying his member id (same millisecond). An expiry is a CANCELED copy whose member id is no team's owner (ESPN's
+# job, 51 s after expirationDate). A withdrawal by me (never observed live: this code never writes) is the same copy
+# with my member id and no decline.
+ME, RIVAL9, RIVAL3 = "{ME-SWID}", "{OWNER-OF-9}", "{OWNER-OF-3}"
+HISTORY = {"transactions": [
+    {"id": "9d6cd924", "type": "TRADE_PROPOSAL", "executionType": "EXECUTE", "status": "PENDING", "teamId": 3, "memberId": ME,
+     "proposedDate": 1791295014000, "expirationDate": 1791467814032, "isPending": True,
+     "items": [{"fromTeamId": 3, "toTeamId": 9, "playerId": 1, "type": "TRADE"}, {"fromTeamId": 9, "toTeamId": 3, "playerId": 2, "type": "TRADE"}]},
+    {"id": "8194e95a", "type": "TRADE_DECLINE", "executionType": "EXECUTE", "status": "EXECUTED", "teamId": 9, "memberId": RIVAL9,
+     "proposedDate": 1791312512869, "relatedTransactionId": "9d6cd924", "isPending": False, "items": []},
+    {"id": "108212c1", "type": "TRADE_PROPOSAL", "executionType": "CANCEL", "status": "CANCELED", "teamId": 3, "memberId": RIVAL9,
+     "proposedDate": 1791312512869, "expirationDate": 1791467814032, "relatedTransactionId": "9d6cd924", "isPending": True,
+     "items": [{"fromTeamId": 3, "toTeamId": 9, "playerId": 1, "type": "TRADE"}, {"fromTeamId": 9, "toTeamId": 3, "playerId": 2, "type": "TRADE"}]},
+    # lapsed: ESPN's job cancels it under a member id that owns no team
+    {"id": "106016a8", "type": "TRADE_PROPOSAL", "executionType": "EXECUTE", "status": "PENDING", "teamId": 3, "memberId": ME,
+     "proposedDate": 1791295221749, "expirationDate": 1791468021772, "isPending": True,
+     "items": [{"fromTeamId": 3, "toTeamId": 4, "playerId": 3, "type": "TRADE"}]},
+    {"id": "bf550d96", "type": "TRADE_PROPOSAL", "executionType": "CANCEL", "status": "CANCELED", "teamId": 3, "memberId": "{NOBODYS-OWNER}",
+     "proposedDate": 1791468072581, "expirationDate": 1791468021772, "relatedTransactionId": "106016a8", "isPending": True,
+     "items": [{"fromTeamId": 3, "toTeamId": 4, "playerId": 3, "type": "TRADE"}]},
+    # withdrawn in the app by me: the cancel copy carries my member id and there is no TRADE_DECLINE
+    {"id": "0270d39d", "type": "TRADE_PROPOSAL", "executionType": "EXECUTE", "status": "PENDING", "teamId": 3, "memberId": ME,
+     "proposedDate": 1791295357661, "expirationDate": 1791468157691, "isPending": True,
+     "items": [{"fromTeamId": 3, "toTeamId": 5, "playerId": 4, "type": "TRADE"}]},
+    {"id": "451b9f04", "type": "TRADE_PROPOSAL", "executionType": "CANCEL", "status": "CANCELED", "teamId": 3, "memberId": ME,
+     "proposedDate": 1791295571923, "expirationDate": 1791468157691, "relatedTransactionId": "0270d39d", "isPending": True,
+     "items": [{"fromTeamId": 3, "toTeamId": 5, "playerId": 4, "type": "TRADE"}]},
+    # the decline record can come after the cancel copy in the list; it still wins
+    {"id": "c1", "type": "TRADE_PROPOSAL", "executionType": "CANCEL", "status": "CANCELED", "teamId": 3, "memberId": RIVAL3,
+     "proposedDate": 1791300000000, "relatedTransactionId": "p1", "isPending": True, "items": []},
+    {"id": "d1", "type": "TRADE_DECLINE", "executionType": "EXECUTE", "status": "EXECUTED", "teamId": 5, "memberId": RIVAL3,
+     "proposedDate": 1791300000000, "relatedTransactionId": "p1", "isPending": False, "items": []},
+    # still open, and noise: a waiver claim, a roster move
+    {"id": "37d622ff", "type": "TRADE_PROPOSAL", "executionType": "EXECUTE", "status": "PENDING", "teamId": 3, "memberId": ME, "items": []},
+    {"id": "w", "type": "WAIVER", "status": "EXECUTED", "teamId": 3, "memberId": ME, "items": [{"type": "ADD", "playerId": 7}]},
+    {"id": "r", "type": "ROSTER", "status": "EXECUTED", "teamId": 9, "memberId": RIVAL9, "items": []},
+]}
+
+
+class _Team:
+    def __init__(self, team_id, owners):
+        self.team_id, self.owners = team_id, owners
+
+
+class HistoryLeague:
+    teams = [_Team(3, [{"id": ME, "displayName": "me"}]), _Team(9, [{"id": RIVAL9}]), _Team(5, [{"id": RIVAL3}]), _Team(4, [])]
+
+    class espn_request:
+        @staticmethod
+        def league_get(params=None, headers=None):
+            assert params == {"view": "mTransactions2"}
+            return HISTORY
+
+
+def test_the_history_view_says_who_closed_each_proposal_and_how():
+    from ff.sources.espn import trade_resolutions
+    res = trade_resolutions(HistoryLeague(), 3)
+    assert res["9d6cd924"] == {"status": "declined", "by": 9, "ts": 1791312512869}
+    assert res["106016a8"] == {"status": "expired", "by": None, "ts": 1791468072581}
+    assert res["0270d39d"] == {"status": "withdrawn", "by": 3, "ts": 1791295571923}
+    assert res["p1"]["status"] == "declined"
+    assert "37d622ff" not in res and "w" not in res and "r" not in res
+    assert trade_resolutions(HistoryLeague(), None) == {}

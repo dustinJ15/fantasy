@@ -295,6 +295,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "open_spots": open_spots, "open_spot_adds": open_adds, "ir_events": ir_events,
         "incoming_trades": incoming, "outgoing_trades": outgoing,
         "pending_trades_error": snap.get("pending_trades_error"),
+        "trade_resolutions": snap.get("trade_resolutions") or {}, "trade_resolutions_error": snap.get("trade_resolutions_error"),
         "odds": {str(tid): {**o, "name": teams[tid]["name"], "record": f"{teams[tid]['wins']}-{teams[tid]['losses']}", "is_me": tid == my_id} for tid, o in odds.items()},
         "rival_needs": {str(tid): {pos: ("hole" if v["hole"] else "surplus" if v["surplus"] else "") for pos, v in n.items() if pos not in ("K", "D/ST")} for tid, n in rival_needs.items()},
         "standings": sorted([{"name": t["name"], "record": f"{t['wins']}-{t['losses']}", "pf": round(t["points_for"], 1), "faab_left": (s["faab_budget"] - t["faab_spent"]) if s["faab"] else None, "waiver_rank": t["waiver_rank"], "is_me": tid == my_id}
