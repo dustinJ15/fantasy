@@ -2,6 +2,7 @@
 import pytest
 
 from ff.model.injuries import decide, week_weights
+from ff.model.season import TITLE_RUN_MULT
 from tests.conftest import P
 
 REG, PLAYOFF_WEEKS = 14, [15, 16, 17]
@@ -36,14 +37,16 @@ def run(mine, week, playoff_pct, ir_slots=0, waivers=(), trades=(), starters=Non
 
 
 def test_week_weights_count_playoff_weeks_by_my_odds():
+    """The same number the trade pricing uses (`season.week_weight`): odds times TITLE_RUN_MULT in the playoffs."""
     w = week_weights(3, 15, REG, 60)
-    assert sum(w.values()) == pytest.approx(13.8) and w[14] == 1.0 and w[15] == 0.6
+    assert sum(w.values()) == pytest.approx(12 + 3 * 0.6 * TITLE_RUN_MULT) and w[14] == 1.0 and w[15] == pytest.approx(0.6 * TITLE_RUN_MULT)
+    assert week_weights(3, 15, REG, 0)[15] == 0.0 and week_weights(3, 15, REG, 100)[15] > 1.0
 
 
 def test_season_ender_goes_to_an_open_ir_slot():
     mine = roster(); hurt(mine[1], 15, 15, 3)
     (row,) = run(mine, 3, 60, ir_slots=1, waivers=fa(1.5))
-    assert row["name"] == "RB1" and row["verdict"] == "ir" and row["hold_value"] == 0 and row["drop_value"] == pytest.approx(20.7, abs=0.1)
+    assert row["name"] == "RB1" and row["verdict"] == "ir" and row["hold_value"] == 0 and row["drop_value"] == pytest.approx(1.5 * 14.7, abs=0.1)
 
 
 def test_season_ender_with_no_ir_slot_is_a_drop_even_with_nothing_to_add():
@@ -56,8 +59,8 @@ def test_four_weeks_in_week_three_is_a_hold():
     mine = roster(); hurt(mine[6], 4, 15, 3)  # WR2, 12/g
     (row,) = run(mine, 3, 60, waivers=fa(1.0, pos="WR", slot="WR"))
     assert row["verdict"] == "hold" and row["return_week"] == 7
-    assert row["back_eff"] == pytest.approx(9.8) and row["w_eff"] == pytest.approx(13.8)
-    assert row["hold_value"] > row["drop_value"] == pytest.approx(13.8, abs=0.1)
+    assert row["back_eff"] == pytest.approx(10.7) and row["w_eff"] == pytest.approx(14.7)  # 8 regular weeks + 3 playoff weeks at 0.9
+    assert row["hold_value"] > row["drop_value"] == pytest.approx(14.7, abs=0.1)
 
 
 def test_same_injury_in_week_eleven_flips_on_contention_and_on_the_pickup():
@@ -65,10 +68,10 @@ def test_same_injury_in_week_eleven_flips_on_contention_and_on_the_pickup():
         mine = roster(); hurt(mine[8], 4, 7, 11)  # TE1 back week 15, playoffs only
         return run(mine, 11, pct, waivers=fa(delta, pos="TE", slot="TE"))[0]
     low = te_out(20, 0.8)
-    assert low["back_eff"] == pytest.approx(0.6) and low["w_eff"] == pytest.approx(4.6) and low["verdict"] == "hold"
+    assert low["back_eff"] == pytest.approx(0.9) and low["w_eff"] == pytest.approx(4.9) and low["verdict"] == "hold"
     assert te_out(20, 2.0)["verdict"] == "drop"        # margin met, and he is the cheapest drop
     high = te_out(90, 2.0)
-    assert high["verdict"] == "hold" and high["hold_value"] == pytest.approx(high["hold_ppw"] * 2.7, abs=0.1)
+    assert high["verdict"] == "hold" and high["hold_value"] == pytest.approx(high["hold_ppw"] * 3 * 0.9 * TITLE_RUN_MULT, abs=0.1)
 
 
 def test_not_the_cheapest_drop_means_hold_and_names_who_is():
@@ -152,13 +155,13 @@ def _backup_out(mu, fa_vorp, weeks=4):
 
 def test_a_backup_below_the_wire_is_dropped_for_a_pickup_above_it():
     row = _backup_out(5.0, 4.0)  # the Jonathon Brooks case: 5/g when back, replacement is 8
-    assert row["hold_value"] == 0 and row["drop_value"] == pytest.approx(13.8, abs=0.1)
+    assert row["hold_value"] == 0 and row["drop_value"] == pytest.approx(14.7, abs=0.1)
     assert row["verdict"] == "drop" and "FA" in row["why"][0] and row["best_fa"]["ppw"] == pytest.approx(1.0)
 
 
 def test_a_backup_above_the_wire_is_held_over_a_marginal_pickup():
     row = _backup_out(9.5, 1.0)  # the Josh Jacobs case: clear of replacement (8) though behind every RB starter
-    assert row["hold_value"] == pytest.approx(0.25 * 1.5 * 9.8, abs=0.1) and row["verdict"] == "hold"
+    assert row["hold_value"] == pytest.approx(0.25 * 1.5 * 10.7, abs=0.1) and row["verdict"] == "hold"
 
 
 def test_just_above_the_wire_is_a_hold_that_says_what_he_is_worth():

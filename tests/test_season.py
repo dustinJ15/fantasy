@@ -2,7 +2,7 @@
 import pytest
 
 from ff.model import acceptance as acc
-from ff.model.season import SeasonCtx, fa_pool, greedy_lineup, season_value, starters_this_week, weekly_values
+from ff.model.season import TITLE_RUN_MULT, SeasonCtx, fa_pool, greedy_lineup, season_value, starters_this_week, week_weight, weekly_values
 from ff.model.trades import evaluate, scan
 from tests.conftest import P
 
@@ -58,10 +58,44 @@ def test_an_ir_qb_is_not_cover_week_by_week(slots):
     assert starts[32] == pytest.approx(5 / 9, abs=0.01)
 
 
-def test_playoff_weeks_are_weighted_by_the_odds():
+def test_playoff_weeks_are_weighted_by_the_odds_and_the_title_run():
+    """A playoff week is worth my odds of being there times TITLE_RUN_MULT: nothing at 0%, above a regular week to a lock."""
     ctx = SeasonCtx.build(12, 5, reg_season_weeks=14, playoff_pct=20)
-    assert ctx.weights == [1.0, 1.0, 1.0, 0.2, 0.2]
+    assert ctx.weights == pytest.approx([1.0, 1.0, 1.0, 0.2 * TITLE_RUN_MULT, 0.2 * TITLE_RUN_MULT])
+    assert ctx.playoff_weight == pytest.approx(0.2 * TITLE_RUN_MULT) and ctx.playoff_weeks == {15, 16}
     assert SeasonCtx.build(12, 5, reg_season_weeks=14, playoff_pct=0).weights == [1.0, 1.0, 1.0, 0.0, 0.0]
+    lock = SeasonCtx.build(12, 5, reg_season_weeks=14, playoff_pct=100)
+    assert lock.weights[3] == pytest.approx(TITLE_RUN_MULT) and lock.weights[3] > 1.0
+    # the playoff week set comes from the league settings, not from the regular-season count
+    assert SeasonCtx.build(12, 5, reg_season_weeks=14, playoff_pct=90, playoff_weeks=[16]).weights == pytest.approx([1.0, 1.0, 1.0, 1.0, 0.9 * TITLE_RUN_MULT])
+    # odds unknown: a playoff week is a plain week
+    assert SeasonCtx.build(12, 5, reg_season_weeks=14, playoff_pct=None).weights == [1.0] * 5
+    assert week_weight(16, frozenset({15, 16}), 90) == pytest.approx(0.9 * TITLE_RUN_MULT) and week_weight(14, frozenset({15, 16}), 90) == 1.0
+
+
+def test_no_playoff_weeks_in_the_settings_weights_every_week_one():
+    ctx = SeasonCtx.build(12, 6, reg_season_weeks=14, playoff_pct=90, playoff_weeks=[])
+    assert ctx.weights == [1.0] * 6 and ctx.playoff_weight is None and ctx.playoff_weeks == frozenset()
+    assert ctx.with_odds(14, 10).weights == [1.0] * 6  # the week set survives a change of odds
+
+
+def test_a_bye_in_the_playoffs_costs_a_contender_more_and_a_dead_team_nothing():
+    """Two RBs alike except for the bye week: to a team at 90% the week-16 bye is the dearer one (a playoff week is worth
+    more than a regular week); to a team at 0% a week-16 bye costs nothing at all."""
+    slots = {"RB": 1}
+    def rb(i, bye):
+        p = P(i, f"RB{i}", "RB", 12, tid=1)
+        p.mu_ros_active = 12
+        p.bye_weeks = [bye] if bye else []
+        return p
+    reg_bye, po_bye, no_bye = rb(1, 13), rb(2, 16), rb(3, None)
+    contender = SeasonCtx.build(12, 6, reg_season_weeks=14, playoff_pct=90, playoff_weeks=[15, 16, 17])
+    v_reg, v_po, v_none = (season_value([p], slots, contender)[0] for p in (reg_bye, po_bye, no_bye))
+    assert v_none > v_reg > v_po
+    assert v_none - v_po == pytest.approx(12 * 0.9 * TITLE_RUN_MULT / sum(contender.weights), abs=0.01)
+    dead = contender.with_odds(14, 0)
+    d_reg, d_po, d_none = (season_value([p], slots, dead)[0] for p in (reg_bye, po_bye, no_bye))
+    assert d_po == d_none > d_reg
 
 
 def test_fa_pool_keeps_the_best_two_per_position():

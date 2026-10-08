@@ -1,7 +1,10 @@
 """End-to-end over the synthetic demo league: analyze_league -> report.render, no network."""
 from datetime import UTC, datetime
 
+import pytest
+
 from ff import demo, report
+from ff.model.season import TITLE_RUN_MULT
 from ff.packet import PACKET_VERSION, analyze_league
 
 FakeXW = demo.FakeCrosswalk
@@ -18,6 +21,13 @@ def test_end_to_end_synthetic(monkeypatch):
     assert abs(sum(o["title_pct"] for o in blk["odds"].values()) - 100) < 2
     assert blk["waivers"] and all(w["bid"] <= blk["faab_remaining"] for w in blk["waivers"])
     assert blk["settings"]["ir_slots"] == 1 and blk["settings"]["reg_season_weeks"] == 14
+    # the playoff-week weight the season pricing used for me: the settings' weeks, my odds times TITLE_RUN_MULT
+    pw = blk["playoff_weight"]
+    me = blk["odds"][str(blk["my_team_id"])]
+    assert pw["weeks"] == blk["settings"]["playoff_weeks"] == [15, 16] and pw["playoff_pct"] == me["playoff_pct"]
+    assert pw["weight"] == pytest.approx(TITLE_RUN_MULT * me["playoff_pct"] / 100, abs=1e-3) and pw["mult"] == TITLE_RUN_MULT
+    md = "\n".join(report._detail_matchup(blk))
+    assert ("playoff weeks 15-16 weighted ×" in md) == (abs(pw["weight"] - 1.0) >= 0.05)
     hurt = {r["name"]: r for r in blk["injuries"]}
     ir_guy = next(p for p in blk["roster"] if p["sources"]["espn_status"] == "INJURY_RESERVE")
     assert ir_guy["weeks_out"] == 4 and ir_guy["mu_ros"] < ir_guy["mu_ros_active"] and hurt[ir_guy["name"]]["verdict"] == "ir"

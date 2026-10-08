@@ -35,7 +35,9 @@ Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday mornin
 ## Layout
 `src/ff/sources/*` data pulls (cached in `data/cache/`), `src/ff/model/*` math (`injuries.py` is the hold / IR / drop / trade
 rule; `mu_ros` is availability-weighted, `mu_ros_active` is per game played; `season.py` prices a roster week by week with
-byes, return dates and the wire as the fallback body; `acceptance.py` is the would-he-say-yes scorecard behind every trade
+byes, return dates and the wire as the fallback body, each week weighted by `week_weight` (1 in the regular season; in the
+league's playoff weeks, my playoff odds × `TITLE_RUN_MULT`, so a 0% team weights them at zero and a lock above a regular week;
+`injuries.week_weights` is the same number and `playoff_weight` in the league block is what the card prints); `acceptance.py` is the would-he-say-yes scorecard behind every trade
 row, `trades.py` the scan and the hard rules), `packet.py` builds the DecisionPacket,
 `ledger.py` is the roster-spot ledger behind the checklist (`Spots` hands out open spots and drops, counts bodies against
 ESPN's position caps; `drop_order` / `drop_note` rank and explain a cut), `report.py` renders markdown (plain-text body)

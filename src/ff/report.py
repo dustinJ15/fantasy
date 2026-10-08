@@ -871,6 +871,18 @@ def _detail_shared(packet: dict) -> list[str]:
     return L
 
 
+def playoff_weight_note(lg: dict) -> str:
+    """" · playoff weeks weighted ×1.4" from the packet's `playoff_weight` (`season.week_weight`), or nothing when
+    no playoff week is left or the weight is a plain 1."""
+    pw = lg.get("playoff_weight") or {}
+    w = pw.get("weight")
+    if w is None or not pw.get("weeks") or abs(w - 1.0) < 0.05:
+        return ""
+    wks = pw["weeks"]
+    span = f"week {wks[0]}" if len(wks) == 1 else f"weeks {wks[0]}-{wks[-1]}"
+    return f" · playoff {span} weighted ×{w:.1f}"
+
+
 def _detail_matchup(lg: dict) -> list[str]:
     """The league header, the odds line, the matchup and the recommended lineup."""
     L = [f"\n---\n# {lg['league_name']} (`{lg['name']}`) — Week {lg['week']}"]
@@ -878,7 +890,7 @@ def _detail_matchup(lg: dict) -> list[str]:
     L.append(f"Record {lg['my_record']} · {acq} · weeks remaining {lg['weeks_remaining']}  ")
     me = lg["odds"].get(str(lg["my_team_id"])) or {}
     if me:
-        L.append(f"Playoff odds **{me['playoff_pct']}%** · title odds **{me['title_pct']}%** · expected wins {me['exp_wins']}")
+        L.append(f"Playoff odds **{me['playoff_pct']}%** · title odds **{me['title_pct']}%** · expected wins {me['exp_wins']}{playoff_weight_note(lg)}")
     opp = lg["opponent"]
     if opp.get("name"):
         theirs = "their set lineup" if opp.get("lineup") == "set" else "their proj"

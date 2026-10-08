@@ -14,7 +14,7 @@ from .model.injuries import decide as decide_injuries
 from .model.injuries import fill_spot
 from .model.lineup import as_set, compare, is_complete, optimize
 from .model.projections import PlayerProj, blend
-from .model.season import SeasonCtx
+from .model.season import TITLE_RUN_MULT, SeasonCtx
 from .model.sim import simulate
 from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
@@ -197,8 +197,12 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
                        "trades": t.get("trades"), "acquisitions": t.get("acquisitions")} for tid, t in teams.items()}
     # The season as the trade math sees it: each remaining week on its own, byes and return dates priced, the best
     # free agents as the bodies the wire supplies, playoff weeks weighted by each team's odds.
-    season_ctx = SeasonCtx.build(week, weeks_remaining, s["reg_season_weeks"], None, fas=fas)
+    season_ctx = SeasonCtx.build(week, weeks_remaining, s["reg_season_weeks"], None, fas=fas, playoff_weeks=s.get("playoff_weeks"))
     playoff_by_team = {tid: o["playoff_pct"] for tid, o in odds.items()}
+    # What a playoff week weighs for me (`season.week_weight`: my odds times TITLE_RUN_MULT), for the card to print.
+    my_ctx = season_ctx.with_odds(s["reg_season_weeks"], playoff_by_team.get(my_id))
+    playoff_weight = {"weeks": sorted(my_ctx.playoff_weeks), "weight": my_ctx.playoff_weight,
+                      "playoff_pct": playoff_by_team.get(my_id), "mult": TITLE_RUN_MULT}
     by_id = {p.espn_id: p for ps in by_team.values() for p in ps}
     # The trade deadline closes the scan: the offers Dustin could still send are none.
     deadline_ms = int(s.get("trade_deadline_ms") or 0)
@@ -288,6 +292,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "settings": {k: s.get(k) for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr",
                                            "reg_season_weeks", "ir_slots", "bench_slots", "trade_deadline_ms", "position_limits", "waiver_order")},
         "trade_deadline_iso": _ms_iso(deadline_ms), "trades_closed": trades_closed,
+        "playoff_weight": playoff_weight,
         "my_team_id": my_id, "my_record": f"{teams[my_id]['wins']}-{teams[my_id]['losses']}" if my_id in teams else None,
         "week_state": wstate,
         "faab_remaining": budget if s["faab"] else None,

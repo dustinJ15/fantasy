@@ -147,6 +147,8 @@ def _stat_row(lg: dict) -> str:
         *([] if final else [f"Win {_badge(_pct(pw * 100 if pw is not None else None), tone)}"]),
         # Title odds are two decimal places of noise in September and they are in the detail tables either way.
         f"Playoffs <b>{_pct(me.get('playoff_pct'))}</b>",
+        # "playoff weeks 15-17 weighted ×1.4": the weight the season pricing gives those weeks (`season.week_weight`)
+        *([note.strip(" ·")] if (note := report.playoff_weight_note(lg)) else []),
     ]
     return f'<div style="color:{MUTED};font-size:13px;margin-top:3px">{" &nbsp;·&nbsp; ".join(cells)}</div>'
 

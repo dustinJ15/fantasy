@@ -138,6 +138,12 @@ def test_title_odds_are_not_in_the_action_card(monkeypatch):
     header = html[html.rindex("<div", 0, at):html.index("</div>", at)]
     cells = [c.strip() for c in header.split("&nbsp;·&nbsp;")]
     assert any(c.startswith("Playoffs") and "41%" in c for c in cells), header
+    # the weight the season pricing gave the playoff weeks rides the same header, from the packet, never computed here
+    lg["playoff_weight"] = {"weeks": [15, 16, 17], "weight": 1.35, "playoff_pct": 90.0, "mult": 1.5}
+    html = render_email(p, {})
+    assert "playoff weeks 15-17 weighted ×1.4" in html
+    lg["playoff_weight"] = {"weeks": [], "weight": None, "playoff_pct": 90.0, "mult": 1.5}
+    assert "weighted ×" not in render_email(p, {})
     odds_cells = [c for c in cells if "Title Town" not in c]
     assert not any(re.search("title", c, re.I) for c in odds_cells), header  # no title cell, whatever its case
     assert not any(re.search(r"(?<![\d.])7%", c) for c in odds_cells), header  # nor the number under another label

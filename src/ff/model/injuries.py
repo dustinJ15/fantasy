@@ -2,8 +2,8 @@
 
 One verdict per rostered player with an injury horizon, from numbers the packet already has: his per-game value on
 return against the lineup I would field without him plus what he is worth as depth, the best free agent's value on the
-same scale, whether an IR slot makes the stash free, and remaining weeks weighted by my playoff odds (a week-15 return
-is worth almost nothing to a team at 20% and almost a full week to a team at 90%). Claude supplies `weeks_out`; nothing
+same scale, whether an IR slot makes the stash free, and remaining weeks weighted by my playoff odds (`season.week_weight`: a
+week-15 return is worth almost nothing to a team at 20% and more than a regular week to a team at 90%). Claude supplies `weeks_out`; nothing
 here reads prose.
 """
 from __future__ import annotations
@@ -12,6 +12,7 @@ from dataclasses import replace
 
 from .lineup import optimize
 from .projections import SLEEPER_ROSTER_MULTI_WEEK, PlayerProj
+from .season import playoff_week_set, week_weight
 from .vbd import own_starter_value
 
 # ESPN lets these designations into the IR slot in a default league (IR always; OUT since 2020). A league can be
@@ -79,9 +80,10 @@ def player_drop_cost(p: PlayerProj, weeks_remaining: int, market: dict | None = 
 
 
 def week_weights(week: int, weeks_remaining: int, reg_season_weeks: int, playoff_pct: float | None) -> dict[int, float]:
-    """Weight of each remaining matchup week: 1 in the regular season, my playoff odds in the playoffs."""
-    pp = (playoff_pct or 0.0) / 100.0
-    return {t: (1.0 if t <= reg_season_weeks else pp) for t in range(week, week + max(weeks_remaining, 1))}
+    """Weight of each remaining matchup week: 1 in the regular season, my playoff odds times `season.TITLE_RUN_MULT`
+    in the playoffs (`season.week_weight`, the same number the trade pricing uses)."""
+    po = playoff_week_set(week, weeks_remaining, reg_season_weeks)
+    return {t: week_weight(t, po, playoff_pct) for t in range(week, week + max(weeks_remaining, 1))}
 
 
 def ir_eligible(p: PlayerProj) -> bool:
