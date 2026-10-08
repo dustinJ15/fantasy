@@ -74,7 +74,9 @@ So finding 4 is exact: neither lever reaches `mu_ros`. Corrections and additions
   injury work but every number in this plan sits on top of it.
   Settled 2026-10-08 (TODO A1): the figure is a full-season total and not "actual plus remaining" either, so the
   fix is per-game arithmetic (`season_pg` in `projections.py`: points per game played, `proj_season / 17` as a
-  fading prior), with `weeks_remaining` out of the denominator altogether.
+  fading prior), with `weeks_remaining` out of the denominator altogether. Still owed (needs live pull): `ff roster`
+  on a real league should show ROS/g within ~15% of the weekly projection for healthy starters; the sessions that
+  fixed A1 and A2 had no cookies.
 
 ## Design
 

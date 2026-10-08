@@ -47,6 +47,7 @@ def apply_clock(players: list[PlayerProj], rows: list[dict], lines: dict, now: d
         if ph == "pre":
             continue
         p.locked = True
+        p.mu_pre = p.mu
         p.actual = actual_by_id.get(p.espn_id, 0.0)
         p.sigma_ros = p.sigma
         if free_agents:

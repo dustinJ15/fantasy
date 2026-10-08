@@ -112,6 +112,7 @@ class PlayerRow:
     bye_weeks: list[int] = field(default_factory=list)  # weeks his NFL team does not play, from the pro schedule
     actual_season: float = 0.0      # points scored so far this season (ESPN's season total)
     games_played: int = 0           # games he has played this season (ESPN's season total over its per-game average)
+    actual_prev_week: float | None = None  # ESPN's final for last week, in league scoring: truth for the projection log
 
 
 def games_played(p) -> int:
@@ -158,6 +159,7 @@ def roster_rows(league: League, week: int) -> list[PlayerRow]:
                 injured=bool(getattr(p, "injured", False)), ir_eligible_raw="IR" in p.eligibleSlots,
                 bye_weeks=bye_weeks(p),
                 actual_season=float(getattr(p, "total_points", 0) or 0), games_played=games_played(p),
+                actual_prev_week=_week_stat(p, week - 1, "points") if week > 1 else None,
             ))
     return rows
 

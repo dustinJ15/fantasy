@@ -62,6 +62,7 @@ class PlayerProj:
     flags: list[str] = field(default_factory=list)
     locked: bool = False          # game started/finished: ESPN won't let this player change slots
     actual: float | None = None   # points scored so far this week (None if not started)
+    mu_pre: float | None = None   # the projection before the clock banked his points: what the accuracy log scores
     sigma_ros: float | None = None  # pre-lock sigma, kept so rest-of-season copies aren't deterministic
     # Injury horizon. `mu_ros` is what the roster spot yields per remaining week; `mu_ros_active` is what he scores in
     # the games he plays. They differ by `avail_ros`, the share of remaining weeks he is expected to be available.
@@ -244,6 +245,7 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
+                 "actual_prev": row.get("actual_prev_week"),   # ESPN's final for last week: the accuracy log's truth
                  "pos_rank": row.get("pos_rank"),
                  "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
                  "grade": fp.get("start_sit_grade") if fp else None, "espn_status": status, "sleeper_status": sl_status,
