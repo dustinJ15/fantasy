@@ -7,6 +7,14 @@ description: Run the morning fantasy football briefing — sync data, build the 
 
 Follow these steps exactly. Do not invent numbers; every figure comes from `ff` output. All commands run from the repo root.
 
+0. MLB pregame alerts, one minute, before anything that can fail: `python3 scripts/mlb_pregame.py` (stdlib, no uv) prints
+   `{"triggers": [...]}`, one one-shot per first pitch among today's baseball games that matter (nothing outside the
+   postseason once the regular-season races are settled), or `"season_over": true`. Load `list_triggers` and `create_trigger`
+   via ToolSearch (claude-code-remote). For each spec whose `name` is not already in `list_triggers(recurring=false,
+   enabled=true)`, call `create_trigger` with `name`, `run_once_at` and `prompt` exactly as printed (never edit the prompt),
+   `create_new_session_on_fire=true`, `notifications={"push": true}`, `initiation="human_schedule"`, no `connectors`. The
+   one-shot fires before first pitch, writes the alert as its reply (Dustin's push), and disables itself. No specs, or the
+   script fails: one line in the log and move on; this step never blocks the briefing and never goes in the email.
 1. `bash scripts/cloud_setup.sh` (installs uv/deps if missing, writes .env from env vars, runs `ff doctor`).
    If doctor reports dead ESPN cookies, stop and email Dustin a one-paragraph note saying the cookies need refreshing
    (see scripts/setup_cookies.md) instead of a briefing.
