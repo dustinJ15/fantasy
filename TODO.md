@@ -37,10 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B7 (S). The cover row is not executable.** `report.py:232-234` takes the first waiver at the position
-  regardless of `on_waivers` ("add Backup K before kickoff" for a claim that lands Wednesday) and takes no
-  spot from the ledger, so no drop is named.
-
 - [ ] **B8 (XS). A skipped hold loses its strike in the HTML.** `src/ff/email_html.py:199` strips `~~` from
   `hold_line`, the only skip marker on holds; the markdown keeps it, the email does not.
 

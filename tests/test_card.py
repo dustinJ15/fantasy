@@ -158,6 +158,58 @@ def test_no_cover_item_for_a_merely_questionable_starter():
     assert "cover:k" not in ids(lg)
 
 
+def test_cover_row_names_a_free_agent_over_a_waiver_claim():
+    # B7: the first K on the wire is still on waivers (the claim lands Wednesday); the free agent behind him is the
+    # one who can be added before kickoff.
+    lg = cover_league()
+    lg["waivers"][0]["on_waivers"] = True
+    lg["waivers"].append({**lg["waivers"][0], "name": "Free K", "team": "KC", "on_waivers": False})
+    text = by_id(lg)["cover:k"]["text"]
+    assert "add Free K" in text
+    assert "Backup K" not in text
+
+
+def test_cover_row_says_claim_when_only_a_waiver_claim_covers():
+    lg = cover_league(waiver_rank=3)
+    lg["waivers"][0]["on_waivers"] = True
+    text = by_id(lg)["cover:k"]["text"]
+    assert "claim" in text and "priority #3" in text and "Backup K" in text
+    assert "add Backup K" not in text
+
+
+def test_cover_row_takes_its_spot_from_the_ledger():
+    # No open bench spot: the add needs a drop, and the ledger names the cheapest one.
+    lg = cover_league()
+    lg["roster"].append(player("Cheap WR", ros=2.0))
+    lg["roster"].append(player("Good WR", ros=9.0))
+    text = by_id(lg)["cover:k"]["text"]
+    assert "drop Cheap WR" in text
+    assert "Good WR" not in text
+
+
+def test_cover_row_uses_the_open_spot_and_the_pickup_above_does_not_share_a_drop():
+    lg = cover_league(open_spots=1)
+    lg["roster"].append(player("Cheap WR", ros=2.0))
+    lg["waivers"].append({"name": "Hot WR", "pos": "WR", "team": "KC", "streamer": False, "delta_over_starter": 0.5,
+                          "delta_week": 4.0, "week_slot": "WR", "slot": "WR", "why": [], "bid": 1, "mu_week": 12.0,
+                          "mu_ros": 12.0, "on_waivers": False})
+    rows = by_id(lg)
+    assert "open bench spot" in rows["waiver:hot-wr"]["text"]
+    assert "drop Cheap WR" in rows["cover:k"]["text"]  # the spot above is spent; the cover needs a drop of its own
+
+
+def test_cover_pickup_is_not_added_twice_and_a_waiver_row_at_the_position_is_the_cover():
+    lg = cover_league(open_spots=2, open_spot_adds=[{"name": "Backup K", "pos": "K", "why": "best K on the wire"}])
+    rows = by_id(lg)
+    assert "open bench spot" in rows["cover:k"]["text"]
+    assert "waiver:backup-k" not in rows  # the cover row already spent a spot on him
+    # A waiver row above that brings in a K already covers the slot.
+    lg = cover_league()
+    lg["waivers"][0].update(streamer=False, delta_week=3.9)
+    rows = by_id(lg)
+    assert "waiver:backup-k" in rows and "cover:k" not in rows
+
+
 # ---------- lint ----------
 
 def packet(lg):

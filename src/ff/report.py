@@ -277,16 +277,22 @@ def _to_dustin(s: str) -> str:
     return s
 
 
-def _cover_items(lg: dict) -> list[dict]:
+def _cover_items(lg: dict, spots: _Spots, added: set[str]) -> list[dict]:
     """A starter at a slot the flex cannot cover is in real doubt and nothing healthy sits behind him.
 
     The optimizer never proposes this: a backup kicker is worth ~nothing in expectation, so he loses every ranking
     we have right up to the Sunday his starter is scratched and the slot scores zero. It is still a button to press.
+
+    The button has to work: the body named is a free agent when there is one (a player still on waivers clears on
+    waiver day, not before kickoff; he is the fallback, worded as the claim he is), and the add spends a roster spot
+    on the ledger like every other pickup, so the row names the drop (B7). A row above that already adds a body at
+    the position is the cover; the row is skipped then.
     """
     slots = lg["settings"]["lineup_slots"]
     rec = lg["lineup_win"]["slots"]
     by_name = {p["name"]: p for p in lg["roster"]}
     starters = {n for ns in rec.values() for n in ns}
+    pos_added = {w["pos"] for w in lg["waivers"] if w["name"] in added}
     out = []
     for pos in COVER_POS:
         if not slots.get(pos):
@@ -298,12 +304,23 @@ def _cover_items(lg: dict) -> list[dict]:
         if any(p["pos"] == pos and p["name"] not in starters and p["mu_ros"] > 0 and p["p_zero"] < RISKY_TO_SIT
                for p in lg["roster"]):
             continue  # a healthy body on the bench already covers it
+        if pos in pos_added:
+            continue  # a waiver row above already brings one in
         who = risky[0]
-        fa = next((w for w in lg["waivers"] if w["pos"] == pos), None)
+        pool = [w for w in lg["waivers"] if w["pos"] == pos and w["name"] not in added]
+        fa = next((w for w in pool if not w.get("on_waivers")), pool[0] if pool else None)
         risk = "on bye" if who["bye"] else f"{who['p_zero']:.0%} to sit"
-        plan = f"add {fa['name']} ({fa['team']}) before kickoff" if fa else "grab a startable one off the wire before kickoff"
+        _, suffix = spots.take(adding=pos)
+        if fa is None:
+            plan = "grab a startable one off the wire before kickoff"
+        elif fa.get("on_waivers"):
+            plan = f"{_add_verb(lg, fa)} {fa['name']} ({fa['team']}) now, nobody at {pos} is a free agent and the claim lands on waiver day"
+        else:
+            plan = f"add {fa['name']} ({fa['team']}) before kickoff"
+        if fa is not None:
+            added.add(fa["name"])
         out.append({"kind": "cover", "id": f"cover:{slug(pos)}", "label": f"Cover {pos}",
-                    "text": f"{who['name']} is {risk} and he is your only {pos}; {plan}"})
+                    "text": f"{who['name']} is {risk} and he is your only {pos}; {plan}{suffix}"})
     return out
 
 
@@ -454,7 +471,7 @@ def todos(lg: dict) -> list[dict]:
     for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]:
         out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
                     "text": f"swap in {w['name']} at {w['pos']} (+{w['delta_over_starter']:.1f} this week)" + _claim_note(lg, w)})
-    out += _cover_items(lg)
+    out += _cover_items(lg, spots, added)
     out += [i for i in inj if i["verdict"] == "drop"]
     # Bench spots still open after the rows above: name who fills each, never someone the card already adds.
     for a in lg.get("open_spot_adds") or []:
