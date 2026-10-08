@@ -45,10 +45,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier C — operations
 
-- [ ] **C4 (XS, routine settings). The briefing cron drifts and the Sunday run is early.** `0 12 * * *` UTC is
-  6 AM Denver only during DST; after 2026-11-01 it is 5 AM. Sunday's lineup check at 6 AM MT predates the
-  11:30 ET inactives. Use `CRON_TZ=America/Denver` and add a Sunday 9:45 MT run (ops.local.md, not the repo).
-
 - [ ] **C5 (S). The email body is assembled by the LLM.** `briefing/SKILL.md:99-103` has the model paste the
   HTML into the Gmail tool and check `wc -c`. `ff email` already exists (`src/ff/mail.py`); give the cloud env
   `GMAIL_USER`/`GMAIL_APP_PASSWORD` and make the skill call it, with the paste as the fallback.

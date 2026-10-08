@@ -51,9 +51,14 @@ Apps Script runtime (retries, escalation, no-double-fire). Run it after editing 
 
 ## Operations (for a fresh session responding to a morning email)
 Trigger ids, env id, routine URLs and the recipient address live in `ops.local.md` (untracked) and in memory; nothing personal is tracked.
-- Routine "FF daily briefing": cron `0 12 * * *` UTC (6 AM Denver during DST), cloud env `fantasy` (network Full, env vars
+- Routine "FF daily briefing": cron `CRON_TZ=America/Denver 59 5 * * *` (5:59 AM Denver year-round; it was `0 12 * * *` UTC
+  until 2026-10-08, which drifts an hour at each DST change), cloud env `fantasy` (network Full, env vars
   ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/LEAGUES_TOML), model `claude-opus-5`. `scripts/cloud_setup.sh` writes `.env` and
-  `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO`.
+  `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO`. A second routine, "FF Sunday lineup check"
+  (`CRON_TZ=America/Denver 45 9 * * 0`, same env and prompt with a preface: inactives are out, research only my questionable
+  starters, email the final lineups as `FF Sunday check — Week N — <date>`, skip waivers, trades and the MLB step 0), runs
+  after the 11:30 ET inactives. The routines UI stores a plain cron in UTC; a timezone needs the **Custom** trigger with the
+  `CRON_TZ=` prefix typed in, which the UI accepts and displays in local time.
 - Incoming trade offers: every pending offer shows in the morning briefing (`incoming_trades` per league, first checklist item).
   Primary alert path: a Google Apps Script doorbell (`scripts/gmail_trade_doorbell.gs`, setup in `scripts/gmail_trade_doorbell.md`)
   runs every minute in Dustin's Gmail, finds ESPN's "Trade Proposal" emails of the last 2 hours, fires the "FF trade offer"
