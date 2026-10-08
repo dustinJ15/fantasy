@@ -266,10 +266,28 @@ def log_projections(league: str | None = LeagueOpt):
 
 
 @app.command()
-def accuracy(week: int | None = typer.Option(None, "--week", help="Score the weeks before this one (default: the newest log's week)")):
+def accuracy(week: int | None = typer.Option(None, "--week", help="Score the weeks before this one (default: the newest log's week)"),
+             fit: bool = typer.Option(False, "--fit", help="Fit BASE_SIGMA / CV_FLOOR per position to the blend residuals and print "
+                                                             "them next to the current constants (writes nothing)")):
     """MAE / bias by source × position over logged weeks (needs >=1 completed week). Offline: the week comes from the log."""
     from . import projlog
     wk = week if week is not None else projlog.current_week(env().season)
+    if fit:
+        rows = projlog.sigma_fit(env().season, wk) if wk is not None else []
+        if not any(r["n"] for r in rows):
+            rprint("no completed weeks logged yet"); return
+        rprint(f"[dim]blend residuals of the weeks before week {wk}; sigma = max({projlog.projections.SIGMA_FLOOR_FRAC} × BASE_SIGMA, "
+               f"CV_FLOOR × mu), Gaussian NLL on a grid; a position is fitted at n ≥ {projlog.FIT_MIN_N}[/]")
+        t = Table("pos", "n", "BASE_SIGMA now", "fit", "CV_FLOOR now", "fit", "on floor", "rmse", "verdict")
+        for r in rows:
+            base = "—" if r["base_fit"] is None else f"{r['base_fit']:.1f}"
+            cv = "—" if r["cv_fit"] is None else f"{r['cv_fit']:.2f}"
+            verdict = "fit" if r["fitted"] else f"keep prior (n < {r['min_n']})"
+            if r["n"] and r["base_fit"] is None:
+                verdict += "; floor never binds, BASE_SIGMA unidentified"
+            t.add_row(r["pos"], str(r["n"]), str(r["base_prior"]), base, str(r["cv_prior"]), cv, str(r["floor_rows"]),
+                      "—" if r["rmse"] is None else str(r["rmse"]), verdict)
+        rprint(t); return
     df = projlog.accuracy(env().season, wk) if wk is not None else projlog.pl.DataFrame()
     if df.is_empty():
         rprint("no completed weeks logged yet"); return

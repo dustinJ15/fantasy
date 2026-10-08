@@ -101,6 +101,10 @@ Trigger ids, env id, routine URLs and the recipient address live in `ops.local.m
   pre-clock projection (`mu_pre`) and ESPN's actual in league scoring (`actual` once his game is `post`, `actual_prev`
   in the next week's first log for Monday night); the scorer takes each player's last pre-kickoff row per league, so K
   and D/ST are scored and half-PPR is scored as half-PPR. No nflverse, no crosswalk; it runs offline.
+  `uv run ff accuracy --fit` (`projlog.sigma_fit`) fits `BASE_SIGMA` / `CV_FLOOR` per position to the blend residuals
+  in the optimizer's own shape (`max(0.6 × BASE_SIGMA, CV_FLOOR × mu)`, Gaussian NLL on a grid, deterministic) and
+  prints them next to the constants in `model/projections.py`; it writes nothing, and a position under
+  `projlog.FIT_MIN_N` (150) scored forecasts reads `keep prior`. TODO D2 says when each position gets there.
 - Skipped trade rows are remembered: `ff render-email --reads` writes each `skip` on a `trade:` row to
   `data/projlog/skipped_trades.json` (`src/ff/rulings.py`), the packet drops that package for 14 days, and the file rides
   the `projlog` branch (cloud_setup.sh restores it). A `do`/`amend` is not remembered.

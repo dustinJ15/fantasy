@@ -11,9 +11,15 @@ import numpy as np
 
 # Position-level projection-to-actual error (weekly points, PPR-ish). Rough priors from
 # published accuracy studies; scaled by the FantasyPros rank-sd where available.
+# `sigma = max(SIGMA_FLOOR_FRAC * BASE_SIGMA[pos], CV_FLOOR[pos] * mu)` (see `_sigma`); `ff accuracy --fit`
+# (`projlog.sigma_fit`) fits both numbers per position to the projlog residuals in exactly this form and prints them next
+# to these, but writes nothing: a position is fitted only at `projlog.FIT_MIN_N` scored forecasts, and as of 2026-10-08
+# (weeks 1-4 scored: QB 18, RB 49, WR 46, TE 21, K 10, D/ST 10) none is, so every value here is still the prior.
 BASE_SIGMA = {"QB": 7.0, "RB": 6.5, "WR": 6.5, "TE": 5.0, "K": 4.0, "D/ST": 5.5}
 # Coefficient of variation floor so that low projections still have spread.
 CV_FLOOR = {"QB": 0.30, "RB": 0.45, "WR": 0.50, "TE": 0.55, "K": 0.45, "D/ST": 0.60}
+# The absolute floor is this fraction of BASE_SIGMA (the fitter reports BASE_SIGMA, never the floor itself).
+SIGMA_FLOOR_FRAC = 0.6
 
 # Injury designation -> probability of a zero (inactive). LLM may override via packet.
 P_ZERO = {
@@ -98,10 +104,18 @@ class PlayerProj:
         return d
 
 
+def sigma_shape(mu, base: float, cv: float):
+    """The positional sigma before the FantasyPros rank-sd fudge: `max(SIGMA_FLOOR_FRAC * base, cv * mu)`.
+
+    Works on a float or a numpy array of `mu`; the fitter in `projlog` minimises the Gaussian log-likelihood of this
+    same shape, so a fitted pair drops straight into BASE_SIGMA / CV_FLOOR."""
+    return np.maximum(SIGMA_FLOOR_FRAC * base, cv * np.asarray(mu, dtype=float))
+
+
 def _sigma(pos: str, mu: float, fp_sd: float | None) -> float:
     base = BASE_SIGMA.get(pos, 6.0)
     cv = CV_FLOOR.get(pos, 0.5)
-    s = max(base * 0.6, cv * mu)
+    s = float(sigma_shape(mu, base, cv))
     if fp_sd is not None and np.isfinite(fp_sd):
         # rank-sd of ~1 is tight consensus; ~6+ is real disagreement. Scale 0.85x..1.4x
         s *= float(np.clip(0.8 + 0.1 * fp_sd, 0.85, 1.4))

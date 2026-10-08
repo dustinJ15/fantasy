@@ -51,9 +51,16 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   from `model/usage.py` (computed, rendered nowhere, moves no number), and the weekly blend, with the
   preseason total as a prior that fades by week 6. This is ROADMAP item 1 and the only private edge; plan in
   `docs/plans/`.
-- [ ] **D2 (M). Fitted variance** per position from the projlog (fixed 2026-10-08: `ff accuracy` scores pre-kickoff
-  forecasts against ESPN's actuals): fit `BASE_SIGMA` and `CV_FLOOR` in `model/projections.py` from the residuals
-  (the "then M" half of the old A5). Then `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp since 2026-10-08) can come down.
+- [ ] **D2 (S, waiting on data). Adopt the fitted variance** per position. The fitter exists since 2026-10-08
+  (`ff accuracy --fit`, `projlog.sigma_fit`): it fits `BASE_SIGMA` and `CV_FLOOR` in `model/projections.py` to the blend
+  residuals in the optimizer's own shape and refuses a position under `projlog.FIT_MIN_N` (150) scored forecasts. As
+  of 2026-10-08 (weeks 1-4 scored) the samples are QB 18, RB 49, WR 46, TE 21, K 10, D/ST 10, so every constant is
+  still the prior. A scored week adds about 12 RB, 12 WR, 4-5 QB and TE, 2-3 K and D/ST: RB and WR cross 150 around
+  week 13-14 of 2026, QB and TE late in 2027, K and D/ST not before 2029 (pool them across positions or lower the bar
+  with a reason). When a row says `fit`: copy the printed pair into `model/projections.py` with the sample size and
+  date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
+  early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
+  says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
 - [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
   (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
 - [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.

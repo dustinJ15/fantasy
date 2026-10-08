@@ -17,9 +17,21 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 
 from .config import ROOT
+from .model import projections
+
+# `sigma_fit` fits a position only at this many scored blend forecasts (a week adds about 12 RB and 12 WR, 4-5 QB and
+# TE, 2-3 K and D/ST across the three leagues). Below it the priors in `model/projections.py` stand and the row says so.
+FIT_MIN_N = 150
+# A forecast whose actual is zero and whose `p_zero` was at least this was the mixture's delta (he sat), not the
+# Gaussian the fit describes; a healthy player's goose egg (p_zero at the 0.02 floor) stays in the sample.
+SAT_OUT_P_ZERO = 0.10
+# Grid the fitter searches (deterministic: no optimiser, no seed). BASE_SIGMA in points, CV_FLOOR as a ratio.
+FIT_BASE_GRID = np.round(np.arange(1.0, 15.0 + 1e-9, 0.1), 1)
+FIT_CV_GRID = np.round(np.arange(0.05, 1.50 + 1e-9, 0.01), 2)
 
 LOG_DIR = ROOT / "data" / "projlog"
 SOURCES = ("espn_pts", "sleeper_pts", "fp_pts", "blend")
@@ -122,7 +134,7 @@ def scored_rows(logs: dict[int, list[list[dict]]], through_week: int) -> list[di
                 if v is None:
                     continue
                 recs.append({"week": wk, "league": key[0], "espn_id": key[1], "pos": r["pos"], "source": src,
-                             "err": v - act, "abs_err": abs(v - act)})
+                             "mu": v, "actual": act, "p_zero": _num(r.get("p_zero")), "err": v - act, "abs_err": abs(v - act)})
     return recs
 
 
@@ -150,3 +162,60 @@ def accuracy(season: int, through_week: int | None = None) -> pl.DataFrame:
     df = pl.DataFrame(recs)
     return df.group_by(["pos", "source"]).agg([pl.len().alias("n"), pl.col("abs_err").mean().round(2).alias("mae"),
                                                pl.col("err").mean().round(2).alias("bias")]).sort(["pos", "mae"])
+
+
+def fit_sample(recs: list[dict]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """pos -> (mu, err) of the blend forecasts the Gaussian half of the mixture should explain.
+
+    Drops a forecast whose actual is zero when its `p_zero` was `SAT_OUT_P_ZERO` or more (the delta component fired),
+    and a non-positive forecast (a bye or a legacy locked row)."""
+    by_pos: dict[str, tuple[list[float], list[float]]] = defaultdict(lambda: ([], []))
+    for r in recs:
+        if r["source"] != "blend" or r["mu"] is None or r["mu"] <= 0:
+            continue
+        if r["actual"] == 0 and (r.get("p_zero") or 0.0) >= SAT_OUT_P_ZERO:
+            continue
+        by_pos[r["pos"]][0].append(r["mu"]); by_pos[r["pos"]][1].append(r["err"])
+    return {pos: (np.asarray(m, dtype=float), np.asarray(e, dtype=float)) for pos, (m, e) in by_pos.items()}
+
+
+def fit_sigma_params(mu: np.ndarray, err: np.ndarray) -> dict:
+    """BASE_SIGMA and CV_FLOOR for `projections.sigma_shape` that minimise the Gaussian negative log-likelihood of
+    `err ~ N(0, sigma(mu)^2)`: the distribution the lineup optimizer already assumes, bias included, since the
+    optimizer does not correct bias either. Exhaustive over FIT_BASE_GRID x FIT_CV_GRID, so it is deterministic.
+
+    `floor_rows` is how many forecasts sit on the absolute floor at the optimum. When it is 0 the floor never binds,
+    every smaller base scores the same and `base` is None (unidentified: keep the prior); `cv` stands on its own."""
+    mu = np.asarray(mu, dtype=float); err = np.asarray(err, dtype=float)
+    best = (np.inf, None, None)
+    for base in FIT_BASE_GRID:
+        sig = projections.sigma_shape(mu[None, :], float(base), FIT_CV_GRID[:, None])   # (cv, n)
+        nll = (np.log(sig) + err[None, :] ** 2 / (2 * sig**2)).sum(axis=1)
+        j = int(np.argmin(nll))
+        if nll[j] < best[0] - 1e-9:   # strict: the lowest base wins a tie, so an unbinding floor reads as the grid's start
+            best = (float(nll[j]), float(base), float(FIT_CV_GRID[j]))
+    nll, base, cv = best
+    floor_rows = int((projections.SIGMA_FLOOR_FRAC * base >= cv * mu).sum())
+    return {"base": base if floor_rows else None, "cv": cv, "n": int(mu.size), "nll": nll, "floor_rows": floor_rows,
+            "rmse": float(np.sqrt(np.mean(err**2)))}
+
+
+def sigma_fit(season: int, through_week: int | None = None, min_n: int = FIT_MIN_N) -> list[dict]:
+    """One row per position: the current BASE_SIGMA / CV_FLOOR, the fitted pair, the sample size and whether the fit
+    counts (`fitted`: n >= min_n). A position under the threshold still shows what the fit would say, flagged `kept`.
+    Positions with no scored forecast at all are listed with n = 0. Offline, from the restored projlog files."""
+    if through_week is None:
+        through_week = current_week(season)
+    sample = fit_sample(scored_rows(_logs(season), through_week)) if through_week is not None else {}
+    out = []
+    for pos in sorted(set(projections.BASE_SIGMA) | set(sample)):
+        row = {"pos": pos, "base_prior": projections.BASE_SIGMA.get(pos), "cv_prior": projections.CV_FLOOR.get(pos),
+               "n": 0, "base_fit": None, "cv_fit": None, "floor_rows": 0, "rmse": None, "fitted": False, "min_n": min_n}
+        if pos in sample:
+            mu, err = sample[pos]
+            if mu.size:
+                f = fit_sigma_params(mu, err)
+                row.update(n=f["n"], base_fit=f["base"], cv_fit=f["cv"], floor_rows=f["floor_rows"], rmse=round(f["rmse"], 2))
+                row["fitted"] = f["n"] >= min_n
+        out.append(row)
+    return out

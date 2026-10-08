@@ -2,9 +2,11 @@
 import csv
 import re
 
+import numpy as np
 import pytest
 
 from ff import projlog
+from ff.model.projections import sigma_shape
 from ff.projlog import COLUMNS, scored_rows, write
 
 
@@ -148,3 +150,60 @@ def test_accuracy_scores_up_to_the_newest_logged_week_not_sleepers_clock(log_dir
 def test_accuracy_with_no_logs_at_all(log_dir):
     assert projlog.current_week(2026) is None
     assert projlog.accuracy(2026).is_empty()
+
+
+# --- D2: BASE_SIGMA / CV_FLOOR fitted from the blend residuals (`ff accuracy --fit`) ---
+
+def _synthetic_residuals(base, cv, n, seed=0):
+    rng = np.random.default_rng(seed)
+    mu = rng.uniform(2.0, 25.0, n)
+    err = rng.normal(0.0, sigma_shape(mu, base, cv))
+    return mu, err
+
+
+def test_fitter_recovers_a_known_sigma_from_synthetic_residuals():
+    mu, err = _synthetic_residuals(base=6.0, cv=0.40, n=4000)
+    f = projlog.fit_sigma_params(mu, err)
+    assert abs(f["base"] - 6.0) <= 0.6 and abs(f["cv"] - 0.40) <= 0.04
+    assert f["n"] == 4000 and 0 < f["floor_rows"] < 4000   # both regimes were in the sample
+    assert projlog.fit_sigma_params(mu, err) == f   # deterministic: a grid, not an optimiser
+
+
+def test_fitter_reports_an_unbinding_floor_as_unidentified():
+    rng = np.random.default_rng(1)
+    mu = rng.uniform(20.0, 30.0, 2000)   # every forecast is far above any floor on the grid
+    err = rng.normal(0.0, 0.5 * mu)
+    f = projlog.fit_sigma_params(mu, err)
+    assert f["base"] is None and f["floor_rows"] == 0
+    assert abs(f["cv"] - 0.5) <= 0.03
+
+
+def test_fit_sample_drops_the_sat_out_zero_and_keeps_the_healthy_goose_egg():
+    recs = [{"source": "blend", "pos": "WR", "mu": 12.0, "actual": 0.0, "p_zero": 0.3, "err": 12.0},   # Questionable, sat: the delta
+            {"source": "blend", "pos": "WR", "mu": 9.0, "actual": 0.0, "p_zero": 0.02, "err": 9.0},    # healthy, zero catches: Gaussian
+            {"source": "blend", "pos": "WR", "mu": 0.0, "actual": 4.0, "p_zero": 0.02, "err": -4.0},   # no forecast
+            {"source": "espn_pts", "pos": "WR", "mu": 11.0, "actual": 5.0, "p_zero": 0.02, "err": 6.0}]  # not the blend
+    sample = projlog.fit_sample(recs)
+    assert list(sample["WR"][0]) == [9.0] and list(sample["WR"][1]) == [9.0]
+
+
+def test_fitter_refuses_a_position_under_the_sample_threshold(log_dir):
+    base, cv = 6.0, 0.40
+    mu_rb, err_rb = _synthetic_residuals(base, cv, projlog.FIT_MIN_N, seed=2)
+    mu_wr, err_wr = _synthetic_residuals(base, cv, projlog.FIT_MIN_N - 1, seed=3)
+    pre, finals = [], []
+    for pos, mus, errs in (("RB", mu_rb, err_rb), ("WR", mu_wr, err_wr)):
+        for i, (m, e) in enumerate(zip(mus, errs)):
+            p = {"espn_id": f"{pos}{i}", "name": f"{pos}{i}", "pos": pos, "blend": round(float(m), 2)}
+            pre.append(_row(p, league="L1"))
+            finals.append(_row(p, league="L1", week=4, actual_prev=round(float(m - e), 2)))
+    _write(log_dir, 2026, 3, "2026-09-26", pre)
+    _write(log_dir, 2026, 4, "2026-09-29", finals)
+    rows = {r["pos"]: r for r in projlog.sigma_fit(2026, through_week=4)}
+    rb, wr = rows["RB"], rows["WR"]
+    assert rb["n"] == projlog.FIT_MIN_N and rb["fitted"] is True
+    assert abs(rb["base_fit"] - base) <= 2.0 and abs(rb["cv_fit"] - cv) <= 0.1   # 150 rows is the floor, not a tight fit
+    assert wr["n"] == projlog.FIT_MIN_N - 1 and wr["fitted"] is False and wr["cv_fit"] is not None   # shown, not adopted
+    assert (wr["base_prior"], wr["cv_prior"]) == (6.5, 0.50)   # the prior rides on the row
+    assert rows["QB"]["n"] == 0 and rows["QB"]["fitted"] is False and rows["QB"]["base_fit"] is None
+    assert np.isfinite(rb["rmse"])
