@@ -533,3 +533,20 @@ def test_an_open_spot_row_has_its_own_prefix_so_it_never_shares_an_id_with_a_wai
     lg = league(open_spots=1, open_spot_adds=[{"name": "Body", "pos": "WR", "kind": "depth", "why": "depth"}])
     rows = by_id(lg)
     assert "open:body" in rows and "waiver:body" not in rows and rows["open:body"]["label"] == "Open spot"
+
+
+# ---------- the alert email's offer card rules the same way ----------
+
+def test_offer_card_prints_ids_before_reads_and_folds_the_ruling_in():
+    """The trade-offer routine rules on `offer:<get>` in reads.json like any row; the alert card used to print the
+    verdict and Claude's read under it and nothing could strike the badge."""
+    t = {"rival": "Them", "rival_team_id": 2, "give": ["My RB"], "get": ["Garrett Wilson"], "verdict": "accept",
+         "my_delta_ppw": 1.2, "their_delta_ppw": -0.4, "why": ["you get the best player"], "hours_left": 20.0}
+    packet = {"generated": "2026-10-08T06:00:00", "leagues": [league(incoming_trades=[t])]}
+    draft = report.offer_card(packet)
+    assert "`[offer:garrett-wilson]`" in draft and "**ACCEPT:**" in draft
+    ruled = report.offer_card(packet, {"L1": {"items": {"offer:garrett-wilson": {"verdict": "skip", "note": "decline, he is in a boot"}},
+                                               "read": "boot on Wednesday"}})
+    assert "~~ACCEPT~~" in ruled and "**skip:** decline, he is in a boot" in ruled and "`[offer:" not in ruled
+    amended = report.offer_card(packet, {"L1": {"items": {"offer:garrett-wilson": {"verdict": "amend", "note": "only if he practices Friday"}}}})
+    assert "**ACCEPT:**" in amended and "**note:** only if he practices Friday" in amended

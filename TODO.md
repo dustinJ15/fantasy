@@ -57,11 +57,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 - [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
   (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
 - [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.
-- [ ] **D6 (S). Research prompt upgrades.** `briefing/SKILL.md:23` budgets ~10 searches for three leagues;
-  `:39` says Questionable plus limited Friday is 0.25 while the code's Friday default is 0.30; no guidance on
-  `mu_mult`; snap share, route share, depth-chart changes and weather are never asked for. `trade-offer/SKILL.md:17`
-  omits `weeks_out` and `ros_mult`, so research on a hurt player cannot reach the math, and `:21` lets the read
-  argue with the verdict in prose instead of ruling on it.
 - [ ] **D7 (S). Email context.** Per-player opponent and implied total (`sources.implied_total`), kickoff day
   (Thursday players need their moves first), usage trend, and p(accept) on the trade row, not only the word.
 - [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.

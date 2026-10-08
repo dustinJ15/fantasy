@@ -728,8 +728,18 @@ def action_card(packet: dict, reads: dict | None = None, show_ids: bool | None =
     return "\n".join(line if (not line or line.startswith("#") or line.startswith("- ")) else line + "  " for line in L)
 
 
-def offer_card(packet: dict, reads: dict | None = None) -> str:
-    """Just the incoming offers (for the alert email): verdict line, why, and Claude's reply, per league with an offer."""
+def offer_rows(lg: dict, r: dict | None) -> list[dict]:
+    """The incoming-offer rows of one league with Claude's rulings folded in, in `incoming_trades` order: the same
+    `offer:` ids and `skip` / `amend` / `do` mechanics as the briefing card, so the alert email ends with one answer per
+    offer instead of a verdict badge and a read underneath arguing with it."""
+    return [x for x in apply_reads(todos(lg), r) if x["kind"] == "trade_in"]
+
+
+def offer_card(packet: dict, reads: dict | None = None, show_ids: bool | None = None) -> str:
+    """Just the incoming offers (for the alert email): verdict line, why, and Claude's reply, per league with an offer.
+    `show_ids` prints each row's reads.json key, on by default exactly when there are no reads yet (the draft the
+    trade-offer routine reads before ruling)."""
+    show_ids = (not reads) if show_ids is None else show_ids
     reads = reads or {}
     L = [f"# FF trade offer — {packet['generated'][:10]}", ""]
     for lg in packet["leagues"]:
@@ -737,10 +747,12 @@ def offer_card(packet: dict, reads: dict | None = None) -> str:
             continue
         L.append(f"## {lg['league_name']}")
         L.append("")
-        for t in lg["incoming_trades"]:
-            L.append(f"- **{VERDICT_WORD[t['verdict']]}:** {incoming_line(t)}. {'; '.join(t['why']) or 'even swap on paper'}")
-        L.append("")
         r = reads.get(lg["name"]) or {}
+        for t, x in zip(lg["incoming_trades"], offer_rows(lg, r)):
+            why = f". {'; '.join(t['why']) or 'even swap on paper'}"
+            x = {**x, "label": VERDICT_WORD[t["verdict"]], "text": x["text"] + why}
+            L.append(f"- {item_line(x)}" + (f"  `[{x['id']}]`" if show_ids else ""))
+        L.append("")
         if r.get("read"):
             L.append(f"**Claude's read:** {r['read']}")
         if r.get("reply"):

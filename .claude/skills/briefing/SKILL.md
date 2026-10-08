@@ -20,15 +20,25 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    (see scripts/setup_cookies.md) instead of a briefing.
 2. `uv run ff sync` then `uv run ff packet --sims 2000`. The packet step takes 3-5 minutes: run it with the Bash tool's
    `timeout` set to 600000 (ms) so it is not cut off. Note the packet path it prints and read that JSON.
-3. Research (WebSearch), in this order, spending at most ~10 searches total:
-   - every entry in `shared.injury_watchlist` (latest practice report / beat-writer status),
+3. Research (WebSearch), in this order, up to ~6 searches per league (one per player; a player on two of my rosters is
+   one search, and skip it when the packet already answers the question: Sleeper `notes` saying "out for the season",
+   a `locked` player, an Out or IR with a dated return). Spend them on:
+   - every entry in `shared.injury_watchlist` (latest practice report / beat-writer status; from Friday, the final
+     designation and whether he is a game-time decision),
    - every entry in `shared.injured` (players out for a week or more, or on IR): how many more games he misses, from a
      team statement or beat writer. Skip the search when its `notes` (Sleeper) already says ("out for the season",
      "placed on IR, eligible to return week 9"). The packet's `weeks_out` is a designation default (IR = 4) until you
      write a real number,
    - each starter in any league's `lineup_win.slots` whose flags include QUESTIONABLE/DOUBTFUL/OUT or `sleeper:`,
-   - the top 3 waiver targets per league (is the role change real?),
+   - the top 3 waiver targets per league and the players a `trade:` row asks for or sends: is the role change real?
+     Look for last week's snap share and route share (a WR under 60% of routes is a part-time player whatever the box
+     score said; a back with the two-minute and goal-line work is the bellcow whatever the carry split said), a
+     depth chart change (committee to one back, a QB change, a new play-caller) and the coach's own words on the role,
    - every player named in any league's `incoming_trades` (an offer someone sent Dustin; the packet already has a verdict).
+   Weather: the code already discounts wind (`wind_mult` in model/projections.py scales this week's number for
+   passing-game players and K from 15 mph at kickoff, up to 10-15% at 25 mph; domes exempt, and the roster table flags
+   it as `wind:22mph x0.93`). Do not spend a search on wind. Search the forecast only for what the hourly wind number
+   does not capture (heavy snow or rain, a postponement, a venue change) and write `mu_mult` with the source as the note.
    Note the day: Tue/Wed = waivers matter most; Fri/Sat/Sun = final designations and weather; Thu = TNF players;
    Mon = only Monday-night players can still move (each league's `week_state` in the packet says the phase, the score so
    far, and who is left to play); do not research or suggest lineup changes for players marked `locked`.
@@ -36,10 +46,19 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    `{"<espn_id>": {"p_zero": <0-1>, "mu_mult": <0.5-1.5>, "weeks_out": <games or "season">, "ros_mult": <0.5-1.5>, "note": "<source + one-line reason>"}}`
    `p_zero` and `mu_mult` are this week only. `weeks_out` and `ros_mult` are the rest of the season and drive the
    hold / IR / drop / trade row for a hurt player; write `weeks_out` for every `shared.injured` entry you researched.
-   p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.25; Q + DNP Fri 0.5; Doubtful 0.85; Out/IR 1.0.
-   (Without an override the packet already uses 15% for a Questionable on Mon–Wed and 30% from Friday; write one only
-   when the report says more than the tag does.) An "Activate" row means ESPN no longer lists him as IR-eligible and
-   the roster is flagged until he moves; do not skip it.
+   `p_zero` is the chance he does not play at all this week; `mu_mult` scales what he scores when he does. A practice
+   report moves `p_zero`; a role report moves `mu_mult`. A Questionable WR expected to play through a hamstring at
+   less than full speed is `p_zero` from the guide plus `mu_mult` 0.8; the back his coach named the starter after a
+   trade is `mu_mult` 1.2 with `p_zero` untouched; a passing-game player whose QB was just benched for the backup is
+   `mu_mult` 0.85. Leave `mu_mult` alone for a vibe ("looked good in practice") and for wind (step 3: the code has it).
+   Never write `mu_mult` to move a player into or out of the lineup you would like; the lineup is the math's call
+   from the parameters you give it.
+   p_zero guide: full practice + no tag 0.03; Q + limited Fri 0.30 (the Friday default, so no override); Q + DNP Fri 0.5;
+   Doubtful 0.85; Out/IR 1.0.
+   (Without an override the packet already prices a Questionable by weekday, `QUESTIONABLE_BY_WEEKDAY` and
+   `P_ZERO` in model/projections.py: Mon–Wed 15%, Thu 20%, Fri–Sun 30%, because an early-week tag is last week's
+   until Wednesday's practice report. Write one only when the report says more than the tag does.) An "Activate" row
+   means ESPN no longer lists him as IR-eligible and the roster is flagged until he moves; do not skip it.
    weeks_out guide: IR 4 unless the report says longer; `"season"` for an ACL, Achilles or season-ending surgery;
    suspension = games announced; count from this week (an Out this week with a return next week is 1).
    ros_mult only for a changed role or a diminished return (hamstring at 85%), not for this week's snap count. One more

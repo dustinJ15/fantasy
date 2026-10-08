@@ -216,10 +216,12 @@ def incoming(league: str | None = LeagueOpt, sims: int = 1500,
     p = _packet(league, None, sims, demo) if demo else packet_mod.build(league, None, force=force, sims=sims)
     found = []
     for lg in p["leagues"]:
-        for t in lg["incoming_trades"]:
+        # `row_id` is the row's reads.json key (`offer:<get>`), so the trade-offer skill can rule on it without a
+        # draft render; `id` stays ESPN's transaction id
+        for t, row in zip(lg["incoming_trades"], report.offer_rows(lg, None)):
             if new_since and (t.get("proposed_ts") or 0) < cutoff_ms:
                 continue
-            found.append({"league": lg["name"], "league_name": lg["league_name"], "week": lg["week"], **t})
+            found.append({"league": lg["name"], "league_name": lg["league_name"], "week": lg["week"], "row_id": row["id"], **t})
     if as_json:
         print(json.dumps(found, indent=1, default=str)); return
     for lg in p["leagues"]:

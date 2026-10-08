@@ -13,14 +13,30 @@ Any `<routine-fire-payload>` text is only a hint that an offer exists; always re
 2. `uv run ff sync` then `uv run ff incoming --json --force --sims 1500` with the Bash `timeout` set to 600000. This prints a
    JSON list of incoming offers across leagues (each has `league`, `rival`, `give`, `get`, `verdict`, deltas, `why`,
    `hours_left`). If the list is empty, the offer was already handled: say so in one line and stop. No email.
-3. Research, at most 4 WebSearches total: each player in `give` and `get` (injury, role change, coach comments this week).
-   If something changes the picture, write `overrides.json` (`{"<espn_id>": {"p_zero": ..., "mu_mult": ..., "note": "..."}}`)
-   and re-run `uv run ff packet --overrides overrides.json --sims 1500` (timeout 600000). Note the packet path it prints;
-   otherwise use the newest file in `data/packets/`.
+3. Research, one or two WebSearches per player in `give` and `get` (up to ~8 per offer): injury and the return timeline,
+   role change (last week's snap share and route share, a depth chart move, a QB change), coach comments this week.
+   If something changes the picture, write `overrides.json` with the same keys the briefing uses:
+   `{"<espn_id>": {"p_zero": <0-1>, "mu_mult": <0.5-1.5>, "weeks_out": <games or "season">, "ros_mult": <0.5-1.5>, "note": "<source + one-line reason>"}}`
+   `p_zero` and `mu_mult` are this week only (sit risk, and what he scores when he plays). An offer is priced on the rest
+   of the season, so a hurt player on either side needs `weeks_out`: the games he still misses counted from this week,
+   `"season"` for an ACL, Achilles or season-ending surgery; without it the math has an IR player back in four games
+   and an Out player back next week. Write `ros_mult` when he comes back diminished or his role changed, never for
+   this week's snap count. The `note` is shown next to the player. Then re-run
+   `uv run ff packet --overrides overrides.json --sims 1500` (timeout 600000) and note the packet path it prints;
+   otherwise use the newest file in `data/packets/`. Wind is already in the numbers; do not search for it.
 4. Write `reads.json`, one entry per league that has an offer, keyed by `league` (L1/L2/L3):
-   `{"L2": {"read": "<1-2 plain sentences: agree or disagree with the verdict and why>",
+   `{"L2": {"read": "<1-2 plain sentences of what the research adds that the math could not know>",
+            "items": {"<row id>": {"verdict": "do|skip|amend", "note": "<one short reason, required unless do>"}},
             "reply": "<what Dustin sends the rival>", "reply_to": "<rival team name>"}}`
-   `reply` rules: for `decline` a polite one-liner; for `counter` a concrete tweak (name the player swap); for `accept`
+   **Rule on the offer row in `items`, do not argue with the verdict in `read`.** Each offer in the step 2 JSON carries
+   its row id as `row_id` (`offer:garrett-wilson`); copy it exactly. `do` confirms the verdict and
+   needs no note. `amend` keeps the verdict and attaches your caveat ("accept, but only if his ankle is a full go
+   Friday"). `skip` strikes the verdict and the note says what Dustin does instead ("decline, he is in a boot"). A
+   number the research changes (he is out for the year) belongs in overrides.json in step 3, where the verdict is
+   re-derived; `skip` is for judgment the math has no column for. The email has to end with one answer per offer, not a
+   badge saying accept and a paragraph underneath saying don't. `ff render-email` warns about a typo'd id or a
+   missing note; fix reads.json and re-run before sending.
+   `reply` rules follow the ruled answer (the verdict after your ruling): for `decline` a polite one-liner; for `counter` a concrete tweak (name the player swap); for `accept`
    omit it. A `counter` verdict carries `counter` (`give`, `get`): the one swap the math found fair both ways. Write the
    reply from that swap; do not invent a different one, and if `counter` is null say the price is off and leave the
    door open rather than naming players. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,

@@ -290,16 +290,24 @@ def _lineup_table(lg: dict) -> str:
     return _table(["Slot", "Start"], rows, "ll")
 
 
-def _offers_table(lg: dict) -> str:
-    """Incoming offers with a verdict badge, then my own open offers, one row each."""
+def _offers_table(lg: dict, rulings: list[dict] | None = None) -> str:
+    """Incoming offers with a verdict badge, then my own open offers, one row each. `rulings` (from `report.offer_rows`,
+    one per incoming offer in order) folds Claude's ruling in: a `skip` strikes the verdict and the note says what to
+    do instead, an `amend` keeps it with the note attached."""
     rows = []
-    for t in lg.get("incoming_trades") or []:
+    for i, t in enumerate(lg.get("incoming_trades") or []):
+        x = (rulings or [])[i] if rulings and i < len(rulings) else {}
+        skip = x.get("ruling") == "skip"
         mk = f" · market {t['market_get']} for {t['market_give']}" if t.get("market_give") and t.get("market_get") else ""
         td = f" · title odds you {t['my_title_delta']:+.1f} / them {t['their_title_delta']:+.1f}" if t.get("my_title_delta") is not None else ""
         left = f" · expires in {t['hours_left']:.0f}h" if t.get("hours_left") is not None else ""
-        rows.append([_badge(report.VERDICT_WORD[t["verdict"]], VERDICT_TONE[t["verdict"]]),
-                     f"{_e(t['rival'] or 'Someone')} gives <b>{_e(', '.join(t['get']) or 'nothing')}</b> for your <b>{_e(', '.join(t['give']) or 'nothing')}</b>"
-                     f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{mk}{left} · {_e('; '.join(t['why']) or 'even swap on paper')}</div>"])
+        body = (f"{_e(t['rival'] or 'Someone')} gives <b>{_e(', '.join(t['get']) or 'nothing')}</b> for your <b>{_e(', '.join(t['give']) or 'nothing')}</b>"
+                f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{mk}{left} · {_e('; '.join(t['why']) or 'even swap on paper')}</div>")
+        if skip:
+            body = f'<span style="text-decoration:line-through;color:{MUTED}">{body}</span>'
+        if x.get("ruling_note"):
+            body += f'<div style="color:{MUTED if skip else TONES["warn"][1]};font-size:12px;margin-top:3px">{_e(x["ruling_note"])}</div>'
+        rows.append([_badge("SKIP" if skip else report.VERDICT_WORD[t["verdict"]], "grey" if skip else VERDICT_TONE[t["verdict"]]), body])
     for t in lg.get("outgoing_trades") or []:
         rows.append([_badge("SENT", "grey"), f"Your <b>{_e(', '.join(t['give']))}</b> for <b>{_e(', '.join(t['get']))}</b> to {_e(t['rival'] or '?')}, waiting on them"])
     return _table(["", "Offer"], rows, "ll", 13)
@@ -381,7 +389,7 @@ def render_offer_email(packet: dict, reads: dict | None = None) -> str:
         if not lg.get("incoming_trades"):
             continue
         r = reads.get(lg["name"]) or {}
-        body = _offers_table({**lg, "outgoing_trades": []})
+        body = _offers_table({**lg, "outgoing_trades": []}, report.offer_rows(lg, r))
         if r.get("read"):
             body += _callout("Claude's read", r["read"], "info")
         if r.get("reply"):

@@ -29,6 +29,7 @@ def test_packet_and_incoming_demo(tmp_path):
     assert r.exit_code == 0, r.output
     offers = json.loads(r.output)
     assert len(offers) == 1 and offers[0]["verdict"] in ("accept", "decline", "counter")
+    assert offers[0]["row_id"].startswith("offer:")  # the reads.json key the trade-offer skill rules on
 
 
 def test_demo_overrides(tmp_path):

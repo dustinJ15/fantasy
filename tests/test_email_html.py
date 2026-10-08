@@ -53,6 +53,11 @@ def test_render_email(monkeypatch):
     short = render_email(p, {"L9": {"reply": "how about RB2 straight up?", "reply_to": "Team 2"}}, only_incoming=True)
     assert "FF trade offer" in short and "how about RB2 straight up?" in short and "Waivers" not in short
     assert len(short) < 20_000
+    # a ruling on the offer row reaches the alert email: skip strikes the verdict badge and carries the note
+    oid = next(x["id"] for x in report.todos(p["leagues"][0]) if x["kind"] == "trade_in")
+    ruled = render_email(p, {"L9": {"items": {oid: {"verdict": "skip", "note": "decline, he is in a boot"}}}}, only_incoming=True)
+    assert ">SKIP<" in ruled and "line-through" in ruled and "decline, he is in a boot" in ruled
+    assert "line-through" not in short
     # no reads -> no callouts
     bare = render_email(p)
     assert "Claude" not in bare.replace("read from Claude", "")
