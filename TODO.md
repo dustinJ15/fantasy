@@ -1,0 +1,200 @@
+# TODO — the backlog, one PR per item
+
+Findings from the 2026-10-08 line-by-line review, ordered by how much each one changes the numbers Dustin acts on.
+ROADMAP.md says where the model should go; this file says what to do next and how to know it is done. Pick the
+top unchecked item in the highest tier, make one PR, tick it, add a row to the CLAUDE.md failure table if the fix
+closes a failure mode. Line numbers are as of commit 82c3480.
+
+Sizes: XS under an hour, S a morning, M a day or two, L a week with a plan in `docs/plans/`.
+
+## Working an item in a fresh session
+
+Dustin's prompt is one line: "Read CLAUDE.md and TODO.md, take the top unchecked item (or item <id>), fix it, and open a PR."
+The session then:
+
+1. Reads CLAUDE.md (the boundary rule, the layout, the failure table) and this file. Reads the files the item names
+   before touching anything; the line numbers drift, the function names do not.
+2. Reproduces the finding first: a failing test, or the probe the item describes (`uv run ff briefing --demo`, a
+   fixture from `tests/`, the projlog branch via `git fetch origin projlog`). An item that cannot be reproduced is
+   reported back, not fixed on faith.
+3. Fixes that one item and nothing else. Scope creep is the thing this list exists to prevent; a second finding on
+   the way is a new line here, not a second change in the PR.
+4. Adds the test that would have caught it, runs `uv run pytest` and `uv run ruff check`, and `uv run ff briefing
+   --demo --short` to see the card still renders.
+5. Ticks the box, notes anything learned under the item in one line, and adds a row to the CLAUDE.md failure table
+   when the fix closes a failure mode Dustin could see in an email.
+6. Opens a PR titled after the item id and its first clause; the body says what was wrong, what changed, how it was
+   verified. Code reaches the cloud routine only after merge to main.
+
+Rules that hold for every item: read-only against ESPN; code owns numbers, Claude owns prose; never commit
+`briefing.md`, `overrides.json`, `reads.json`, `data/`, `leagues.toml` or `ops.local.md`; a test that only asserts
+"no exception" does not count as the test.
+
+## Tier A — bugs that distort every number today
+
+- [ ] **A1 (M). Rest-of-season per-game values are inflated and the inflation grows every week.**
+  `src/ff/model/projections.py:179-181` does `ros_pg = proj_season / weeks_remaining`. Confirmed against a live
+  league on 2026-10-08 (week 5, 13 matchup weeks left): ESPN's `projected_total_points` is a static full-season
+  figure, not a remaining total. Amon-Ra St. Brown: 91.3 scored, season total 246.2, the code says 18.9 per game
+  rest of season (honest: ~14.5). Kyle Monangai: 61.3 scored in 4 games, season total 129.8, weekly projection
+  10.6, so the total is not "actual plus remaining" either. Inflation is 17/13 today, 17/8 in week 10, 17/5 in
+  week 13. Healthy players get half of it (the 50/50 shrink toward this week's `mu`), hurt players the full dose,
+  so hold values for injured players are overstated relative to healthy ones. The sim's team strengths ride on
+  `mu_ros` while sigma does not scale, so playoff and title odds grow overconfident weekly. Absolute thresholds
+  (`DROP_MARGIN` 3.0, the 0.75 ppw trade floor, `MUST_TRY_PPW` 2.0, `surplus` at repl + 3.0) shrink in relative
+  terms as the season goes on. `docs/plans/injured-player-decision.md` flagged this as "needs live pull"; the
+  pull is done and the answer is yes.
+  Fix: build the healthy per-game base from this week's blended projection, season-to-date points per game
+  (`actual` totals are in the snapshot) and `proj_season / 17` as a prior; drop `weeks_remaining` from the
+  denominator. `espn_pg` (what the rival's app shows him, `acceptance.his_view`) needs the same treatment.
+  Re-check every absolute threshold above once the scale is honest.
+  Done when: a synthetic row with `proj_week=10, proj_season=170, weeks_remaining=5` gives `mu_ros_active` near
+  10, not 34; `ff roster` on a real league shows ROS/g within ~15% of the weekly projection for healthy starters.
+
+- [ ] **A2 (S). The accuracy harness scores the blend against itself.**
+  `src/ff/projlog.py:37-42` picks the latest log per week, which is Monday's, written after `model/clock.py`
+  set each played player's `mu` to his actual score. `ff accuracy` on the projlog branch (weeks 1-4) reports a
+  blend MAE of 0.11 at TE and 0.38 at RB, which is impossible; week-4 Monday logs Kittle's blend as 19.0 and
+  Lawrence's as 13.08, their actual scores. K shows bias equal to its projection because nflverse's player stats
+  carry no kicking fantasy points; D/ST is absent. Half-PPR leagues are scored against PPR actuals
+  (`projlog.py:45-67`), and `write` is last-league-wins per player. The ROADMAP rule "re-weight a source only
+  if it trails the blend by 5% for 6 weeks" can never fire.
+  Fix: log the pre-clock `mu` (a `mu_pre` column, or log before `apply_clock`), score the last file written
+  before the first kickoff of the week, and use ESPN's own `actual_week` from the snapshot as truth (league
+  scoring, covers K and D/ST). Keep one row per league per player.
+  Done when: blend MAE at WR is 5-7 points, K and D/ST have real rows, and `ff accuracy` output goes in the
+  ROADMAP sourcing section.
+
+- [ ] **A3 (S). The title-odds delta on trade and offer rows is seed noise.**
+  `src/ff/packet.py:152` simulates the baseline with seed 7 at `sims`; `:198` and `:245` re-simulate with seed
+  11 at 1500. With no trade at all the demo shows deltas from -1.5 to +0.9 title points between the two.
+  Fix: common random numbers. Re-run the baseline with the same seed and n as the re-sim (or pass the baseline
+  draws in), so a null trade reads 0.0.
+  Done when: a test applies an empty trade and asserts `my_title_delta == 0.0`.
+
+- [ ] **A4 (S). Opponent strength is the optimizer's guess, not his set lineup.**
+  `src/ff/packet.py:120` runs the EV optimizer over the opponent's roster. From Saturday on his lineup is set
+  and visible in each player's `slot`. Use the starters in non-bench slots when the run is on a weekend (or
+  when every starter slot is filled), the optimizer otherwise.
+  Done when: a Sunday fixture with a rival who benched his best RB produces a lower `opponent.mu` than the
+  optimizer's.
+
+- [ ] **A5 (S, then M). P(win) lineups trade real points for unfitted variance with no threshold.**
+  `src/ff/model/lineup.py:102` benches a higher-EV player for any P(win) gain, even 0.001. Sigma is a guess
+  (`projections.py:14-16`) scaled by a FantasyPros rank-sd fudge (`:94-100`). Until variance is fitted, require
+  a minimum P(win) gain over the EV lineup (start at 1.5 percentage points) before deviating, and say the gain
+  on the lineup row. Then (after A2) fit `BASE_SIGMA` and `CV_FLOOR` per position from projlog residuals.
+  Done when: the demo and a real packet show `lineup_diff` only with a stated P(win) gain above the floor; a
+  test with a 0.3pp gain keeps the EV lineup.
+
+- [ ] **A6 (S, fold into A1). This week's matchup leaks into rest-of-season value.**
+  `projections.py:181` shrinks `mu_ros_active` halfway toward `mu`, which already carries the Vegas multiplier
+  and this week's opponent. A starter facing the league's best defense this week is worth less in every trade
+  and hold row for the rest of the season. Shrink toward a matchup-neutral number instead.
+
+## Tier B — checklist and ledger bugs
+
+- [ ] **B1 (S). One drop is spent twice.** `src/ff/report.py:359` reserves only `ir` and `trade` verdict
+  players. A `drop`-verdict player is noted (`:362-366`) but never added to `reserved` or `spots.dropped`, so
+  `_drop_order` (`:58-60`) hands him out again as the drop for a waiver pickup. Reproduced: two adds against one
+  freed spot. `note(drop=)` then runs twice for him, so `cut()` position counts are off by one.
+  Fix: add drop-verdict names to `reserved` (or `dropped`) when the row carries an `add`.
+  Done when: a test with an injury drop plus a start-worthy pickup names two different drops.
+
+- [ ] **B2 (S). Activation folding is order-dependent.** `report.py:288-312` folds the activate row's drop into
+  the drop row only when the activate row comes first; `injuries.decide` orders by `mu_ros_active`, so a cheap
+  returning player and a dearer season-ender print both "drop Dart to make room" and "drop Dart: out for the
+  season; add X". Pre-compute the activations' drops before emitting any row.
+  Done when: `tests/test_review_fixes.py` runs the Daniels/Dart case in both orders.
+
+- [ ] **B3 (S). A remembered push stays "do this one" after the math stops supporting it.**
+  `report.py:415-423` never re-checks `sendable` on a remembered math push, and `push_line` still says "too
+  good to let slide". Drop a math-sourced push whose row is no longer `sendable`; keep Claude-sourced pushes.
+
+- [ ] **B4 (S). Pushes reopen the morning after a decline.** `src/ff/rulings.py:106-118`: once the sent offer
+  leaves `pending_trades`, a `sent` push with `closed != today` falls through to a new `open`. A `sent` or
+  `skipped` push should stay closed for `SKIP_DAYS` unless Claude rules `push` again.
+
+- [ ] **B5 (S). Offer outcomes mislabel.** `rulings.py:185-190`: an offer I withdrew, or a counter he accepted
+  under a different id, is recorded as his decline and penalises him for 7 days. `:187` compares the expiry
+  date only, in machine-local (UTC) time, so an offer that lapsed at 9 PM Denver reads "declined". `:215`
+  treats `expired` like `declined` in `history`. Separate withdrawn, expired and declined; only declined should
+  carry the `recent_decline` factor.
+
+- [ ] **B6 (S-M). The drop criterion is `mu_ros` alone.** `report.py:60`. It ignores `market.redraft_value`
+  and `trend_30d` (already on each roster row via `enrich`), handcuff status, bye timing and this week's
+  `p_zero`. A rookie RB the market prices highly is cut before a WR4 nobody would trade for, and the card never
+  shows the two numbers side by side. Show market value next to the drop and penalise cutting a player the
+  market would pay for (he is trade bait, see the `trade` verdict).
+
+- [ ] **B7 (S). The cover row is not executable.** `report.py:232-234` takes the first waiver at the position
+  regardless of `on_waivers` ("add Backup K before kickoff" for a claim that lands Wednesday) and takes no
+  spot from the ledger, so no drop is named.
+
+- [ ] **B8 (XS). A skipped hold loses its strike in the HTML.** `src/ff/email_html.py:199` strips `~~` from
+  `hold_line`, the only skip marker on holds; the markdown keeps it, the email does not.
+
+- [ ] **B9 (XS). Row ids can collide.** `trade:<get>` (`report.py:446`) ignores `give`; `waiver:<name>` is shared
+  by the Waiver and Open-spot rows. Latent today; `apply_reads` would rule both with one key.
+
+## Tier C — operations
+
+- [ ] **C1 (S). The projlog push step fails as written.** `scripts/cloud_setup.sh:31-33` restores
+  `data/projlog` as untracked files; `.claude/skills/briefing/SKILL.md:110` then runs
+  `git checkout -B projlog FETCH_HEAD`, which git refuses when those files differ, and the fallback branches off
+  main and is rejected non-fast-forward. The agent has been improvising each morning (`origin/projlog` has
+  commits through 2026-10-07), which is how a day's rulings get lost. Make it a worktree or a stash-free
+  copy-and-commit; test it in CI with a scratch remote.
+
+- [ ] **C2 (S). The Gmail doorbell can miss a second proposal in the same thread.**
+  `scripts/gmail_trade_doorbell.gs:25` searches `-label:ff-alerted`, `:137` labels the thread, `:110` fires only
+  on the newest message. ESPN's subject is identical each time, so a second proposal threads under an already
+  labelled one and is never seen. Dedupe per message id (Script Properties or a message-level marker) and add a
+  two-messages-in-one-thread case to `gmail_trade_doorbell.test.js`.
+
+- [ ] **C3 (XS). The poller has blind spots.** `.github/workflows/trade-poll.yml:59-60` skips Monday and UTC
+  hours 0-11 with a 6h window; evening offers (prime trade time in Denver) wait for the morning briefing.
+
+- [ ] **C4 (XS, routine settings). The briefing cron drifts and the Sunday run is early.** `0 12 * * *` UTC is
+  6 AM Denver only during DST; after 2026-11-01 it is 5 AM. Sunday's lineup check at 6 AM MT predates the
+  11:30 ET inactives. Use `CRON_TZ=America/Denver` and add a Sunday 9:45 MT run (ops.local.md, not the repo).
+
+- [ ] **C5 (S). The email body is assembled by the LLM.** `briefing/SKILL.md:99-103` has the model paste the
+  HTML into the Gmail tool and check `wc -c`. `ff email` already exists (`src/ff/mail.py`); give the cloud env
+  `GMAIL_USER`/`GMAIL_APP_PASSWORD` and make the skill call it, with the paste as the fallback.
+
+- [ ] **C6 (XS). Sleeper's week can differ from ESPN's on Monday and Tuesday.** `packet.py:313` fetches
+  Sleeper projections for `sleeper.state().week`; ESPN's `current_week` rolls Tuesday. Use the league's week.
+
+## Tier D — where real edge would come from (after Tier A)
+
+- [ ] **D1 (M-L). In-season rest-of-season projection.** Season-to-date points per game, target and carry share
+  from `model/usage.py` (computed, rendered nowhere, moves no number), and the weekly blend, with the
+  preseason total as a prior that fades by week 6. This is ROADMAP item 1 and the only private edge; plan in
+  `docs/plans/`.
+- [ ] **D2 (M). Fitted variance** per position from the fixed projlog (A2 first). Then A5's floor can come down.
+- [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
+  (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
+- [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.
+- [ ] **D5 (S). Weather into projections.** Fetched per game (`sources/weather.py`), applied nowhere. Wind over
+  15 mph: penalty on passing and K.
+- [ ] **D6 (S). Research prompt upgrades.** `briefing/SKILL.md:23` budgets ~10 searches for three leagues;
+  `:39` says Questionable plus limited Friday is 0.25 while the code's Friday default is 0.30; no guidance on
+  `mu_mult`; snap share, route share, depth-chart changes and weather are never asked for. `trade-offer/SKILL.md:17`
+  omits `weeks_out` and `ros_mult`, so research on a hurt player cannot reach the math, and `:21` lets the read
+  argue with the verdict in prose instead of ruling on it.
+- [ ] **D7 (S). Email context.** Per-player opponent and implied total (`sources.implied_total`), kickoff day
+  (Thursday players need their moves first), usage trend, and p(accept) on the trade row, not only the word.
+- [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.
+
+## Tier E — tests that would catch model errors
+
+- [ ] **E1.** `tests/test_lineup.py:69-77` "underdog prefers variance" passes with variance ignored (the WR also
+  wins on EV). Give the high-variance player a lower EV.
+- [ ] **E2.** `tests/test_packet_synthetic.py:155-170` reconstructs the expected rows from the block it tests
+  and branches on the output; `:155`'s `or any(p_zero == 1.0)` is always true.
+- [ ] **E3.** Regression tests for B1, B2, B3, B4 and `_Spots.cut` reaching the `stuck` branch.
+- [ ] **E4.** `tests/test_email_html.py:124` `assert "Title" not in html` breaks on any name containing "Title".
+- [ ] **E5.** `tests/test_season.py:616` accepts any `accept_word`; `test_sim.py` has no symmetry check (four
+  equal teams should each sit near 25%).
+- [ ] **E6.** `tests/test_waivers.py` pins FAAB constants for a feature no league uses; waiver priority has none.
