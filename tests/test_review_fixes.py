@@ -175,6 +175,31 @@ def test_a_pickup_the_injury_row_already_adds_is_not_a_second_row():
     assert ids(lg).count("waiver:now-guy") == 0 and "then add Now Guy" in by_id(lg)["injury:stash"]["text"]
 
 
+def test_a_cap_with_nobody_to_drop_says_your_call_instead_of_naming_a_cut():
+    """`_Spots.cut` reaching the `stuck` branch: the trade puts a position over ESPN's cap and every body there is one
+    the ledger will not cut (a starter, or the IR occupant, who counts toward the cap but frees no bench spot). The
+    row must say so and name nobody, not invent a drop or print the cap as if a body had been found."""
+    one_qb = league(roster=[player("Only QB", pos="QB", slot="QB"), player("Starter WR", slot="WR"), player("Bench WR", ros=3.0)],
+                    lineup_win={"slots": {"QB": ["Only QB"], "WR": ["Starter WR"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                    settings={"lineup_slots": {"QB": 1, "WR": 2}, "position_limits": {"QB": 1}},
+                    trades=[{**trade(["QB In"], ["Bench WR"]), "get_pos": ["QB"], "drops": []}])
+    spots = report._Spots(one_qb, 0, set())
+    assert spots.cut(one_qb["trades"][0]) == ([], "; ESPN caps QB at 1 and there is no obvious QB to drop, your call")
+    assert spots.dropped == [] and spots.counts["QB"] == 1  # a stuck cut spends nothing on the ledger
+    row = by_id(one_qb)["trade:qb-in"]
+    assert row["drops"] == []
+    assert row["text"] == ("offer Rival your Bench WR for QB In (+1.5 pts/wk for you, +0.5 for them)"
+                           "; ESPN caps QB at 1 and there is no obvious QB to drop, your call")
+    # the IR occupant counts against the cap but is never the cut: three WRs against a cap of three, one of them on IR
+    ir_wr = league(roster=[player("Starter WR", slot="WR"), player("WR Two", slot="WR"), player("IR WR", slot="IR", ros=0.0),
+                           player("RB Two", pos="RB", ros=5.0)],
+                   lineup_win={"slots": {"WR": ["Starter WR", "WR Two"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                   settings={"lineup_slots": {"RB": 2, "WR": 2}, "position_limits": {"WR": 3}},
+                   trades=[{**trade(["WR In"], ["RB Two"]), "get_pos": ["WR"], "drops": []}])
+    assert report._Spots(ir_wr, 0, set()).cut(ir_wr["trades"][0]) == ([], "; ESPN caps WR at 3 and there is no obvious WR to drop, your call")
+    assert by_id(ir_wr)["trade:wr-in"]["drops"] == []
+
+
 # ---------- claim vs add ----------
 
 def test_a_player_on_waivers_is_a_claim_with_the_priority_spelled_out():
