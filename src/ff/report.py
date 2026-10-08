@@ -6,6 +6,7 @@ from collections import Counter
 from datetime import date
 
 from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, handcuff_for, market_value, sit_note, weeks_left
+from .model import waivers as waivers_model
 
 
 def slug(text: str) -> str:
@@ -336,23 +337,42 @@ def _lineup_item(lg: dict) -> dict:
 
 def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
     """At most one pickup who starts this week and one who upgrades a slot for the season; each spends a spot on the
-    ledger and goes into `added` so no row below brings him in again."""
+    ledger and goes into `added` so no row below brings him in again. A claim in a rolling-priority league also says
+    whether the priority it spends is worth it (`_priority_note`)."""
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]
-    ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= 1.0 and w not in starts and w["name"] not in added]
+    ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= waivers_model.CLAIM_WORTHY_PPW and w not in starts and w["name"] not in added]
     out = []
     for w in starts[:1]:
         _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)"
-                            f"{due_note(w.get('kickoff_day'))}{suffix}"})
+                            f"{due_note(w.get('kickoff_day'))}{_priority_note(lg, w)}{suffix}"})
     for w in ups[:1]:
         _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}"
-                            f"{due_note(w.get('kickoff_day'))}{suffix}"})
+                            f"{due_note(w.get('kickoff_day'))}{_priority_note(lg, w)}{suffix}"})
     return out
+
+
+def _priority_note(lg: dict, w: dict) -> str:
+    """"; worth it: +2.1/wk now vs ~0.7/wk of future claims given up" or "; pass: you'd give up priority #2 for
+    +0.3/wk (~0.7/wk of future claims)" on a claim in a rolling-priority league (`model.waivers.priority_cost`, the
+    wire's claim-worthy upgrades as the sample of future claims). Empty for a free agent, a FAAB league, a league
+    whose order resets weekly, or when the order or my rank is unknown."""
+    if not w.get("on_waivers") or lg.get("faab_remaining") is not None:
+        return ""
+    s = lg.get("settings") or {}
+    deltas = [x["delta_over_starter"] for x in lg["waivers"] if not x["streamer"] and x["delta_over_starter"] >= waivers_model.CLAIM_WORTHY_PPW]
+    cost = waivers_model.priority_cost(lg.get("waiver_rank"), s.get("team_count"), deltas, weeks_left(lg), s.get("waiver_order"))
+    if cost is None:
+        return ""
+    gain = waivers_model.claim_gain(w["delta_over_starter"], w.get("delta_week") or 0.0, weeks_left(lg))
+    if waivers_model.claim_worth_it(gain, cost):
+        return f"; worth it: +{gain:.1f}/wk now vs ~{cost:.1f}/wk of future claims given up"
+    return f"; pass: you'd give up priority #{lg['waiver_rank']} for +{gain:.1f}/wk (~{cost:.1f}/wk of future claims)"
 
 
 def _stream_items(lg: dict) -> list[dict]:

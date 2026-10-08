@@ -61,8 +61,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D3 (M). Waiver priority value.** All three leagues use priority, the model prices FAAB only
-  (`model/waivers.py`). A `claim` row should weigh what spending priority N costs against expected future claims.
 - [ ] **D4 (M). Playoff schedule weighting** for weeks 15-17 (ROADMAP 5); best acted on weeks 6-10, so now.
 - [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.
 
@@ -75,7 +73,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 - [ ] **R1 (S). Bring README.md up to date.** Last touched 2026-09-23 (commit `1f7d98f`), before the 2026-10-08
   backlog run that landed 30 commits. Stale or missing as of 2026-10-08: "How it's built" says `uv run pytest` runs
   40 tests (it is 317); "What the math does" and the Commands table describe waivers as FAAB bids while all three
-  leagues use priority (`claim` / `add` rows, D3 still open), and say nothing about the wind penalty (D5), the
+  leagues use priority (`claim` / `add` rows, and since D3 the priority a claim spends), and say nothing about the wind penalty (D5), the
   opponent's set lineup on Sat–Mon (A4), the P(win) floor on the lineup row (A5), market-, handcuff- and bye-aware
   drops (B6, B6b), or the title-odds delta being common-random-numbers (A3); the Architecture diagram does not show
   `src/ff/ledger.py` (B12), `src/ff/rulings.py` and the four memories that ride the `projlog` branch

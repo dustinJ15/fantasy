@@ -207,6 +207,7 @@ def test_a_priority_league_carries_the_rank_and_no_faab_through_packet_markdown_
     monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
     snap = make_snapshot()
     snap["settings"]["faab"] = False
+    snap["settings"]["waiver_order"] = "rolling"
     snap["teams"][0]["waiver_rank"] = 6
     on_waivers = {fa["espn_id"] for fa in snap["free_agents"][::2]}
     for fa in snap["free_agents"]:
@@ -221,6 +222,7 @@ def test_a_priority_league_carries_the_rank_and_no_faab_through_packet_markdown_
         if r["kind"] in ("waiver", "waiver_up"):
             assert "$" not in r["text"]
             assert r["text"].startswith("claim (waivers, you are priority #6) ") or r["text"].startswith("add ")
+            assert ("of future claims" in r["text"]) == r["text"].startswith("claim")  # the priority is priced on a claim only
     packet = {"version": 3, "generated": "2026-09-10T07:00:00", "season": 2026,
               "shared": {"injury_watchlist": [], "exposure": {}, "trending_adds": [], "usage_error": None, "unmatched_ids": []},
               "leagues": [blk]}
@@ -229,3 +231,72 @@ def test_a_priority_league_carries_the_rank_and_no_faab_through_packet_markdown_
     assert "| bid |" not in waivers_md and "$" not in waivers_md and "| target |" in waivers_md
     html = render_email(packet, None, full=True)
     assert "waiver priority #6" in html and "FAAB left" not in html and ">Bid<" not in html
+
+
+# ---------- the priority a claim spends (D3) ----------
+
+def _rolling(**kw):
+    """A rolling-priority league (a successful claim sends you to the back) with a stacked wire: three claim-worthy
+    upgrades beyond the row's own player, so holding a high priority is worth something."""
+    wire = [_waiver("Big Guy", d_start=2.1, on_waivers=True), _waiver("Next Guy", d_start=1.5, on_waivers=True),
+            _waiver("Third Guy", d_start=1.2, on_waivers=True), _waiver("Depth", d_start=0.3)]
+    settings = {"lineup_slots": {"RB": 2}, "team_count": 10, "waiver_order": "rolling"}
+    return league(waivers=wire, waiver_rank=2, faab_remaining=None, weeks_remaining=12, settings=settings, **kw)
+
+
+def test_a_claim_in_a_rolling_league_prices_the_priority_it_spends():
+    """Priority #2 of 10 with 12 weeks left: the row says what claiming now gets against the future claims it gives
+    up, and the two numbers are the model's (`priority_cost`), not a guess in prose."""
+    text = by_id(_rolling())["waiver:big-guy"]["text"]
+    assert text.startswith("claim (waivers, you are priority #2) Big Guy (RB), +2.1/wk over your RB")
+    assert "; worth it: +2.1/wk now vs ~0.7/wk of future claims given up" in text
+
+
+def test_a_small_upgrade_says_pass_when_the_priority_is_worth_more():
+    """A one-week fill-in at priority #2: the start-now row spreads his week over the season and the priority wins."""
+    lg = _rolling()
+    lg["waivers"].insert(0, _waiver("Fill In", d_week=3.6, d_start=0.0, on_waivers=True))
+    text = by_id(lg)["waiver:fill-in"]["text"]
+    assert text.startswith("claim (waivers, you are priority #2) Fill In (RB) and start him at RB (+4 pts this week)")
+    assert "; pass: you'd give up priority #2 for +0.3/wk (~0.7/wk of future claims)" in text
+
+
+def test_a_reverse_standings_league_shows_no_cost():
+    """ESPN resets the order to reverse standings every week, so priority costs nothing to spend; an unknown order
+    (an older snapshot) prints nothing rather than a made-up number."""
+    for order in ("reset", None):
+        lg = _rolling()
+        lg["settings"]["waiver_order"] = order
+        text = by_id(lg)["waiver:big-guy"]["text"]
+        assert text == "claim (waivers, you are priority #2) Big Guy (RB), +2.1/wk over your RB; drop Bench WR", (order, text)
+
+
+def test_a_free_agent_row_is_untouched_by_the_priority_value():
+    lg = _rolling()
+    lg["waivers"][0]["on_waivers"] = False
+    assert by_id(lg)["waiver:big-guy"]["text"] == "add Big Guy (RB), +2.1/wk over your RB; drop Bench WR"
+
+
+def test_priority_cost_is_the_rolling_formula():
+    """V(n) = sum_k Binom(n-1, k; RIVAL_CLAIM_P) * d_(k+1) over the wire's claim-worthy deltas sorted best first
+    (0 past the end); cost = (V(rank) - V(last)) * (weeks_remaining - 1) / (2 * weeks_remaining)."""
+    from ff.model import waivers as wv
+    d = [2.1, 1.5, 1.2]
+    p = wv.RIVAL_CLAIM_P
+    v2 = (1 - p) * 2.1 + p * 1.5
+    v10 = sum(__import__("math").comb(9, k) * p ** k * (1 - p) ** (9 - k) * (d[k] if k < 3 else 0.0) for k in range(10))
+    assert wv.priority_value(2, d) == round(v2, 4) and wv.priority_value(10, d) == round(v10, 4)
+    assert wv.priority_cost(2, 10, d, 12, "rolling") == round((v2 - v10) * 11 / 24, 2)
+    assert wv.priority_cost(1, 10, d, 12, "rolling") > wv.priority_cost(2, 10, d, 12, "rolling") > wv.priority_cost(10, 10, d, 12, "rolling") == 0.0
+    assert wv.priority_cost(2, 10, d, 1, "rolling") == 0.0  # the last week: nothing left to claim for
+    assert wv.priority_cost(2, 10, [], 12, "rolling") == 0.0  # an empty wire: no future claims to give up
+    assert wv.priority_cost(2, 10, d, 12, "reset") is None and wv.priority_cost(2, 10, d, 12, None) is None
+    assert wv.priority_cost(None, 10, d, 12, "rolling") is None
+
+
+def test_waiver_order_is_read_from_espns_acquisition_settings():
+    """`waiverOrderReset` true is the weekly reset to reverse standings, false the rolling order; absent is unknown."""
+    from ff.sources.espn import waiver_order
+    assert waiver_order({"waiverOrderReset": True}) == "reset"
+    assert waiver_order({"waiverOrderReset": False}) == "rolling"
+    assert waiver_order({}) is None

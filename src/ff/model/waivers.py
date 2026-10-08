@@ -1,5 +1,7 @@
-"""Free-agent ranking, FAAB max-bid, streamers, handcuffs."""
+"""Free-agent ranking, FAAB max-bid, the priority a claim spends, streamers, handcuffs."""
 from __future__ import annotations
+
+from math import comb
 
 from .projections import PlayerProj
 from .vbd import own_starter_value
@@ -34,6 +36,50 @@ def faab_bid(delta_over_starter: float, weeks_remaining: int, budget_remaining: 
     if league_max_remaining is not None and delta_over_starter >= 8:
         bid = max(bid, min(budget_remaining, league_max_remaining + 1))
     return min(bid, budget_remaining)
+
+
+# ---- the priority a claim spends (D3) ----
+# All three leagues run waiver priority, not FAAB. In a rolling order a successful claim sends me to the back of the
+# line, so claiming priority #N now gives up the claims that priority would have won later; when ESPN resets the order
+# to reverse standings every week the priority is free to spend. `waiver_order` in the settings tells them apart.
+WAIVER_ORDER_ROLLING = "rolling"  # ESPN "Waiver Order Reset: No": move to last after a successful claim
+WAIVER_ORDER_RESET = "reset"      # ESPN "Waiver Order Reset: Yes": reverse standings each week, priority costs ~nothing
+RIVAL_CLAIM_P = 0.35              # chance a team ahead of me puts in a claim on a given waiver day
+CLAIM_WORTHY_PPW = 1.0            # the upgrade row's bar; the wire at or above it is the sample of future claims
+
+
+def priority_value(rank: int, deltas: list[float]) -> float:
+    """Points a week the player a claim at priority `rank` lands is worth, over the wire's claim-worthy upgrade deltas
+    sorted best first: each of the `rank - 1` teams ahead claims with `RIVAL_CLAIM_P`, so with k of them claiming I
+    get the (k+1)-th best (nothing once the list runs out). V(n) = sum_k Binom(n-1, k; p) * d_(k+1)."""
+    d = sorted((x for x in deltas if x > 0), reverse=True)
+    n = max(int(rank) - 1, 0)
+    p = RIVAL_CLAIM_P
+    return round(sum(comb(n, k) * p ** k * (1 - p) ** (n - k) * (d[k] if k < len(d) else 0.0) for k in range(n + 1)), 4)
+
+
+def priority_cost(rank: int | None, team_count: int | None, deltas: list[float], weeks_remaining: int,
+                  waiver_order: str | None) -> float | None:
+    """Points a week of future claims given up by spending priority `rank` now in a rolling league: the value of
+    holding `rank` less the value of holding last (where a claim sends me), times the weeks discount
+    (weeks_remaining - 1) / (2 * weeks_remaining): a later claim is made about halfway through what is left, so the
+    player it lands pays for about half as many weeks as one claimed today; the last week has nothing left to claim
+    for. None when the order resets weekly (the priority is free) or is unknown, or the rank is."""
+    if waiver_order != WAIVER_ORDER_ROLLING or not rank or not team_count:
+        return None
+    weeks = max(int(weeks_remaining), 1)
+    discount = (weeks - 1) / (2 * weeks)
+    return round(max(priority_value(rank, deltas) - priority_value(team_count, deltas), 0.0) * discount, 2)
+
+
+def claim_gain(delta_over_starter: float, delta_week: float, weeks_remaining: int) -> float:
+    """What the claim gets me, a week: the season-long upgrade, or a one-week fill-in's points spread over the weeks
+    left, whichever is more."""
+    return round(max(delta_over_starter, 0.0, max(delta_week, 0.0) / max(int(weeks_remaining), 1)), 2)
+
+
+def claim_worth_it(gain_ppw: float, cost_ppw: float) -> bool:
+    return gain_ppw >= cost_ppw
 
 
 def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj]], my_bench: list[PlayerProj],

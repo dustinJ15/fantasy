@@ -63,6 +63,15 @@ def position_limits(roster_settings: dict) -> dict[str, int]:
     return out
 
 
+def waiver_order(acq: dict) -> str | None:
+    """"reset" when ESPN's `acquisitionSettings.waiverOrderReset` is true (the order goes back to reverse standings
+    every week, so a claim costs no priority), "rolling" when it is false (a successful claim sends you to the back),
+    None when the setting is absent."""
+    if "waiverOrderReset" not in acq:
+        return None
+    return "reset" if acq.get("waiverOrderReset") else "rolling"
+
+
 def settings(ref: LeagueRef, league: League) -> LeagueSettings:
     s = league.settings
     raw = league.espn_request.league_get(params={"view": "mSettings"})["settings"]
@@ -87,6 +96,7 @@ def settings(ref: LeagueRef, league: League) -> LeagueSettings:
         trade_deadline_ms=int(s.trade_deadline or 0),
         ppr=ppr,
         position_limits=position_limits(raw["rosterSettings"]),
+        waiver_order=waiver_order(raw.get("acquisitionSettings") or {}),
     )
 
 

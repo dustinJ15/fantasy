@@ -286,7 +286,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     return {
         "name": snap["ref"]["name"], "league_name": s["name"], "week": week, "weeks_remaining": weeks_remaining,
         "settings": {k: s.get(k) for k in ("team_count", "lineup_slots", "faab", "faab_budget", "playoff_team_count", "playoff_weeks", "ppr",
-                                           "reg_season_weeks", "ir_slots", "bench_slots", "trade_deadline_ms", "position_limits")},
+                                           "reg_season_weeks", "ir_slots", "bench_slots", "trade_deadline_ms", "position_limits", "waiver_order")},
         "trade_deadline_iso": _ms_iso(deadline_ms), "trades_closed": trades_closed,
         "my_team_id": my_id, "my_record": f"{teams[my_id]['wins']}-{teams[my_id]['losses']}" if my_id in teams else None,
         "week_state": wstate,

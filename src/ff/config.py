@@ -83,3 +83,6 @@ class LeagueSettings:
     # ESPN's per-position roster caps ("Too many players with default position WR (maximum 6)"): pos -> max rostered,
     # IR included. Positions ESPN leaves unlimited are absent.
     position_limits: dict[str, int] = field(default_factory=dict)
+    # "rolling" (a successful claim sends you to the back of the waiver order), "reset" (ESPN resets it to reverse
+    # standings every week) or None when the snapshot predates the field. Prices what a claim costs in priority.
+    waiver_order: str | None = None
