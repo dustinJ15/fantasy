@@ -40,7 +40,7 @@ class Signals:
     fills_hole: bool = False           # the position he receives is below replacement for him
     trades: int | None = None          # ESPN transaction counter
     acquisitions: int | None = None
-    recent_decline: bool = False       # he declined or let an offer of mine expire in the last week
+    recent_decline: bool = False       # he declined an offer of mine in the last week (a lapse or a counter is not that)
     prior: float | None = None         # per-rival acceptance prior from the outcome log, if any
 
 

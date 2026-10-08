@@ -9,7 +9,7 @@ The scan re-derives the same offers daily from the same rosters; the only state 
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 from .config import DATA_DIR
@@ -159,22 +159,54 @@ def record_rulings(packet: dict, reads: dict, skips_path: Path = SKIPS_PATH, pus
 
 # ---------- outcomes: what ESPN did with the offers I actually sent ----------
 # The first real acceptance data this repo has. Every offer of mine that shows in `outgoing_trades` is opened here the
-# morning it is seen and closed the morning it is gone: accepted when the players I asked for are on my roster,
-# expired when its expiry passed, declined otherwise. The scan reads it for a per-rival prior and a recency factor.
+# morning it is seen and closed the morning it is gone: accepted when the players I asked for are on my roster and the
+# ones I offered are not; countered when he has a counter pending or a different package with him went through;
+# withdrawn when a piece I offered left my roster with nothing coming back (ESPN voids the proposal, his answer was
+# never given); expired when its expiry passed before the run; declined otherwise. The scan reads it for a per-rival
+# prior (accepted / declined / expired: the offers he actually had in front of him until the end) and a recency factor
+# (declined only). An offer I withdrew in the app with my roster unchanged still reads declined: ESPN's pending view
+# has no terminal status, and nothing else here can tell the two apart.
 
 OUTCOMES_PATH = DATA_DIR / "projlog" / "offer_outcomes.json"
 RECENT_DAYS = 7
-CLOSED = ("accepted", "declined", "expired")
+CLOSED = ("accepted", "declined", "expired")   # count toward the prior
 
 
 def load_outcomes(path: Path = OUTCOMES_PATH) -> dict[str, dict]:
     return _load(path)
 
 
-def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None = None) -> list[str]:
+def _expired(o: dict, now: datetime) -> bool:
+    """The offer's expiry is before `now`. `expires_ts` is ESPN's clock (ms, UTC); older entries have only `expires`,
+    the naive machine-local string `packet._ms_iso` wrote, compared in the same machine-local time."""
+    ts = o.get("expires_ts")
+    if ts:
+        return ts / 1000 <= now.timestamp()
+    try:
+        return datetime.fromisoformat(o.get("expires") or "") <= now.astimezone().replace(tzinfo=None)
+    except ValueError:
+        return False
+
+
+def _countered(o: dict, incoming: list[dict]) -> bool:
+    """He has an offer to me pending that he proposed after mine: ESPN's counter declines the original and opens his."""
+    rid = o.get("rival_team_id")
+    if rid is None:
+        return False
+    since = o.get("proposed_ts") or 0
+    return any(str(t.get("rival_team_id")) == str(rid) and (t.get("proposed_ts") or 0) >= since for t in incoming)
+
+
+def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None = None,
+                    now: datetime | None = None) -> list[str]:
     """Open an entry for every offer of mine pending on ESPN; close the ones that are not pending any more.
-    A league whose pending list could not be read closes nothing (an empty list there means nothing)."""
-    today = today or date.today()
+    `now` is the run's clock (aware); `today` defaults to its local date. A league whose pending list could not be
+    read closes nothing (an empty list there means nothing)."""
+    if now is None:
+        now = datetime.combine(today, time(12), tzinfo=UTC) if today else datetime.now(UTC)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=UTC)
+    today = today or now.astimezone().date()
     outs = load_outcomes(path)
     events = []
     for lg in packet.get("leagues") or []:
@@ -185,20 +217,26 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
             if key not in outs:
                 outs[key] = {"status": "open", "league": league, "rival": t.get("rival"), "rival_team_id": t.get("rival_team_id"),
                              "give": list(t.get("give") or []), "get": list(t.get("get") or []),
-                             "opened": today.isoformat(), "expires": t.get("expires_iso")}
+                             "opened": today.isoformat(), "expires": t.get("expires_iso"),
+                             "expires_ts": t.get("expires_ts"), "proposed_ts": t.get("proposed_ts")}
                 events.append(f"{key}: opened")
         if lg.get("pending_trades_error"):
             continue
         roster_names = {p["name"] for p in lg.get("roster") or []}
+        incoming = lg.get("incoming_trades") or []
         for key, o in outs.items():
             if o.get("league") != league or o.get("status") != "open" or key.split("|", 1)[1] in pending:
                 continue
             got = [n for n in o.get("get") or [] if n in roster_names]
-            gave = [n for n in o.get("give") or [] if n in roster_names]
-            if got and not gave:
+            kept = [n for n in o.get("give") or [] if n in roster_names]
+            if got and not kept:
                 status = "accepted"
-            elif (o.get("expires") or "")[:10] and o["expires"][:10] < today.isoformat():
+            elif got or _countered(o, incoming):
+                status = "countered"      # a different package with him went through, or his counter is on the table
+            elif _expired(o, now):
                 status = "expired"
+            elif len(kept) < len(o.get("give") or []):
+                status = "withdrawn"      # a piece I offered left my roster first; the proposal died by my hand
             else:
                 status = "declined"
             o["status"], o["closed"] = status, today.isoformat()
@@ -210,8 +248,9 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
 
 
 def history(outs: dict[str, dict], league: str, today: date | None = None) -> dict[int, dict]:
-    """Per rival team id, what his answers so far say: `recent_decline` (a no or an expiry in the last RECENT_DAYS)
-    and `prior`, his acceptance rate with a half-count of smoothing, only once he has answered twice."""
+    """Per rival team id, what his answers so far say: `recent_decline` (a no in the last RECENT_DAYS; an expiry, a
+    counter or a withdrawal is not one) and `prior`, his acceptance rate over the offers he had in front of him
+    (`CLOSED`) with a half-count of smoothing, only once there are two of those."""
     today = today or date.today()
     tally: dict[int, dict] = {}
     for o in outs.values():
@@ -225,7 +264,7 @@ def history(outs: dict[str, dict], league: str, today: date | None = None) -> di
             closed = date.fromisoformat(o.get("closed", ""))
         except ValueError:
             closed = today
-        if o["status"] != "accepted" and today - closed <= timedelta(days=RECENT_DAYS):
+        if o["status"] == "declined" and today - closed <= timedelta(days=RECENT_DAYS):
             t["recent_decline"] = True
     return {rid: {"n": t["n"], "recent_decline": t["recent_decline"],
                   "prior": round((t["accepted"] + 0.5) / (t["n"] + 1), 3) if t["n"] >= 2 else None} for rid, t in tally.items()}

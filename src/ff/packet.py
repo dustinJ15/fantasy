@@ -250,7 +250,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         base = {"id": tx["id"], "rival_team_id": rid, "rival": teams.get(rid, {}).get("name"),
                 "proposed_iso": _ms_iso(tx.get("proposed_ts")), "expires_iso": _ms_iso(tx.get("expires_ts")),
                 "hours_left": _hours_left(tx.get("expires_ts"), now), "proposed_ts": tx.get("proposed_ts"),
-                "unmatched_ids": unmatched}
+                "expires_ts": tx.get("expires_ts"), "unmatched_ids": unmatched}
         if tx.get("direction") != "incoming" or rid is None:
             outgoing.append({**base, "give": [p.name for p in give], "get": [p.name for p in get]})
             continue
@@ -371,7 +371,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
         "leagues": league_blocks,
     }
     # What ESPN did with the offers I sent: opened the morning they show, closed the morning they are gone.
-    packet["shared"]["offer_outcomes"] = record_outcomes(packet)
+    packet["shared"]["offer_outcomes"] = record_outcomes(packet, now=datetime.now(UTC))
     # Who moved in or out of an IR slot since the last run (noted per league above, before the injury rule ran).
     save_ir_moves(ir_moves)
     packet["shared"]["ir_moves"] = [e for b in league_blocks for e in b.get("ir_events") or []]

@@ -37,12 +37,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B5 (S). Offer outcomes mislabel.** `rulings.py:185-190`: an offer I withdrew, or a counter he accepted
-  under a different id, is recorded as his decline and penalises him for 7 days. `:187` compares the expiry
-  date only, in machine-local (UTC) time, so an offer that lapsed at 9 PM Denver reads "declined". `:215`
-  treats `expired` like `declined` in `history`. Separate withdrawn, expired and declined; only declined should
-  carry the `recent_decline` factor.
-
 - [ ] **B6 (S-M). The drop criterion is `mu_ros` alone.** `report.py:60`. It ignores `market.redraft_value`
   and `trend_30d` (already on each roster row via `enrich`), handcuff status, bye timing and this week's
   `p_zero`. A rookie RB the market prices highly is cut before a WR4 nobody would trade for, and the card never
@@ -55,6 +49,12 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 - [ ] **B8 (XS). A skipped hold loses its strike in the HTML.** `src/ff/email_html.py:199` strips `~~` from
   `hold_line`, the only skip marker on holds; the markdown keeps it, the email does not.
+
+- [ ] **B10 (XS, needs a live ESPN pull). An in-app withdrawal still reads `declined`.** `rulings.record_outcomes`
+  (B5, 2026-10-08) tells a counter, a voided proposal and a lapse from a decline by the roster, the pending list and
+  the clock, but an offer I cancel in the app with my roster unchanged leaves no trace in `mPendingTransactions`.
+  `docs/plans/trade-acceptance.md` open question 3: probe `mTransactions2` (or the activity feed) for a terminal
+  status on a cancelled proposal; if one is readable, close the entry as `withdrawn` from it.
 
 - [ ] **B9 (XS). Row ids can collide.** `trade:<get>` (`report.py:446`) ignores `give`; `waiver:<name>` is shared
   by the Waiver and Open-spot rows. Latent today; `apply_reads` would rule both with one key.

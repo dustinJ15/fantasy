@@ -1,18 +1,24 @@
 """The offer outcome log (rulings.record_outcomes / history), the fallback on a trade row, the counter on an offer."""
-from datetime import date
+from datetime import UTC, date, datetime
 
 from ff.model.trades import evaluate, scan
 from ff.rulings import history, load_outcomes, record_outcomes
 from tests.conftest import P
 
 
-def _packet(outgoing, roster_names=("Keeper",), error=None):
-    return {"leagues": [{"name": "L1", "outgoing_trades": list(outgoing), "pending_trades_error": error,
-                         "roster": [{"name": n} for n in roster_names]}]}
+def _packet(outgoing, roster_names=("Keeper",), error=None, incoming=()):
+    return {"leagues": [{"name": "L1", "outgoing_trades": list(outgoing), "incoming_trades": list(incoming),
+                         "pending_trades_error": error, "roster": [{"name": n} for n in roster_names]}]}
 
 
-def offer(oid, give, get, rid=4, expires="2026-10-09T12:00"):
-    return {"id": oid, "rival": "Hawk Tua", "rival_team_id": rid, "give": list(give), "get": list(get), "expires_iso": expires}
+def _ms(iso_utc: str) -> int:
+    return int(datetime.fromisoformat(iso_utc).replace(tzinfo=UTC).timestamp() * 1000)
+
+
+def offer(oid, give, get, rid=4, expires="2026-10-09T12:00", proposed="2026-10-07T09:00"):
+    # `expires_iso` is what `_ms_iso` writes on a UTC machine (naive, machine-local); `expires_ts` is the clock
+    return {"id": oid, "rival": "Hawk Tua", "rival_team_id": rid, "give": list(give), "get": list(get),
+            "expires_iso": expires, "expires_ts": _ms(expires), "proposed_ts": _ms(proposed)}
 
 
 def test_an_offer_is_opened_when_seen_and_closed_by_what_happened(tmp_path):
@@ -43,6 +49,45 @@ def test_history_gives_a_prior_after_two_answers_and_flags_a_fresh_no():
     assert h[4] == {"n": 2, "recent_decline": True, "prior": 0.5}
     assert h[5] == {"n": 1, "recent_decline": False, "prior": None}
     assert 9 not in h and "L2" not in str(h)
+
+
+def test_an_offer_that_lapsed_the_evening_before_in_denver_is_expired_not_declined(tmp_path):
+    """B5: the expiry is 9 PM Denver on the 8th, which is 03:00 UTC on the 9th; the 6 AM Denver run on the 9th used
+    to compare the date part only ("2026-10-09" < "2026-10-09" is false) and call it his decline."""
+    path = tmp_path / "o.json"
+    record_outcomes(_packet([offer("a", ["Coker"], ["Rice"], expires="2026-10-09T03:00")]), path, date(2026, 10, 8))
+    run = datetime(2026, 10, 9, 12, 0, tzinfo=UTC)
+    assert record_outcomes(_packet([], roster_names=("Coker",)), path, now=run) == ["L1|a: expired"]
+    assert load_outcomes(path)["L1|a"]["closed"] == "2026-10-09"
+    # and one that still had six hours to run when it vanished is a decline
+    record_outcomes(_packet([offer("b", ["Coker"], ["Rice"], expires="2026-10-09T18:00")]), path, date(2026, 10, 8))
+    assert record_outcomes(_packet([], roster_names=("Coker",)), path, now=run) == ["L1|b: declined"]
+
+
+def test_a_counter_from_the_rival_and_a_piece_i_moved_are_not_his_decline(tmp_path):
+    path = tmp_path / "o.json"
+    d1, d2 = date(2026, 10, 7), date(2026, 10, 8)
+    record_outcomes(_packet([offer("a", ["Coker"], ["Rice"]), offer("b", ["Evans", "Washington"], ["London"], rid=10),
+                             offer("c", ["Pollard"], ["Hall"], rid=6), offer("d", ["Mixon"], ["Henry"], rid=7)]), path, d1)
+    his_counter = {"id": "x", "rival_team_id": 4, "proposed_ts": _ms("2026-10-07T20:00"), "give": ["Coker", "TE2"], "get": ["Rice"]}
+    # a: gone, Coker still mine, his counter is pending -> countered. b: gone, London arrived, Washington stayed -> he took
+    # a different package. c: gone, Pollard left my roster and nothing came back -> I moved the piece, ESPN voided it.
+    # d: gone, Mixon still mine, no counter, not expired -> declined.
+    events = record_outcomes(_packet([], roster_names=("Coker", "London", "Washington", "Mixon"), incoming=[his_counter]), path, d2)
+    assert sorted(events) == ["L1|a: countered", "L1|b: countered", "L1|c: withdrawn", "L1|d: declined"]
+    h = history(load_outcomes(path), "L1", d2)
+    assert h[7] == {"n": 1, "recent_decline": True, "prior": None}
+    assert 4 not in h and 6 not in h and 10 not in h  # none of those is an answer from him
+
+
+def test_only_a_decline_carries_the_recent_decline_factor():
+    outs = {"L1|1": {"league": "L1", "rival_team_id": 4, "status": "expired", "closed": "2026-10-06"},
+            "L1|2": {"league": "L1", "rival_team_id": 4, "status": "declined", "closed": "2026-09-20"},
+            "L1|3": {"league": "L1", "rival_team_id": 5, "status": "withdrawn", "closed": "2026-10-06"},
+            "L1|4": {"league": "L1", "rival_team_id": 6, "status": "countered", "closed": "2026-10-06"}}
+    h = history(outs, "L1", date(2026, 10, 7))
+    assert h[4] == {"n": 2, "recent_decline": False, "prior": 0.167}  # the lapse still counts as a no in the prior
+    assert 5 not in h and 6 not in h
 
 
 def _rosters():
