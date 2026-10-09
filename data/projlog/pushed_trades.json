@@ -68,7 +68,7 @@
   "skip_note": "two mid WRs for the WR1 overall reads 0.77 on his chart after the 2-for-1 tax; the scan no longer proposes it"
  },
  "L3|Brock Purdy+Michael Wilson": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-10-08",
   "last": "2026-10-08",
   "league": "L3",
@@ -81,6 +81,8 @@
    "Michael Wilson"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-10-09",
+  "skip_note": "not shipping Bowers for a QB. Brissett's at 16 a game, Caleb Williams is back around week 6, and Michael Wilson never cracks my lineup, so the deal is really Bowers down to Juwan Johnson at TE."
  }
 }

@@ -257,5 +257,31 @@
    "Bo Nix"
   ],
   "note": "Same Bowers as the deal above and it costs you Olave too. Take the Purdy one instead."
+ },
+ "L3|Brock Purdy+Michael Wilson": {
+  "date": "2026-10-09",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Brock Bowers"
+  ],
+  "get": [
+   "Brock Purdy",
+   "Michael Wilson"
+  ],
+  "note": "not shipping Bowers for a QB. Brissett's at 16 a game, Caleb Williams is back around week 6, and Michael Wilson never cracks my lineup, so the deal is really Bowers down to Juwan Johnson at TE."
+ },
+ "L3|Brock Purdy+Jaylen Warren": {
+  "date": "2026-10-09",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Brock Bowers"
+  ],
+  "get": [
+   "Brock Purdy",
+   "Jaylen Warren"
+  ],
+  "note": "same Bowers walking out for a QB I don't need. Warren's a better throw-in than Wilson but it still leaves me starting Juwan Johnson at TE."
  }
 }
