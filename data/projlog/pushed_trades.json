@@ -84,5 +84,21 @@
   "note": null,
   "closed": "2026-10-09",
   "skip_note": "not shipping Bowers for a QB. Brissett's at 16 a game, Caleb Williams is back around week 6, and Michael Wilson never cracks my lineup, so the deal is really Bowers down to Juwan Johnson at TE."
+ },
+ "L3|Bryce Young+Tetairoa McMillan": {
+  "status": "open",
+  "since": "2026-10-10",
+  "last": "2026-10-10",
+  "league": "L3",
+  "rival": "Hawk Tua ",
+  "give": [
+   "Chris Olave"
+  ],
+  "get": [
+   "Bryce Young",
+   "Tetairoa McMillan"
+  ],
+  "source": "math",
+  "note": null
  }
 }

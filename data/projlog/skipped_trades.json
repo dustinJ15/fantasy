@@ -283,5 +283,46 @@
    "Jaylen Warren"
   ],
   "note": "same Bowers walking out for a QB I don't need. Warren's a better throw-in than Wilson but it still leaves me starting Juwan Johnson at TE."
+ },
+ "L1|Jaxon Smith-Njigba+Tyler Shough": {
+  "date": "2026-10-10",
+  "league": "L1",
+  "rival": "CTESPN",
+  "give": [
+   "Chris Olave",
+   "Ashton Jeanty"
+  ],
+  "get": [
+   "Jaxon Smith-Njigba",
+   "Tyler Shough"
+  ],
+  "note": "Olave and Jeanty out the door for a WR and a QB who sits behind Lawrence, and the title odds don't move. no reason to churn at 4-0"
+ },
+ "L1|Joe Burrow+Kenneth Walker III": {
+  "date": "2026-10-10",
+  "league": "L1",
+  "rival": "CTESPN",
+  "give": [
+   "Amon-Ra St. Brown",
+   "Ashton Jeanty"
+  ],
+  "get": [
+   "Kenneth Walker III",
+   "Joe Burrow"
+  ],
+  "note": "that's St. Brown for +0.1 title points. he's the best player you own, keep him"
+ },
+ "L3|Joe Burrow+Michael Wilson": {
+  "date": "2026-10-10",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Brock Bowers"
+  ],
+  "get": [
+   "Joe Burrow",
+   "Michael Wilson"
+  ],
+  "note": "the Hawk Tua deal already fixes QB and this one costs Bowers to do the same job. doing both guts the roster"
  }
 }
