@@ -18,6 +18,11 @@ that says what to do. Everything is read-only against ESPN; I make the moves mys
 </p>
 
 <p align="center">
+  <img src="examples/briefing-phone.jpg" width="320" alt="The real briefing email open in Gmail on a phone: a numbered checklist with LINEUP, IR, WAIVER and a struck-through SKIP row"><br>
+  <sub>The real thing on a Saturday morning, on the phone. Row 2 is the bug that got fixed that afternoon: McMillan was locked in the IR slot.</sub>
+</p>
+
+<p align="center">
   <img src="examples/incoming-terminal.svg" width="760" alt="ff incoming --demo: an incoming trade offer with a DECLINE verdict"><br>
   <sub>The same offer from the terminal. Someone in a league of eight always wants your two starters for their one.</sub>
 </p>
@@ -127,7 +132,7 @@ uv run ff packet --demo              # the raw decision packet JSON
 ```
 
 The output of exactly that, plus the rendered email, is in [examples/](examples/); `scripts/screenshots.sh` regenerates
-all of it, images included (it needs a Chrome or Chromium binary, `CHROME=/path/to/chrome` if it is not on PATH).
+all of it, images included (the phone photo is the one file taken by hand; it needs a Chrome or Chromium binary, `CHROME=/path/to/chrome` if it is not on PATH).
 
 For your own leagues:
 
