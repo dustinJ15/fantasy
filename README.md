@@ -12,15 +12,18 @@ that says what to do. Everything is read-only against ESPN; I make the moves mys
 
 [Try it](#try-it) · [The one rule](#the-one-rule) · [What the math does](#what-the-math-does) · [Architecture](#architecture) · [Commands](#commands)
 
-<p align="center">
-  <img src="examples/briefing-email.png" width="640" alt="The morning briefing email, rendered from the demo league"><br>
-  <sub>The morning email, from the demo league. Every name is made up; every number comes from <code>ff</code>.</sub>
-</p>
-
-<p align="center">
-  <img src="examples/briefing-phone.jpg" width="320" alt="The real briefing email open in Gmail on a phone: a numbered checklist with LINEUP, IR, WAIVER and a struck-through SKIP row"><br>
-  <sub>The real thing on a Saturday morning, on the phone. Row 2 is the bug that got fixed that afternoon: McMillan was locked in the IR slot.</sub>
-</p>
+<table align="center">
+  <tr>
+    <td align="center" valign="top" width="640">
+      <img src="examples/briefing-email.png" width="640" alt="The morning briefing email, rendered from the demo league"><br>
+      <sub>The morning email, from the demo league. Every name is made up; every number comes from <code>ff</code>.</sub>
+    </td>
+    <td align="center" valign="top" width="300">
+      <img src="examples/briefing-phone.jpg" width="300" alt="The real briefing email open in Gmail on a phone: a numbered checklist with LINEUP, IR, WAIVER and a struck-through SKIP row"><br>
+      <sub>The real one, on the phone, one Saturday in October. Row 2 is the bug fixed that afternoon: McMillan was locked in the IR slot.</sub>
+    </td>
+  </tr>
+</table>
 
 <p align="center">
   <img src="examples/incoming-terminal.svg" width="760" alt="ff incoming --demo: an incoming trade offer with a DECLINE verdict"><br>
@@ -84,9 +87,12 @@ emits a figure, never edits the HTML, and never writes to ESPN. The full playboo
   cheapest drop not already named), so an activation and a pickup never cut the same body. The drop order is
   `drop_cost`: rest-of-season points plus a market penalty for cutting someone a rival would trade for, plus a
   handcuff's insurance value, less the week a body on bye gives the pickup nothing for. Bodies are counted against
-  ESPN's per-position caps, so a trade row names the drop the trade screen will demand.
+  ESPN's per-position caps, so a trade row names the drop the trade screen will demand. The checklist runs in the order
+  the app allows: IR moves and pickups first, then the lineup once the roster is what it will be, with a pickup who
+  starts this week folded into the lineup row as a move conditional on the add.
 - **Game clock**: once a player has kicked off he is locked and his actual points are banked, so the Monday email
-  never suggests benching someone who already played.
+  never suggests benching someone who already played. A locked player is also never today's drop or IR move, since
+  ESPN refuses both until the week rolls on Tuesday; the row says so and names the day.
 
 ## Architecture
 
@@ -131,8 +137,9 @@ uv run ff incoming --demo            # the incoming-offer verdict
 uv run ff packet --demo              # the raw decision packet JSON
 ```
 
-The output of exactly that, plus the rendered email, is in [examples/](examples/); `scripts/screenshots.sh` regenerates
-all of it, images included (the phone photo is the one file taken by hand; it needs a Chrome or Chromium binary, `CHROME=/path/to/chrome` if it is not on PATH).
+The output of exactly that, plus the rendered email, is in [examples/](examples/). `scripts/screenshots.sh` regenerates
+all of it, images included; it needs a Chrome or Chromium binary (`CHROME=/path/to/chrome` if it is not on PATH). The
+phone photo is the one file in there taken by hand.
 
 For your own leagues:
 
