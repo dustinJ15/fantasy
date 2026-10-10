@@ -35,6 +35,11 @@ IR_MIN_WEEKS = 2
 # bench body for days); only a real one, IR_REENTRY_WEEKS or more, is worth sending him back.
 IR_REENTRY_DAYS = 10
 IR_REENTRY_WEEKS = 3
+# ESPN locks a player the moment his NFL game kicks off, until the week rolls on Tuesday: no drop, no move into or
+# out of the IR slot. `model/clock.py` sets `locked` from the kickoff; a locked body is never named as today's move,
+# the row says why and what day it becomes possible (McMillan, Oct 10: locked in the IR slot since Thursday night,
+# and the card told Dustin to swap him out).
+LOCKED_WHY = "his game has kicked off and ESPN locks him until the week rolls on Tuesday"
 # What cutting a player the market would pay for costs, in points a week per 1000 of FantasyCalc redraft value.
 # A bench body the market prices at 2500 (about overall rank 50) is trade bait, so he carries +2.5 a week over his
 # `mu_ros`; a WR4 nobody would trade for sits near 300 (+0.3) or is not listed at all (+0). It is a thumb on the
@@ -174,18 +179,24 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
     bounced = {p.espn_id for p in hurt if p.slot != "IR" and p.weeks_out < IR_REENTRY_WEEKS
                and (ir_memory.get(p.espn_id) or {}).get("left_days") is not None
                and ir_memory[p.espn_id]["left_days"] <= IR_REENTRY_DAYS}
-    stashable = [p for p in hurt if p.slot != "IR" and ir_eligible(p) and p.weeks_out >= IR_MIN_WEEKS and p.espn_id not in bounced]
+    worth_stashing = [p for p in hurt if p.slot != "IR" and ir_eligible(p) and p.weeks_out >= IR_MIN_WEEKS and p.espn_id not in bounced]
+    # Locked (his game has kicked off): he cannot go into the slot today, and a locked occupant cannot come out of it.
+    stashable = [p for p in worth_stashing if not p.locked]
+    locked_stash = {p.espn_id for p in worth_stashing if p.locked}
     stashable.sort(key=lambda q: (-calc[q.espn_id]["hold_value"], -(q.mu_ros_active or 0)))
     to_ir = {p.espn_id for p in stashable[:ir_open]}
     stash_ids = {p.espn_id for p in stashable}
-    swappable = list(on_ir)  # occupants not yet promised to someone
+    swappable = [p for p in on_ir if not p.locked]  # occupants not yet promised to someone
+    locked_occ = [p for p in on_ir if p.locked]
+    occ_value = lambda q: calc.get(q.espn_id, {}).get("hold_value", q.mu_ros * w_eff)  # noqa: E731
     # The cheapest cut, for the drop rows: not this week's starters, not K/DST, not anyone in or headed to the IR slot.
     # Ranked by `drop_cost`, the same number the checklist ledger uses, so a Drop row never names a body the ledger
     # would keep (the market's rookie, my RB1's handcuff) and never holds one the ledger is about to cut.
     droppable = [p for p in mine if p.espn_id not in starters_week and p.pos not in NOT_DROPPABLE and p.slot != "IR"
                  and p.espn_id not in to_ir]
     cost = lambda p: player_drop_cost(p, weeks_remaining, values.get(str(p.espn_id)), handcuffs)  # noqa: E731
-    cheapest = min(droppable, key=cost) if droppable else None
+    # A locked body sorts last, the same as the ledger: ESPN refuses the drop until Tuesday.
+    cheapest = min(droppable, key=lambda p: (p.locked, cost(p))) if droppable else None
 
     out = []
     for p in sorted(hurt, key=lambda q: -(q.mu_ros_active or 0)):
@@ -220,20 +231,31 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
             # return week is not that signal: an Out defaults to one week, which used to print "he is back" on
             # every player still listed Out.
             if not ir_eligible(p):
+                if p.locked:
+                    continue  # ESPN wants the slot cleared and will not let him move until Tuesday: nothing to click today
                 row["verdict"] = "activate"
                 why.append(f"ESPN lists him {(row['espn_status'] or 'active').replace('_', ' ').lower()}, the IR slot has to be cleared")
             else:
                 continue  # stashed and still out: nothing to do
         elif p.espn_id in to_ir:
             row["verdict"] = "ir"; why.append("IR slot open, the stash is free")
-        elif p.espn_id in stash_ids and swappable:
-            # Swap with the occupant when he is worth less the rest of the way.
-            occ = min(swappable, key=lambda q: calc.get(q.espn_id, {}).get("hold_value", q.mu_ros * w_eff))
-            occ_val = calc.get(occ.espn_id, {}).get("hold_value", occ.mu_ros * w_eff)
-            if occ_val < c["hold_value"]:
+        elif p.espn_id in stash_ids and (swappable or locked_occ):
+            # Swap with the occupant when he is worth less the rest of the way. A locked occupant is the same swap
+            # on Tuesday; today the row holds and says so, instead of naming a move the app refuses.
+            occ = min(swappable, key=occ_value) if swappable else None
+            if occ is not None and occ_value(occ) < c["hold_value"]:
                 row["verdict"] = "ir"; row["ir_occupant"] = occ.name
                 swappable.remove(occ)
-                why.append(f"{occ.name} is worth less the rest of the way ({occ_val:.0f} vs {c['hold_value']:.0f} pts)")
+                why.append(f"{occ.name} is worth less the rest of the way ({occ_value(occ):.0f} vs {c['hold_value']:.0f} pts)")
+            else:
+                lo = min(locked_occ, key=occ_value, default=None)
+                if lo is not None and occ_value(lo) < c["hold_value"]:
+                    row["verdict"] = "hold"; row["ir_locked"] = lo.name
+                    why.append(f"{lo.name} is worth less the rest of the way ({occ_value(lo):.0f} vs {c['hold_value']:.0f} pts), but "
+                               f"{lo.name}'s game has kicked off and ESPN locks the IR slot until the week rolls; swap him in on Tuesday")
+        elif p.espn_id in locked_stash and (ir_open > len(to_ir) or any(occ_value(q) < c["hold_value"] for q in on_ir)):
+            row["verdict"] = "hold"; row["ir_locked"] = p.name
+            why.append(f"move him to IR on Tuesday, not today: {LOCKED_WHY}")
         if p.espn_id in bounced:
             days = ir_memory[p.espn_id]["left_days"]
             ago = "today" if days == 0 else ("1 day ago" if days == 1 else f"{days} days ago")
@@ -242,6 +264,9 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
         if "verdict" not in row:
             if sends:
                 row["verdict"] = "trade"; why.append("a rival takes him in a package that helps me")
+            elif p.locked and (dead or (c["fa"] and gap >= margin)):
+                row["verdict"] = "hold"
+                why.append(f"{dead or 'a drop by the numbers'}, but {LOCKED_WHY}; cut him then if the card still says so")
             elif c["fa"] and gap >= margin and cheapest is not None and cheapest.espn_id == p.espn_id:
                 row["verdict"] = "drop"
                 why.append(f"{c['fa']['name']} adds {c['drop_value']:.0f} pts the rest of the way vs {c['hold_value']:.0f} for him")

@@ -268,13 +268,13 @@ def test_a_reverse_standings_league_shows_no_cost():
         lg = _rolling()
         lg["settings"]["waiver_order"] = order
         text = by_id(lg)["waiver:big-guy"]["text"]
-        assert text == "claim (waivers, you are priority #2) Big Guy (RB), +2.1/wk over your RB; drop Bench WR", (order, text)
+        assert text == "claim (waivers, you are priority #2) Big Guy (RB), +2.1/wk over your RB; drop Bench WR; if he is gone, Next Guy (RB, +1.5/wk)", (order, text)
 
 
 def test_a_free_agent_row_is_untouched_by_the_priority_value():
     lg = _rolling()
     lg["waivers"][0]["on_waivers"] = False
-    assert by_id(lg)["waiver:big-guy"]["text"] == "add Big Guy (RB), +2.1/wk over your RB; drop Bench WR"
+    assert by_id(lg)["waiver:big-guy"]["text"] == "add Big Guy (RB), +2.1/wk over your RB; drop Bench WR; if he is gone, Next Guy (RB, +1.5/wk)"
 
 
 def test_priority_cost_is_the_rolling_formula():

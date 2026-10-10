@@ -321,11 +321,24 @@ def _offer_items(lg: dict) -> list[dict]:
             for t in lg.get("incoming_trades") or []]
 
 
-def _lineup_item(lg: dict) -> dict:
+def _pickup_move(lg: dict, w: dict) -> str:
+    """"Keon Coleman: free agent → WR over Wan'Dale Robinson once the add above is through": a pickup who starts
+    this week is a lineup move too, so it rides on the lineup row with the rest, after the add, and is worded so
+    the lineup above it still stands when he was gone by the time Dustin clicked (Oct 10: he was)."""
+    slot = w.get("week_slot") or w["pos"]
+    by_name = {p["name"]: p for p in lg["roster"]}
+    names = [n for n in lg["lineup_win"]["slots"].get(slot) or [] if n in by_name and not by_name[n].get("locked")]
+    over = min(names, key=lambda n: (1 - (by_name[n].get("p_zero") or 0.0)) * by_name[n]["mu"], default=None)
+    return (f"{w['name']}: free agent → {slot}" + (f" over {over}" if over else "") + " once the add above is through"
+            + due_note(w.get("kickoff_day")))
+
+
+def _lineup_item(lg: dict, pickups: list[dict] = ()) -> dict:
     """The lineup row: the moves in app order before kickoff, only the unplayed slots mid-week, a pointer to next
-    week once the week is final."""
+    week once the week is final. `pickups` are the free agents the waiver rows above add who start this week; their
+    move prints last, conditional on the add (`_pickup_move`), so the lineup is set once, after the roster moves."""
     ph = (lg.get("week_state") or {}).get("phase", "pre")
-    ch = _lineup_changes(lg) if ph != "final" else []
+    ch = (_lineup_changes(lg) + [_pickup_move(lg, w) for w in pickups]) if ph != "final" else []
     if ph == "final":
         return {"kind": "lineup", "id": "lineup", "label": "Lineup", "moves": [],
                 "text": f"week {lg['week']} is over; set next week's lineup once ESPN rolls to week {lg['week'] + 1} (Tuesday)"}
@@ -338,22 +351,30 @@ def _lineup_item(lg: dict) -> dict:
 def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
     """At most one pickup who starts this week and one who upgrades a slot for the season; each spends a spot on the
     ledger and goes into `added` so no row below brings him in again. A claim in a rolling-priority league also says
-    whether the priority it spends is worth it (`_priority_note`)."""
+    whether the priority it spends is worth it (`_priority_note`). The wire moves between the sync and the click
+    (Oct 10: the pickup was on another roster by noon), so each row names the next body on the list as the fallback.
+    A free agent who starts this week comes back on the row as `pickup`, for the lineup row to fold in; a claim
+    lands on waiver day, so his start is next card's business."""
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]
     ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= waivers_model.CLAIM_WORTHY_PPW and w not in starts and w["name"] not in added]
     out = []
     for w in starts[:1]:
         _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
+        nxt = next((x for x in starts if x is not w), None)
+        fallback = f"; if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_week']:.0f} this week)" if nxt else ""
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']} (+{w['delta_week']:.0f} pts this week)"
-                            f"{due_note(w.get('kickoff_day'))}{_priority_note(lg, w)}{suffix}"})
+                            f"{due_note(w.get('kickoff_day'))}{_priority_note(lg, w)}{suffix}{fallback}",
+                    "pickup": None if w.get("on_waivers") else w})
     for w in ups[:1]:
         _, suffix = spots.take(adding=w["pos"])
         added.add(w["name"])
+        nxt = next((x for x in ups if x is not w), None)
+        fallback = f"; if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_over_starter']:.1f}/wk)" if nxt else ""
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}), +{w['delta_over_starter']:.1f}/wk over your {w['slot']}"
-                            f"{due_note(w.get('kickoff_day'))}{_priority_note(lg, w)}{suffix}"})
+                            f"{due_note(w.get('kickoff_day'))}{_priority_note(lg, w)}{suffix}{fallback}"})
     return out
 
 
@@ -484,10 +505,15 @@ def _ledger(lg: dict) -> Spots:
 
 
 def todos(lg: dict) -> list[dict]:
-    """The literal things to do today in one league, in the order Dustin clicks through ESPN: answer an offer, set
-    the lineup, IR moves, then drops paired with the pickup that takes the spot, then trades to go send. Each item:
-    {id, kind, label, text, moves?}. kind ∈ trade_in | lineup | injury | waiver | waiver_up | stream | cover | sent |
-    trade | hold. Holds come last and the renderers print them as a footnote, not a step. Shared by both renderers.
+    """The literal things to do today in one league, in the order Dustin clicks through ESPN: answer an offer, the
+    roster moves (IR, pickups with their drop, the drops with their add), then the lineup once the roster is what it
+    will be, then trades to go send. Each item: {id, kind, label, text, moves?}. kind ∈ trade_in | lineup | injury |
+    waiver | waiver_up | stream | cover | sent | trade | hold. Holds come last and the renderers print them as a
+    footnote, not a step. Shared by both renderers.
+
+    The lineup comes after the adds because an add changes it: the card used to say "set it this way" and then,
+    two rows down, "add X and start him at WR", so the lineup was set twice and the first setting was wrong the
+    moment the add went through. Now the pickup's start is a move on the lineup row, conditional on the add.
 
     This is only the order and the push selection: each row kind has its own builder above, and the builders share
     one ledger (`ff.ledger.Spots`) so an activation and a pickup never spend the same drop.
@@ -496,7 +522,7 @@ def todos(lg: dict) -> list[dict]:
     whole card in prose. Player names make the ids readable; `_unique_ids` keeps them unique within a league
     (two packages for the same player read `trade:<get>-for-<give>`, an Open-spot row is `open:<name>`).
     """
-    out = _offer_items(lg) + [_lineup_item(lg)]
+    out = _offer_items(lg)
     spots = _ledger(lg)
     inj = _injury_items(lg, spots)  # counts each drop and add on the ledger as its row prints it (a folded Drop row's add never does)
     # A Drop row spends its spot on its own add, so he is not the drop for a pickup too (the card once cut one body
@@ -504,11 +530,13 @@ def todos(lg: dict) -> list[dict]:
     spots.reserved |= {r["name"] for r in lg.get("injuries") or [] if r["verdict"] == "drop" and r.get("add")}
     out += [i for i in inj if i["verdict"] in ("ir", "activate")]
     added = {r["add"]["name"] for r in lg.get("injuries") or [] if r.get("add")}
-    out += _waiver_items(lg, spots, added)
+    wv = _waiver_items(lg, spots, added)
+    out += wv
     out += _stream_items(lg)
     out += _cover_items(lg, spots, added)
     out += [i for i in inj if i["verdict"] == "drop"]
     out += _open_spot_items(lg, spots, added)
+    out += [_lineup_item(lg, [i["pickup"] for i in wv if i.get("pickup")])]
     out += _sent_items(lg)
     out += _trade_items(lg, spots, _pushed(lg))
     out += [i for i in inj if i["verdict"] == "trade"]

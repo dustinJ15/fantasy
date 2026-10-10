@@ -90,6 +90,46 @@ def test_ir_slot_taken_by_a_lesser_stash_is_a_swap():
     assert not any(r["name"] == "TE2" for r in rows)     # stashed and still out: no row of his own
 
 
+def test_a_locked_occupant_is_not_swapped_out_and_the_row_says_when():
+    """Oct 10: McMillan's game had kicked off Thursday, ESPN locked him in the IR slot, and the card said to swap
+    Monangai in for him. A locked occupant cannot leave the slot until the week rolls; the stash holds and says so."""
+    mine = roster(); hurt(mine[1], 6, 15, 3)
+    hurt(mine[9], 15, 15, 3); mine[9].slot = "IR"; mine[9].locked = True
+    row = next(r for r in run(mine, 3, 60, ir_slots=1) if r["name"] == "RB1")
+    assert row["verdict"] == "hold" and row["ir_occupant"] is None and row["ir_locked"] == "TE2"
+    assert row["why"] == ["TE2 is worth less the rest of the way (0 vs 76 pts), but TE2's game has kicked off and ESPN locks the IR slot "
+                          "until the week rolls; swap him in on Tuesday"]
+
+
+def test_an_unlocked_occupant_is_preferred_over_a_locked_one():
+    mine = roster(); hurt(mine[1], 6, 15, 3)
+    hurt(mine[9], 15, 15, 3); mine[9].slot = "IR"; mine[9].locked = True
+    hurt(mine[4], 15, 15, 3); mine[4].slot = "IR"
+    row = next(r for r in run(mine, 3, 60, ir_slots=2) if r["name"] == "RB1")
+    assert row["verdict"] == "ir" and row["ir_occupant"] == "RB4"
+
+
+def test_a_locked_player_is_not_moved_to_ir_today():
+    """His game has kicked off: ESPN will not move him into the slot until Tuesday, and the row says so."""
+    mine = roster(); hurt(mine[1], 6, 15, 3); mine[1].locked = True
+    (row,) = run(mine, 3, 60, ir_slots=1)
+    assert row["verdict"] == "hold" and row["ir_locked"] == "RB1"
+    assert row["why"] == ["move him to IR on Tuesday, not today: his game has kicked off and ESPN locks him until the week rolls on Tuesday"]
+
+
+def test_a_locked_occupant_espn_wants_off_ir_is_no_row_today():
+    mine = roster(); hurt(mine[1], 1, 15, 3, status="QUESTIONABLE"); mine[1].slot = "IR"; mine[1].locked = True
+    assert run(mine, 3, 60, ir_slots=1) == []
+
+
+def test_a_locked_dead_spot_holds_until_tuesday():
+    mine = roster(); hurt(mine[1], 15, 15, 3); mine[1].locked = True
+    (row,) = run(mine, 3, 60)
+    assert row["verdict"] == "hold"
+    assert row["why"] == ["out for the season, dead roster spot, but his game has kicked off and ESPN locks him until the week rolls "
+                          "on Tuesday; cut him then if the card still says so"]
+
+
 def test_a_stash_still_listed_out_stays_on_ir_whatever_the_guessed_return():
     """An Out defaults to one week; that guess used to print "he is back" on every stash still listed Out."""
     mine = roster(); hurt(mine[1], 1, 15, 3); mine[1].slot = "IR"

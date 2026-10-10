@@ -50,6 +50,11 @@ def sit_note(p: dict) -> str:
     return ""
 
 
+def lock_note(p: dict) -> str:
+    """"locked until the week rolls, his game has kicked off" for a body ESPN will not let go until Tuesday; empty otherwise."""
+    return "locked until the week rolls, his game has kicked off" if p.get("locked") else ""
+
+
 def bench(lg: dict, exclude: set[str] = frozenset()) -> list[dict]:
     starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
     return [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"
@@ -64,8 +69,12 @@ def drop_order(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
     four-week stash is not. The IR occupant is skipped because dropping him frees an IR slot, not a bench spot. The
     market term is the B6 fix: by `mu_ros` alone a rookie RB the market priced like a starter was cut before a WR4
     nobody would trade for; he is trade bait (see the `trade` verdict), not a cut.
+
+    A locked body (his game has kicked off) sorts last whatever he costs: ESPN refuses the drop until the week rolls
+    on Tuesday, so he is named only when nobody else can go, and `drop_note` says he is locked. On a Monday that is
+    everyone who played Sunday; the note is the signal to wait for Tuesday's card.
     """
-    return [p["name"] for p in sorted(bench(lg, exclude), key=lambda p: drop_cost(p, lg))]
+    return [p["name"] for p in sorted(bench(lg, exclude), key=lambda p: (bool(p.get("locked")), drop_cost(p, lg)))]
 
 
 def drop_candidate(lg: dict) -> str | None:
@@ -77,25 +86,29 @@ def drop_note(lg: dict, name: str, exclude: set[str] = frozenset()) -> str:
     """The numbers behind a named drop: " (market 300, 3.0/wk)", the bye or sit risk that made him the cut this
     week, and when a body cheaper by `mu_ros` alone was passed over (for his market price, or because he backs up
     my RB1), who he is and his numbers, so the card shows them side by side. Empty when the market does not list
-    the drop, this week is not the reason, and nobody was passed over."""
+    the drop, this week is not the reason, and nobody was passed over. A drop ESPN has locked (his game has kicked
+    off) says so, as does a cheaper body passed over only because he is locked."""
     pool = {p["name"]: p for p in bench(lg, exclude)}
     p = pool.get(name)
     if p is None:
         return ""
-    # Passed over for a reason of his own (priced, or my RB1's backup); a body outranked only by this drop's bye or
-    # sit risk is not "kept", and the note on the drop already says why he goes.
-    cheaper = [q for q in pool.values() if q["name"] != name and q["mu_ros"] < p["mu_ros"] and drop_cost(q, lg) > drop_cost(p, lg)
-               and (market_value(q) is not None or handcuff_for(lg, q["name"]))]
-    mv, sit = market_value(p), sit_note(p)
-    if mv is None and not cheaper and not sit:
+    # Passed over for a reason of his own (locked today, priced, or my RB1's backup); a body outranked only by this
+    # drop's bye or sit risk is not "kept", and the note on the drop already says why he goes.
+    locked_over = lambda q: bool(q.get("locked")) and not p.get("locked")  # noqa: E731
+    cheaper = [q for q in pool.values() if q["name"] != name and q["mu_ros"] < p["mu_ros"]
+               and (locked_over(q) or (drop_cost(q, lg) > drop_cost(p, lg) and (market_value(q) is not None or handcuff_for(lg, q["name"]))))]
+    mv, extra = market_value(p), ", ".join(x for x in (sit_note(p), lock_note(p)) if x)
+    if mv is None and not cheaper and not extra:
         return ""
     out = f" (market {mv:.0f}, {p['mu_ros']:.1f}/wk" if mv is not None else f" (not priced by the market, {p['mu_ros']:.1f}/wk"
-    out += f", {sit})" if sit else ")"
+    out += f", {extra})" if extra else ")"
     if cheaper:
         q = min(cheaper, key=lambda q: q["mu_ros"])
         qv, cuff = market_value(q), handcuff_for(lg, q["name"])
         nums = (f"market {qv:.0f}, " if qv is not None else "") + f"{q['mu_ros']:.1f}/wk"
-        out += f" over {q['name']} ({nums}; {f'handcuff for {cuff}' if cuff else 'trade bait'}, not a cut)"
+        reason = ("locked until the week rolls, not a cut today" if locked_over(q)
+                  else f"handcuff for {cuff}, not a cut" if cuff else "trade bait, not a cut")
+        out += f" over {q['name']} ({nums}; {reason})"
     return out
 
 

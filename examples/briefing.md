@@ -1,13 +1,13 @@
-# FF briefing — 2026-10-08
+# FF briefing — 2026-10-10
 
 ## Demo League
 _4-0 · vs Bye Week Blues · win 59% · playoffs 97.6% · title 21.4%_  
 
 - **Incoming offer (DECLINE):** The Tuesday Regrets offers Dontae Kowalczyk for your Jalen Haggerty, Silas Pennington: -4.5 pts/wk for you, +4.5 for them, title odds -11.6; expires in 21h
-- **Lineup (in order):** Cole Ibarra: QB → bench · Beau Whitlock: bench → QB · Nico Vell: bench → RB/WR/TE
 - **IR:** move Grady Sorensen (WR) to IR (out ~4 wks, back wk 9), then add Kwame Brandt (WR, +0.9/wk) — **note:** Brandt is cover for the Sorensen weeks only; he is the first cut when a spot is needed
-- **Waiver:** add Jermaine Vell (TE) and start him at TE (+7 pts this week) (there is an open bench spot) — **note:** the full bid is right; Beau Bassett is the fallback if you're outbid
+- **Waiver:** add Jermaine Vell (TE) and start him at TE (+7 pts this week) (there is an open bench spot); if he is gone, Jaxon Bassett (RB, +7 this week) — **note:** the full bid is right; Beau Bassett is the fallback if you're outbid
 - **Stream:** swap in Texans D/ST at D/ST (+2.6 this week)
+- **Lineup (in order):** Cole Ibarra: QB → bench · Beau Whitlock: bench → QB · Nico Vell: bench → RB/WR/TE · Jermaine Vell: free agent → TE over Reggie Lindqvist once the add above is through
 - **Already sent:** your Rico Achebe for Rico Saldana is still waiting on Waiver Wire Widows, 21h left
 - **Trade (worth sending):** offer Bye Week Blues your Beau Whitlock for Darius Solano, Dontae Rutherford (+2.2 pts/wk for you, +0.9 for them, coin flip, p(accept) 0.43); drop Rico Achebe in the trade screen (ESPN caps TE at 3); he'd start Jermaine Vell (the wire), Beau Bassett (the wire) at TE; Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after — they start Darius Solano today; they start Dontae Rutherford today; leaves you no backup QB — **note:** send it Monday, not today: Ibarra is a game-time call and Whitlock is your only other QB this week
 
@@ -21,7 +21,7 @@ _4-0 · vs Bye Week Blues · win 59% · playoffs 97.6% · title 21.4%_
 
 _Full detail below._
 
-# Detail — 2026-10-08
+# Detail — 2026-10-10
 
 
 ---

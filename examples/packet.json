@@ -1,6 +1,6 @@
 {
  "version": 6,
- "generated": "2026-10-08T20:02:48",
+ "generated": "2026-10-10T19:12:30",
  "season": 2026,
  "demo": true,
  "shared": {
@@ -2103,11 +2103,11 @@
      "id": "in-1",
      "rival_team_id": 2,
      "rival": "The Tuesday Regrets",
-     "proposed_iso": "2026-10-08T17:02",
-     "expires_iso": "2026-10-09T17:02",
+     "proposed_iso": "2026-10-10T16:12",
+     "expires_iso": "2026-10-11T16:12",
      "hours_left": 21.0,
-     "proposed_ts": 1791478966119,
-     "expires_ts": 1791565366119,
+     "proposed_ts": 1791648748218,
+     "expires_ts": 1791735148218,
      "unmatched_ids": [],
      "counter": null,
      "give": [
@@ -2176,11 +2176,11 @@
      "id": "out-1",
      "rival_team_id": 3,
      "rival": "Waiver Wire Widows",
-     "proposed_iso": "2026-10-08T17:02",
-     "expires_iso": "2026-10-09T17:02",
+     "proposed_iso": "2026-10-10T16:12",
+     "expires_iso": "2026-10-11T16:12",
      "hours_left": 21.0,
-     "proposed_ts": 1791478966119,
-     "expires_ts": 1791565366119,
+     "proposed_ts": 1791648748218,
+     "expires_ts": 1791735148218,
      "unmatched_ids": [],
      "give": [
       "Rico Achebe"

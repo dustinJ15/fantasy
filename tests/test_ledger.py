@@ -47,13 +47,15 @@ def test_todos_is_the_order_over_the_builders_and_one_shared_ledger():
     inj = report._injury_items(lg, spots)
     spots.reserved |= {r["name"] for r in lg["injuries"] if r["verdict"] == "drop" and r.get("add")}
     added = {r["add"]["name"] for r in lg["injuries"] if r.get("add")}
-    manual = report._offer_items(lg) + [report._lineup_item(lg)]
+    manual = report._offer_items(lg)
     manual += [i for i in inj if i["verdict"] in ("ir", "activate")]
-    manual += report._waiver_items(lg, spots, added)
+    wv = report._waiver_items(lg, spots, added)
+    manual += wv
     manual += report._stream_items(lg)
     manual += report._cover_items(lg, spots, added)
     manual += [i for i in inj if i["verdict"] == "drop"]
     manual += report._open_spot_items(lg, spots, added)
+    manual += [report._lineup_item(lg, [i["pickup"] for i in wv if i.get("pickup")])]
     manual += report._sent_items(lg)
     manual += report._trade_items(lg, spots, report._pushed(lg))
     manual += [i for i in inj if i["verdict"] == "trade"]

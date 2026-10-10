@@ -310,18 +310,19 @@ def test_each_verdict_is_a_row_with_the_numbers_in_words():
 
 
 def test_the_checklist_runs_in_espn_click_order_with_holds_last():
-    """Offer, lineup, IR, pickups, drops with their add, trades, and the holds as a footnote at the very end."""
+    """Offer, IR, pickups, drops with their add, then the lineup once the roster is set, trades, and the holds as a
+    footnote at the very end. The lineup used to come first and was wrong the moment the add below it went through."""
     lg = league(injuries=[injury("Ankle Guy", "hold"), injury("Knee Guy", "ir", weeks_out=15, return_week=None, avail=0.0),
                           injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0)],
                 trades=[{"rival": "Them", "give": ["A"], "get": ["Kai"], "my_delta_ppw": 1.0, "their_delta_ppw": 0.5, "why": [], "sendable": True}])
     lg["open_spot_adds"] = [{"name": "Body", "pos": "WR", "kind": "depth", "why": "best body on the wire, depth only"}]
-    assert ids(lg) == ["lineup", "injury:knee-guy", "injury:done-guy", "open:body", "trade:kai", "injury:ankle-guy"]
+    assert ids(lg) == ["injury:knee-guy", "injury:done-guy", "open:body", "lineup", "trade:kai", "injury:ankle-guy"]
 
 
 def test_a_one_game_hold_is_not_a_row():
     """Out this week and worth keeping is the lineup's business; a row saying "hold him" is just the injury report."""
     lg = league(injuries=[injury("Ankle Guy", "hold", weeks_out=1.0, return_week=4), injury("Knee Guy", "ir", weeks_out=1.0, return_week=4)])
-    assert ids(lg) == ["lineup", "injury:knee-guy"]
+    assert ids(lg) == ["injury:knee-guy", "lineup"]
 
 
 def test_ir_swap_names_the_occupant():
@@ -597,6 +598,53 @@ def waiver(name="Now Guy", **kw):
          "slot": "WR", "on_waivers": False, "why": [], "mu_week": 12.0, "mu_ros": 9.0}
     w.update(kw)
     return w
+
+
+def test_a_pickup_who_starts_rides_on_the_lineup_row_after_the_add():
+    """Oct 10: the card said "set it this way" and then "add Keon Coleman and start him at WR", so the lineup was set
+    twice. The add comes first and his start is a move on the lineup row, worded so the lineup still stands if he
+    was gone by the time Dustin clicked (he was)."""
+    lg = league(open_spots=1, roster=[player("Starter WR", slot="WR"), player("Weak WR", mu=6.0, slot="WR"), player("Bench WR", ros=3.0)],
+                lineup_win={"slots": {"WR": ["Starter WR", "Weak WR"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                waivers=[waiver("Now Guy", kickoff_day="Thu")])
+    rows = by_id(lg)
+    assert ids(lg).index("waiver:now-guy") < ids(lg).index("lineup")
+    assert rows["lineup"]["moves"] == ["Now Guy: free agent → WR over Weak WR once the add above is through, set by Thu"]
+    assert rows["lineup"]["text"] == rows["lineup"]["moves"][0]
+
+
+def test_a_claim_who_starts_is_not_on_the_lineup_row():
+    """A claim lands on waiver day, so today's lineup cannot include him; the waiver row still says where he starts."""
+    lg = league(open_spots=1, waivers=[waiver("Now Guy", on_waivers=True)])
+    rows = by_id(lg)
+    assert rows["lineup"]["moves"] == [] and "start him at WR" in rows["waiver:now-guy"]["text"]
+
+
+def test_a_locked_starter_is_not_the_one_the_pickup_replaces():
+    lg = league(open_spots=1, roster=[player("Starter WR", slot="WR"), player("Played WR", mu=2.0, slot="WR", locked=True)],
+                lineup_win={"slots": {"WR": ["Starter WR", "Played WR"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                waivers=[waiver("Now Guy")])
+    assert by_id(lg)["lineup"]["moves"] == ["Now Guy: free agent → WR over Starter WR once the add above is through"]
+
+
+def test_the_waiver_row_names_the_next_body_in_case_he_is_gone():
+    """The wire moves between the 6 AM sync and the click; the row carries the fallback so the email is not stale."""
+    lg = league(open_spots=2, waivers=[waiver("Now Guy"), waiver("Second Guy", delta_week=2.0),
+                                      waiver("Up Guy", delta_week=0.5, delta_over_starter=1.5), waiver("Up Two", delta_week=0.5, delta_over_starter=1.1)])
+    rows = by_id(lg)
+    assert rows["waiver:now-guy"]["text"].endswith("(there is an open bench spot); if he is gone, Second Guy (WR, +2 this week)")
+    assert rows["waiver:up-guy"]["text"].endswith("(there is an open bench spot); if he is gone, Up Two (WR, +1.1/wk)")
+    assert "waiver:second-guy" not in rows and "waiver:up-two" not in rows
+
+
+def test_a_locked_body_is_the_drop_only_when_nobody_else_can_go():
+    """ESPN refuses to drop a player whose game has kicked off until the week rolls; the ledger names him last and
+    says so, and names the unlocked body it took instead of a cheaper locked one."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Played WR", ros=2.0, locked=True), player("Bench WR", ros=3.0)])
+    assert report._drop_order(lg) == ["Bench WR", "Played WR"]
+    assert report._drop_note(lg, "Bench WR") == " (not priced by the market, 3.0/wk) over Played WR (2.0/wk; locked until the week rolls, not a cut today)"
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Played WR", ros=2.0, locked=True)])
+    assert report._drop_note(lg, "Played WR") == " (not priced by the market, 2.0/wk, locked until the week rolls, his game has kicked off)"
 
 
 def test_waiver_row_carries_the_kickoff_day():
