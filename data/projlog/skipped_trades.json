@@ -485,5 +485,31 @@
    "Dak Prescott"
   ],
   "note": "if the Allen deal lands I don't need another QB, and I'm not thinning the receivers for Dak."
+ },
+ "L2|Christian Watson": {
+  "date": "2026-10-19",
+  "league": "L2",
+  "rival": "SpangeBob",
+  "give": [
+   "Mike Evans",
+   "Sam LaPorta"
+  ],
+  "get": [
+   "Christian Watson"
+  ],
+  "note": "costs you a title point by the math and strips your TE depth to nothing, all to swap Evans for Watson. not paying LaPorta for that"
+ },
+ "L3|Dak Prescott+Javonte Williams": {
+  "date": "2026-10-19",
+  "league": "L3",
+  "rival": "Hawk Tua ",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Dak Prescott",
+   "Javonte Williams"
+  ],
+  "note": "the Taylor deal already fixes QB. no reason to sell St. Brown for Dak on top of it"
  }
 }
