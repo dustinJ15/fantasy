@@ -37,7 +37,34 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-(none open)
+The Oct 20 card is the evidence for B12-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
+causes and the fixtures. Take them in order.
+
+- [ ] **B12 (M). A freed spot goes to a depth add before the rows that need one.** `injuries.decide` ends with
+  `fill_spot` on every `ir`/`drop` row, `report._ledger` and `todos` reserve those players, and `ledger.bench` skips
+  K/D/ST, so the Cover K row cut Henderson / Shakir / Juwan Johnson while the Drop row dropped the kicker on IR for
+  "best body on the wire, depth only", and that body was the wire's top QB, so the Waiver row claimed the second one.
+  Fix: a Drop-verdict player is the ledger's first drop at cost 0 (the row folds like an activation's), an IR move
+  credits an open spot, depth adds print only for spots still open after the waiver/cover rows and never a QB/K/D/ST
+  when two are held. Plan §1.
+- [ ] **B14 (S). Three rows for one kicker.** `_stream_items` ignores `added` and the cover row, and prints
+  `delta_over_starter` (rest of season) as "this week". One row per position: the stream names the specialist it
+  replaces as its drop, prints `delta_week`, and is the cover row when the current K/D/ST is out or on bye. Plan §2.
+- [ ] **B15 (M). The lineup seats zeros.** `lineup.optimize` keeps `mu > 0` bodies (Grupe on IR at K) and the
+  per-slot fallback seats a bye QB instead of EMPTY, so the row read "Lawrence: QB → bench · Herbert: bench → QB"
+  and the header's P(win) counted two empty slots the card fills Wednesday. Fix: `ev > 0 and not bye` to start,
+  EMPTY otherwise, the claim named on the lineup row at an empty slot, and `lineup_after` in the header. Plan §3.
+- [ ] **B16 (S). Trade candidates in the detail with no row and no reason.** `_detail_trades` prints the scan's top
+  three with no `sendable` flag; `sendable` never reads the title delta; no warning for this week's opponent.
+  Plan §4.
+- [ ] **B17 (XS). Words that contradict the state**: "100% to sit" for a player on IR, Evans in Watch and Out at
+  once, "week 12.;", the roster table's μ next to "100% to sit", "their set lineup" on a Tuesday, a Drop row on a
+  listed handcuff. Plan §5.
+- [ ] **B18 (S). Noise-level lineup swaps**: `MIN_SWAP_GAIN` for a swap between two healthy starters (Caleb for
+  Kyler at +0.8, with a Thursday deadline). Plan §6. After B12-B17.
+- [ ] **B19 (S). A lint on the card as a whole** (`report.card_lint`, run by `ff render-email`): one add per body,
+  no healthy cut while a Drop-verdict player stays, no zero-EV starter over a live bench body, Stream and Cover never
+  the same position, every detail trade candidate says whether it is a row. Plan "A check on the card as a whole".
 
 ## Tier C — operations
 
