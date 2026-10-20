@@ -115,15 +115,20 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
      If a sentence sounds like a press release or a LinkedIn post, rewrite it. `ff render-email` prints a warning for
      the patterns it can detect; fix reads.json and re-run before sending.
 7. `uv run ff render-email --packet <packet path from step 5> --reads reads.json --out briefing.html --md briefing.md`
-   (seconds, no sims). Then send with the Gmail connector. To: the address in the `BRIEFING_TO` environment variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject: `FF briefing — Week <N> — <YYYY-MM-DD>`.
-   Pass the full contents of briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). briefing.html
-   is the action cards only (well under 20 KB, one tag per line); the full detail tables are in briefing.md. There is no attachment
-   or FILE: syntax. Read briefing.html in order, from the first line to the last, and paste every line verbatim, including
-   the closing `</body></html>`. Before sending, run `wc -c briefing.html` and compare it to the length of what you
+   (seconds, no sims). Then send it:
+   `uv run ff email briefing.md --html briefing.html --subject "FF briefing — Week <N> — <YYYY-MM-DD>"`
+   (`src/ff/mail.py`: Gmail SMTP with `GMAIL_USER`/`GMAIL_APP_PASSWORD` from the cloud env, to `BRIEFING_TO`; the two
+   files go on the wire as they are on disk, nothing to assemble). It prints `sent '<subject>' to <address>`; that is
+   the send, do not send again. Code owns the body: never paste, trim or retype the HTML when this path works.
+   Fallback, only if `ff email` fails (it exits with "GMAIL_USER and GMAIL_APP_PASSWORD must be set" when the env lacks
+   them, or SMTP refuses the login): send with the Gmail connector. To: the address in the `BRIEFING_TO` environment
+   variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject as above. Pass the full contents of
+   briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). briefing.html is the action cards only
+   (well under 20 KB, one tag per line); the full detail tables are in briefing.md. There is no attachment or FILE:
+   syntax. Read briefing.html in order, from the first line to the last, and paste every line verbatim, including the
+   closing `</body></html>`. Before sending, run `wc -c briefing.html` and compare it to the length of what you
    assembled; if they differ, re-read the file and fix the body rather than sending a truncated email.
-   Send exactly one email.
-   If Gmail is unavailable, fall back to `uv run ff email briefing.md --html briefing.html` (needs GMAIL_USER/GMAIL_APP_PASSWORD),
-   and if that also fails, print the full briefing.md so it's in the run log.
+   Send exactly one email, by whichever path worked. If both fail, print the full briefing.md so it's in the run log.
 8. After a successful send, run `uv run ff heartbeat` (dead-man's switch; no-op if HEALTHCHECK_URL is unset).
 9. Record projections for accuracy tracking: `uv run ff log-projections`, then
    `bash scripts/projlog_push.sh "projlog: week <N> <date>"`. The script commits ONLY `data/projlog` on top of the
@@ -140,7 +145,9 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
 
 ## If anything fails
 If any step errors and cannot be recovered with one retry (dead cookies, a source down, a crash in `ff`), STOP the normal
-flow and instead email Dustin (same Gmail path) with subject `FF briefing FAILED — <YYYY-MM-DD>` containing:
+flow and instead email Dustin (write the report as a markdown file and send it the same way as step 7: `uv run ff email
+<file> --subject "FF briefing FAILED — <YYYY-MM-DD>"`, the Gmail connector only if that fails) with subject `FF briefing
+FAILED — <YYYY-MM-DD>` containing:
 which step failed, the exact error text, what you tried, and the one action Dustin should take (e.g. refresh cookies per
 scripts/setup_cookies.md, or "no action, source was down"). If a partial briefing exists (some leagues succeeded), include it
 below the failure report. Then run `uv run ff heartbeat --fail`. Never end a run silently.
