@@ -22,9 +22,9 @@ def league(**kw):
     return lg
 
 
-def trade(get, give, rival="Rival", mine=1.5, theirs=0.5, sendable=True, why=()):
+def trade(get, give, rival="Rival", mine=1.5, theirs=0.5, sendable=True, why=(), why_not=None):
     return {"rival": rival, "rival_team_id": 2, "give": list(give), "get": list(get), "my_delta_ppw": mine,
-            "their_delta_ppw": theirs, "sendable": sendable, "why": list(why), "market_give": 100, "market_get": 90}
+            "their_delta_ppw": theirs, "sendable": sendable, "why_not": why_not, "why": list(why), "market_give": 100, "market_get": 90}
 
 
 def full(x):
@@ -133,6 +133,55 @@ def test_a_reach_is_not_a_row():
 def test_neutral_for_them_reads_as_words_not_plus_zero():
     lg = league(trades=[trade(["Kai"], ["Maye"], theirs=0.0)])
     assert "neutral for them" in by_id(lg)["trade:kai"]["text"]
+
+
+# ---------- B16: trade candidates in the detail say whether they are a row, and why not ----------
+
+def detail_trades(lg):
+    return [ln for ln in report._detail_trades(lg) if ln.startswith("- **")]
+
+
+def test_a_candidate_off_the_card_says_why():
+    """The Oct 20 detail led with a package that cost the rival 0.7/wk, and nothing said why it was not a row."""
+    lg = league(trades=[trade(["Warren"], ["McMillan"], sendable=False, theirs=-0.6, why_not="costs him 0.6/wk")])
+    assert "trade:warren" not in by_id(lg)
+    (line,) = detail_trades(lg)
+    assert line.startswith("- **not a row: costs him 0.6/wk** — **Give McMillan → get Warren**")
+
+
+def test_the_detail_lists_the_rows_first_and_marks_them():
+    reach = trade(["Kai"], ["Maye"], sendable=False, theirs=-0.4, why_not="costs him 0.4/wk")
+    row = trade(["Jake"], ["Evans"])
+    lg = league(trades=[reach, row])
+    assert ids(lg)[-1] == "trade:jake"
+    lines = detail_trades(lg)
+    assert lines[0].startswith("- **row** — **Give Evans → get Jake**")
+    assert lines[1].startswith("- **not a row: costs him 0.4/wk** — **Give Maye → get Kai**")
+
+
+def test_a_sendable_package_behind_the_two_rows_says_so():
+    lg = league(trades=[trade(["A"], ["X"]), trade(["B"], ["Y"]), trade(["C"], ["Z"])])
+    assert [x["id"] for x in report.todos(lg) if x["kind"] == "trade"] == ["trade:a", "trade:b"]
+    words = [ln.split("** — ")[0][4:] for ln in detail_trades(lg)]
+    assert words == ["row", "row", f"not a row: behind the {report.TRADE_ROWS} on the card"]
+
+
+def test_a_package_with_this_weeks_opponent_warns_on_the_row_and_in_the_detail():
+    """The FCLS detail listed a two-for-two with the man I play Sunday and nothing said so."""
+    lg = league(trades=[trade(["Kai"], ["Maye"])], opponent={"team_id": 2, "name": "Rival", "mu": 100.0, "sd": 20.0, "lineup": "projected"},
+                deadlines={"offer_after_kickoff": False})
+    warn = "he is your opponent this week; accepted today it executes before kickoff"
+    assert warn in by_id(lg)["trade:kai"]["warn"]
+    assert detail_trades(lg)[0].endswith(warn)
+    lg["deadlines"] = {"offer_after_kickoff": True, "next_kickoff_word": "Thu 6:15 PM"}
+    assert "he is your opponent this week; accepted today it executes after the Thu 6:15 PM kickoff" in by_id(lg)["trade:kai"]["warn"]
+    lg["opponent"]["team_id"] = 3
+    assert not any("opponent" in w for w in by_id(lg)["trade:kai"]["warn"])
+
+
+def test_an_old_packet_without_why_not_still_says_not_a_row():
+    lg = league(trades=[trade(["Kai"], ["Maye"], sendable=False, theirs=-0.4)])
+    assert detail_trades(lg)[0].startswith("- **not a row** — ")
 
 
 # ---------- the cover item ----------

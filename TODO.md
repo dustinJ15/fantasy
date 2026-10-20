@@ -38,12 +38,9 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-The Oct 20 card is the evidence for B16-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
+The Oct 20 card is the evidence for B17-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
 causes and the fixtures. Take them in order.
 
-- [ ] **B16 (S). Trade candidates in the detail with no row and no reason.** `_detail_trades` prints the scan's top
-  three with no `sendable` flag; `sendable` never reads the title delta; no warning for this week's opponent.
-  Plan §4.
 - [ ] **B17 (XS). Words that contradict the state**: "100% to sit" for a player on IR, Evans in Watch and Out at
   once, "week 12.;", the roster table's μ next to "100% to sit", "their set lineup" on a Tuesday, a Drop row on a
   listed handcuff. Plan §5.

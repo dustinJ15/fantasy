@@ -17,7 +17,7 @@ from .model.lineup import Lineup, as_set, compare, is_complete, optimize
 from .model.projections import PlayerProj, blend
 from .model.season import TITLE_RUN_MULT, SeasonCtx
 from .model.sim import simulate
-from .model.trades import drop_already_offered, evaluate, lineup_strength, needs, scan
+from .model.trades import apply_title_delta, drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
 from .rulings import drop_recently_skipped, history, ir_memory, load_ir_moves, load_outcomes, load_pushes, load_skips, mark_pushed, note_ir_roster, record_outcomes, save_ir_moves
@@ -275,7 +275,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         new_mine = [p for p in mine if p.espn_id not in give and p.name not in cut] + get
         new_theirs = [p for p in by_team[rid] if p.name not in c["get"]] + [p for p in mine if p.espn_id in give]
         st2 = dict(strength); st2[my_id] = lineup_strength(new_mine, slots); st2[rid] = lineup_strength(new_theirs, slots)
-        c["my_title_delta"], c["their_title_delta"] = title_deltas(st2, rid)
+        apply_title_delta(c, *title_deltas(st2, rid))
 
     # hurt players: IR / trade / drop / hold, from the waiver and trade results above. The IR-slot memory is noted
     # first so the morning a player comes off IR already counts against re-stashing him.

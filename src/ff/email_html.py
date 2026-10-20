@@ -374,14 +374,16 @@ def _league_detail(lg: dict) -> str:
     body += _h("Trades")
     if lg["trades"]:
         rows = []
-        for t in lg["trades"][:3]:
-            worth = t.get("sendable", t["their_delta_ppw"] >= 0)
+        for t, word, opp in report.trade_candidates(lg):
+            worth = word == "row"
             td = f" · title odds you {t['my_title_delta']:+.1f} / them {t['their_title_delta']:+.1f}" if "my_title_delta" in t else ""
             odds = report.accept_note(t).replace(", ", " · ", 1).replace(", p(accept)", " · p(accept)")
             after = f" · {t['after_line']}" if t.get("after_line") else ""
-            rows.append([_badge("SEND" if worth else "REACH", "good" if worth else "grey"),
+            reason = report.to_dustin(word[len("not a row: "):]) if word.startswith("not a row: ") else ""
+            why = "; ".join([*([reason] if reason else []), *t["why"], *([opp] if opp else [])])
+            rows.append([_badge("ROW" if worth else "NOT A ROW", "good" if worth else "grey"),
                          f"Give <b>{_e(', '.join(t['give']))}</b> → get <b>{_e(', '.join(t['get']))}</b> from {_e(t['rival'])}"
-                         f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{odds}{after} · {_e('; '.join(t['why']))}</div>"])
+                         f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{odds}{after} · {_e(why)}</div>"])
         body += _table(["", "Offer"], rows, "ll", 13)
     else:
         body += _muted("No mutually beneficial package found this week.")

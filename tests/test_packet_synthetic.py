@@ -160,6 +160,17 @@ def test_card_lists_every_worth_sending_trade(monkeypatch):
     assert _trade_rows(blk, [reach]) == [] and _trade_rows(blk, []) == []
 
 
+def test_every_scanned_candidate_says_whether_it_is_sendable_and_why_not(monkeypatch):
+    """B16: `why_not` is set exactly when a package is not sendable, and the packet's title-odds re-sim gates it."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    blk = analyze_league(make_snapshot(), FakeXW(), {}, {}, {}, {}, overrides=None, sims=100)
+    assert blk["trades"] and any("my_title_delta" in t for t in blk["trades"][:3])
+    for t in blk["trades"]:
+        assert (t["why_not"] is None) == t["sendable"]
+        if t.get("my_title_delta", 0.0) < 0:
+            assert not t["sendable"] and "lowers my title odds" in t["why_not"]
+
+
 def test_empty_offer_has_zero_title_delta(monkeypatch):
     """A3: trade and offer rows compare a re-sim against the baseline with common random numbers, so an offer that
     moves nobody reads 0.0 at any draw count; a re-sim on its own seed used to read up to +-1.5 title points."""

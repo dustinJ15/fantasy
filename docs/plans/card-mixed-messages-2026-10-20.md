@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: B12 (§1), B14 (§2) and B15 (§3) implemented 2026-10-20; the rest plan only.
+Status: B12 (§1), B14 (§2), B15 (§3) and B16 (§4) implemented 2026-10-20; the rest plan only.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B16, B17, B18, B19, in that order.
+Still open: B17, B18, B19, in that order.
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
@@ -146,6 +146,16 @@ me", "lowers my title odds"); `_detail_trades` prints "row" or "not a row: <why_
 
 **Test** (`tests/test_trades.py`, `tests/test_card.py`): a package with `their_delta_ppw` -0.6 reads "not a row:
 costs him 0.6/wk" in the detail; a package with `my_title_delta` -0.8 is not sendable; the opponent warning prints.
+
+Implemented (B16): `trades.why_not_sendable` names each floor a package misses (`THEIR_FLOOR_PPW`, `acc.SENDABLE`,
+`SEND_MIN_PPW`, a stream, `MARKET_FLOOR`) and the scan stores it as `why_not` next to `sendable`; `trades
+.apply_title_delta` is how the packet attaches the re-sim's deltas, and a negative `my_title_delta` clears `sendable`
+and `must_try` and adds "lowers my title odds". `report.trade_candidates` orders the detail (rows, then sendable,
+then the rest, `DETAIL_TRADES` in all) and `report.row_word` prints "row" / "not a row: <why_not>" (a sendable
+package past `TRADE_ROWS` reads "behind the 2 on the card"); `report.opponent_warn` rides on the row's `warn` and the
+detail line when the rival is `lg["opponent"]`, "before kickoff" or "after the <next kickoff>" from
+`deadlines.offer_after_kickoff`. Tests under "B16" in `tests/test_trades.py`, `tests/test_card.py`,
+`tests/test_packet_synthetic.py`.
 
 ### 5. Words that contradict the state (B17, one XS PR)
 
