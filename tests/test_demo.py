@@ -62,3 +62,23 @@ def test_examples_reads_rule_on_the_current_demo_card():
     for field in ("paste", "reply"):
         for name in re.findall(r"\b[A-Z][a-z]{2,}\b", reads["demo"][field]):
             assert name in card, f"reads.json {field} names {name}, who is not on the card"
+
+
+def test_the_demo_card_passes_the_card_lint_and_render_email_prints_it(tmp_path):
+    """`ff render-email` runs `report.card_lint` on every league with the rulings in (B19): the demo card is clean, and
+    a candidate the scan left without a reason is the one warning a stale packet shows."""
+    from ff import demo, report
+    p = demo.build_packet(None, sims=100, write=False)
+    for lg in p["leagues"]:
+        assert report.card_lint(lg) == []
+    packet = tmp_path / "p.json"
+    packet.write_text(json.dumps(p))
+    r = runner.invoke(app, ["render-email", "--packet", str(packet), "--out", str(tmp_path / "b.html")])
+    assert r.exit_code == 0, r.output
+    assert "card:" not in r.output
+    t = p["leagues"][0]["trades"][0]
+    t.update(sendable=False, why_not=None, must_try=False, pushed=False)
+    packet.write_text(json.dumps(p))
+    r = runner.invoke(app, ["render-email", "--packet", str(packet), "--out", str(tmp_path / "b.html")])
+    assert r.exit_code == 0, r.output
+    assert "card: demo: the detail lists" in r.output and "does not say why" in r.output
