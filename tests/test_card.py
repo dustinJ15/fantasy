@@ -737,8 +737,8 @@ def test_trade_row_prints_p_accept_next_to_the_word():
 
 
 def test_detail_tables_show_the_game_and_the_usage_next_to_the_projection():
-    lg = league(roster=[{**player("Starter WR", slot="WR"), "odds_line": line(), "usage": {"tgt_share": 0.262, "tgt_pg": 8.1, "carry_pg": 0.0}},
-                        player("Bench WR", ros=3.0)],
+    lg = league(roster=[{**player("Starter WR", slot="WR", p0=0.0), "odds_line": line(), "usage": {"tgt_share": 0.262, "tgt_pg": 8.1, "carry_pg": 0.0}},
+                        player("Bench WR", ros=3.0, p0=0.0)],
                 lineup_win={"slots": {"WR": ["Starter WR"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": ["Bench WR"]},
                 lineup_ev={"mu": 100.0}, odds={}, current_lineup_mu=100.0, opponent={"name": "Them", "mu": 90.0, "sd": 20.0}, handcuffs=[], weeks_remaining=12)
     roster = "\n".join(report._detail_roster(lg))
@@ -987,3 +987,92 @@ def test_the_header_prints_the_p_win_with_the_cards_adds_in_when_it_moves():
                                "leagues": [two_bye_qbs(lineup_after={"p_win": 0.45, "adds": ["Bo Nix"]}, odds={},
                                                        opponent={"name": "Them", "mu": 90.0, "sd": 20.0})]})
     assert "win 25% today, ~45% once Bo Nix is in" in card
+
+
+# ---------- B17: words that contradict the state ----------
+
+def test_the_cover_row_says_on_ir_or_out_not_a_percentage():
+    """The Oct 20 card: "Grupe is 100% to sit and your only K" for a kicker on IR. The designation is the reason, so
+    the row says so; the percentage is for a researched Questionable."""
+    assert by_id(grupe_league())["cover:k"]["text"].startswith("Blake Grupe is on IR and your only K")
+    out_k = {**player("Out K", pos="K", slot="K", p0=1.0, ros=4.0), "sources": {"espn_status": "OUT"}}
+    lg = grupe_league(roster=[player("Starter WR", slot="WR"), out_k], injuries=[], lineup_win={"slots": {"K": ["Out K"], "WR": ["Starter WR"]}, "p_win": 0.5, "mu": 90.0, "sd": 20.0, "bench": []})
+    assert by_id(lg)["cover:k"]["text"].startswith("Out K is out and your only K")
+    lg = healthy_k_league(roster=[player("Starter WR", slot="WR"), player("Shaky K", pos="K", slot="K", p0=0.55, ros=7.5)],
+                          lineup_win={"slots": {"K": ["Shaky K"], "WR": ["Starter WR"]}, "p_win": 0.5, "mu": 90.0, "sd": 20.0, "bench": []})
+    assert by_id(lg)["cover:k"]["text"].startswith("Shaky K is 55% to sit and your only K")
+
+
+def test_why_parts_names_the_designation_not_a_percentage():
+    ir = {**player("IR Guy", slot="WR", p0=1.0), "sources": {"espn_status": "INJURY_RESERVE"}}
+    out = {**player("Out Guy", slot="WR", p0=1.0), "sources": {"espn_status": "OUT"}}
+    lg = league(roster=[ir, out, player("Shaky", slot="WR", p0=0.55)],
+                lineup_win={"slots": {"WR": ["IR Guy", "Out Guy", "Shaky"]}, "p_win": 0.5, "mu": 90.0, "sd": 20.0, "bench": []})
+    why = report.why_parts(lg)[0]
+    assert "IR Guy on IR" in why and "Out Guy out" in why and "100%" not in why
+
+
+def test_a_player_on_the_out_line_leaves_the_watch_line():
+    """Mike Evans was in Watch (Doubtful) and in Out (~1 wk) at once: the Out line has the number, so he leaves Watch."""
+    lg = league(lineup_win={"slots": {"WR": ["Mike Evans"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []})
+    p = packet(lg)
+    p["shared"]["injury_watchlist"] = [{"name": "Mike Evans", "pos": "WR", "team": "TB", "league": "L1", "status": "DOUBTFUL", "p_zero": 1.0, "override_note": "hamstring, out Sunday"},
+                                       {"name": "Shaky", "pos": "WR", "team": "GB", "league": "L1", "status": "QUESTIONABLE", "p_zero": 0.5, "override_note": "limited Wed"}]
+    p["shared"]["injured"] = [{"name": "Mike Evans", "pos": "WR", "team": "TB", "league": "L1", "weeks_out": 1.0, "return_week": 8, "override_note": "hamstring, out Sunday"}]
+    assert [w["name"] for w in report.watchlist(p)] == ["Shaky"]
+    assert [w["name"] for w in report.injured_list(p)] == ["Mike Evans"]
+
+
+def test_a_note_ending_in_a_period_does_not_print_as_period_semicolon():
+    """"back around week 12.;" on the Out line: the note's trailing period goes before the lines are joined with "; "."""
+    w = {"name": "Olave", "pos": "WR", "team": "NO", "league": "L1", "status": "DOUBTFUL", "weeks_out": 4.0, "return_week": 12, "override_note": "back around week 12."}
+    assert report.injured_line(w).endswith("back around week 12")
+    assert report.watch_line(w).endswith("back around week 12")
+
+
+def test_the_roster_table_prints_the_expected_points_next_to_an_out_designation():
+    """"Evans 17.84 this week" next to "100% to sit": the wk column is what he is expected to score (μ × (1 − p_zero),
+    0 on a bye); the μ he would score if he plays moves into the flags."""
+    out = {**player("Mike Evans", slot="WR", mu=17.84, p0=1.0), "ev": 0.0, "flags": ["espn:OUT"], "odds_line": {}}
+    shaky = {**player("Shaky", slot="WR", mu=12.0, p0=0.5), "ev": 6.0, "flags": ["espn:DOUBTFUL"], "odds_line": {}}
+    bye = {**player("Bye Guy", mu=10.0, p0=1.0, bye=True), "ev": 0.0, "flags": [], "odds_line": {}}
+    fine = {**player("Fine", slot="WR", mu=9.0, p0=0.02), "ev": 8.82, "flags": [], "odds_line": {}}
+    lines = report._detail_roster(league(roster=[out, shaky, bye, fine], handcuffs=[]))
+    row = {ln.split(" | ")[0].strip("| "): ln for ln in lines if ln.startswith("| ") and not ln.startswith("| player")}
+    assert "| Mike Evans | WR | 0.0 |" in row["Mike Evans"] and "17.8 if he plays" in row["Mike Evans"]
+    assert "| Shaky | WR | 6.0 |" in row["Shaky"] and "12.0 if he plays" in row["Shaky"]
+    assert "| Bye Guy | WR | 0.0 |" in row["Bye Guy"] and "if he plays" not in row["Bye Guy"]
+    assert "| Fine | WR | 8.8 |" in row["Fine"] and "if he plays" not in row["Fine"]
+
+
+def test_an_older_packet_without_ev_still_prints_the_expected_points():
+    out = {**player("Mike Evans", slot="WR", mu=17.84, p0=1.0), "flags": ["espn:OUT"], "odds_line": {}}
+    lines = report._detail_roster(league(roster=[out], handcuffs=[]))
+    assert any("| Mike Evans | WR | 0.0 |" in ln for ln in lines)
+
+
+def test_the_matchup_line_calls_the_rivals_lineup_set_only_when_the_packet_says_so():
+    lg = league(opponent={"name": "Rival", "mu": 101.2, "sd": 18.0, "lineup": "projected"}, odds={}, weeks_remaining=10,
+                lineup_ev={"mu": 100.0}, current_lineup_mu=99.0)
+    lines = "\n".join(report._detail_matchup(lg))
+    assert "their projected lineup 101.2" in lines and "set" not in lines
+    lg["opponent"]["lineup"] = "set"
+    assert "their set lineup 101.2" in "\n".join(report._detail_matchup(lg))
+
+
+def test_a_drop_row_on_a_listed_handcuff_says_so():
+    """The Dillon Drop row and the Handcuffs line disagreed: the row now says he is the handcuff and why that is not
+    enough (the handcuff value is already in `drop_cost`; the words were missing)."""
+    lg = league(injuries=[{**injury("AJ Dillon", "drop", weeks_out=6.0, return_week=13), "hold_value": 0.0}],
+                handcuffs=[{"starter": "Chuba Hubbard", "handcuff": "AJ Dillon", "owner_team_id": 1, "est_value": 0.3}])
+    row = by_id(lg)["injury:aj-dillon"]
+    assert row["text"].startswith("drop AJ Dillon (RB)")
+    assert "handcuff for Chuba Hubbard, but worth ~0 pts the rest of the way even then" in report.detail_line(row)
+    lg["handcuffs"] = []
+    assert "handcuff" not in report.detail_line(by_id(lg)["injury:aj-dillon"])
+
+
+def test_a_drop_note_on_an_out_body_says_out_not_a_percentage():
+    lg = league(week=14, weeks_remaining=4,
+                roster=[player("Starter WR", slot="WR"), {**player("Out Guy", ros=3.2, p0=1.0), "sources": {"espn_status": "OUT"}}, player("Plays", ros=3.0)])
+    assert report._drop_note(lg, "Out Guy").endswith(", out this week)")

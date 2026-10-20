@@ -163,11 +163,13 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     opp_mu, opp_var = strength.get(opp_id, (None, None))
     opp_lineup = None
     if opp_id:
-        # His lineup is set and visible in each player's `slot` from Saturday on (and whenever every starter slot is
-        # already filled); earlier in the week it is last week's carried over, so the optimizer is the better guess.
+        # His lineup is set and visible in each player's `slot` from Saturday on; earlier in the week it is last
+        # week's carried over (every slot filled, nobody has touched it), so the optimizer is the better guess and
+        # the card never calls a Tuesday lineup "set" (B17). Fixtures and the demo pass no `now`: a complete lineup
+        # reads as set there, so nothing changes with the calendar.
         shown = as_set(by_team[opp_id], slots)
-        set_day = now is not None and now_dt.weekday() in LINEUP_SET_DAYS
-        if set_day or is_complete(shown, slots):
+        set_day = now_dt.weekday() in LINEUP_SET_DAYS if now is not None else is_complete(shown, slots)
+        if set_day:
             opp_week, opp_lineup = shown, "set"
         else:
             opp_week, opp_lineup = optimize(by_team[opp_id], slots, objective="ev"), "projected"

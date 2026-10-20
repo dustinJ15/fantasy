@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import Counter
 
 from .model import injuries
+from .model.lineup import NEVER_STARTS_AT
 
 # Chance of sitting at which a starter needs a contingency plan rather than a note.
 RISKY_TO_SIT = 0.4
@@ -42,9 +43,12 @@ def drop_cost(p: dict, lg: dict) -> float:
 
 
 def sit_note(p: dict) -> str:
-    """"on bye this week" / "90% to sit this week" when this week is the reason he is cheap; empty otherwise."""
+    """"on bye this week" / "out this week" / "90% to sit this week" when this week is the reason he is cheap; empty
+    otherwise. An Out designation (or a researched scratch at `NEVER_STARTS_AT`) is "out", never "100% to sit"."""
     if p.get("bye"):
         return "on bye this week"
+    if (p.get("p_zero") or 0.0) >= NEVER_STARTS_AT:
+        return "out this week"
     if (p.get("p_zero") or 0.0) >= RISKY_TO_SIT:
         return f"{p['p_zero']:.0%} to sit this week"
     return ""

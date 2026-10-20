@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: B12 (§1), B14 (§2), B15 (§3) and B16 (§4) implemented 2026-10-20; the rest plan only.
+Status: B12 (§1), B14 (§2), B15 (§3), B16 (§4) and B17 (§5) implemented 2026-10-20; the rest plan only.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B17, B18, B19, in that order.
+Still open: B18, B19, in that order.
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
@@ -170,6 +170,17 @@ detail line when the rival is `lg["opponent"]`, "before kickoff" or "after the <
   number, as today.
 - The Dillon Drop row and the Handcuffs line disagree: the Drop row's detail says "handcuff for Hubbard, but worth
   ~0 even then" when he is in `lg["handcuffs"]`.
+
+Implemented (B17): `_cover_items`, `why_parts` and the detail watchlist use `report.sit_word` ("on IR" / "out" at
+`NEVER_STARTS_AT`, the percentage below it) and `ledger.sit_note` says "out this week" the same way; `report.watchlist`
+drops a name that is in `shared.injured`; `report.note_word` strips the note's trailing period before the "; " join;
+`report.week_ev` (the packet's `ev`, 0 on a bye, `mu × (1 − p_zero)` on an older packet) is the roster table's wk
+column in both renderers and `_flags` carries "μ 17.8 if he plays" for a body at `RISKY_TO_SIT` or above; `packet`
+says "set" only on `LINEUP_SET_DAYS` when it knows the day (a complete lineup still reads as set when `now` is None,
+so fixtures and the demo do not move with the calendar) and the matchup line reads "their projected lineup" otherwise;
+a Drop row on a body in `lg["handcuffs"]` reads "handcuff for Hubbard, but worth ~0 pts the rest of the way even then"
+(`ledger.handcuff_for`). Tests under "B17" in `tests/test_card.py` and the set-lineup test in
+`tests/test_packet_synthetic.py`.
 
 ### 6. Noise-level lineup swaps (B18, after the rest)
 

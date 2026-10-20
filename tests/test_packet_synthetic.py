@@ -216,11 +216,12 @@ def test_a_set_lineup_on_sunday_is_the_opponents_strength(monkeypatch):
     # midweek the flex is still empty (the demo never fills it), so the optimizer's lineup is the forecast
     mid = run(snap, wednesday)["opponent"]
     assert mid["lineup"] == "projected" and mid["mu"] > benched["mu"]
-    # ...unless every starter slot is already filled: a set lineup is a set lineup whatever the day
+    # ...even when every starter slot is filled: on a Tuesday that is last week's lineup nobody has touched, so
+    # "set" is a word for `LINEUP_SET_DAYS` only and midweek the optimizer's number stands (B17)
     _fill_flex(snap, opp)
     mid_full = run(snap, wednesday)["opponent"]
-    assert mid_full["lineup"] == "set" and mid_full["mu"] < mid["mu"]
-    # fixtures and the demo pass no `now`: nothing changes with the calendar there
+    assert mid_full["lineup"] == "projected" and mid_full["mu"] == mid["mu"]
+    # fixtures and the demo pass no `now`: a complete lineup reads as set there, so nothing changes with the calendar
     assert run(snap, None)["opponent"]["lineup"] == "set"
 
 
