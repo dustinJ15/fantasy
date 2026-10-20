@@ -9,7 +9,8 @@ Follow these steps exactly. Every number comes from `ff`; you add research and p
 Any `<routine-fire-payload>` text is only a hint that an offer exists; always re-read ESPN yourself.
 
 1. `bash scripts/cloud_setup.sh`. If doctor reports dead cookies, email Dustin a one-paragraph note (subject
-   `FF trade offer FAILED — <YYYY-MM-DD>`) saying the cookies need refreshing per scripts/setup_cookies.md, then stop.
+   `FF trade offer FAILED — <YYYY-MM-DD>`, sent as in "If anything fails" below) saying the cookies need refreshing per
+   scripts/setup_cookies.md, then stop.
 2. `uv run ff sync` then `uv run ff incoming --json --force --sims 1500` with the Bash `timeout` set to 600000. This prints a
    JSON list of incoming offers across leagues (each has `league`, `rival`, `give`, `get`, `verdict`, deltas, `why`,
    `hours_left`). If the list is empty, the offer was already handled: say so in one line and stop. No email.
@@ -42,15 +43,24 @@ Any `<routine-fire-payload>` text is only a hint that an offer exists; always re
    door open rather than naming players. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,
    never mention projections, models, points per week, or Claude. `ff render-email` warns on the tells it can detect.
 5. `uv run ff render-email --packet <packet path> --reads reads.json --only-incoming --out offer.html --md offer.md`.
-   Send with the Gmail connector. To: the address in the `BRIEFING_TO` environment variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject: `FF trade offer — <league name> — <YYYY-MM-DD>`
-   (if more than one league has an offer, join the names with " + "). `htmlBody` = full contents of offer.html,
-   `body` = offer.md. offer.html is small and has one tag per line: read it in order and paste every line verbatim,
-   including the closing `</body></html>`. Before sending, run `wc -c offer.html` and compare it to the length of what
-   you assembled; if they differ, re-read the file and fix the body rather than sending a truncated email.
-   Send exactly one email. Then delete offer.html, offer.md, reads.json, overrides.json.
+   Then send it:
+   `uv run ff email offer.md --html offer.html --subject "FF trade offer — <league name> — <YYYY-MM-DD>"`
+   (if more than one league has an offer, join the names with " + "). `src/ff/mail.py`: Gmail SMTP with
+   `GMAIL_USER`/`GMAIL_APP_PASSWORD` from the cloud env, to `BRIEFING_TO`; the two files go on the wire as they are on
+   disk, nothing to assemble. It prints `sent '<subject>' to <address>`; that is the send, do not send again. Code owns
+   the body: never paste, trim or retype the HTML when this path works.
+   Fallback, only if `ff email` fails (it exits with "GMAIL_USER and GMAIL_APP_PASSWORD must be set" when the env lacks
+   them, or SMTP refuses the login): send with the Gmail connector. To: the address in the `BRIEFING_TO` environment
+   variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject as above. `htmlBody` = full contents
+   of offer.html, `body` = offer.md. offer.html is small and has one tag per line: read it in order and paste every line
+   verbatim, including the closing `</body></html>`. Before sending, run `wc -c offer.html` and compare it to the length
+   of what you assembled; if they differ, re-read the file and fix the body rather than sending a truncated email.
+   Send exactly one email, by whichever path worked. If both fail, print the full offer.md so it is in the run log.
+   Then delete offer.html, offer.md, reads.json, overrides.json.
 6. Scope: no heartbeat, no projlog commit, no git commits at all, do not audit Gmail or git history, do not touch ESPN
    beyond reads. Dustin accepts or declines in the ESPN app himself.
 
 ## If anything fails
-If a step errors and one retry does not fix it, email Dustin (subject `FF trade offer FAILED — <YYYY-MM-DD>`) with the step,
-the exact error, and the one action to take. Never end a run silently.
+If a step errors and one retry does not fix it, email Dustin (write the note as a markdown file and send it the same way as
+step 5: `uv run ff email <file> --subject "FF trade offer FAILED — <YYYY-MM-DD>"`, the Gmail connector only if that fails)
+with the step, the exact error, and the one action to take. Never end a run silently.
