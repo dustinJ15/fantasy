@@ -13,8 +13,8 @@ import numpy as np
 # published accuracy studies; scaled by the FantasyPros rank-sd where available.
 # `sigma = max(SIGMA_FLOOR_FRAC * BASE_SIGMA[pos], CV_FLOOR[pos] * mu)` (see `_sigma`); `ff accuracy --fit`
 # (`projlog.sigma_fit`) fits both numbers per position to the projlog residuals in exactly this form and prints them next
-# to these, but writes nothing: a position is fitted only at `projlog.FIT_MIN_N` scored forecasts, and as of 2026-10-08
-# (weeks 1-4 scored: QB 18, RB 49, WR 46, TE 21, K 10, D/ST 10) none is, so every value here is still the prior.
+# to these, but writes nothing: a position is fitted only at `projlog.FIT_MIN_N` scored forecasts, and as of 2026-10-20
+# (weeks 1-6 scored: QB 31, RB 70, WR 67, TE 31, K 16, D/ST 16) none is, so every value here is still the prior.
 BASE_SIGMA = {"QB": 7.0, "RB": 6.5, "WR": 6.5, "TE": 5.0, "K": 4.0, "D/ST": 5.5}
 # Coefficient of variation floor so that low projections still have spread.
 CV_FLOOR = {"QB": 0.30, "RB": 0.45, "WR": 0.50, "TE": 0.55, "K": 0.45, "D/ST": 0.60}

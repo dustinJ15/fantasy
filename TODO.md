@@ -49,10 +49,11 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 - [ ] **D2 (S, waiting on data). Adopt the fitted variance** per position. The fitter exists since 2026-10-08
   (`ff accuracy --fit`, `projlog.sigma_fit`): it fits `BASE_SIGMA` and `CV_FLOOR` in `model/projections.py` to the blend
   residuals in the optimizer's own shape and refuses a position under `projlog.FIT_MIN_N` (150) scored forecasts. As
-  of 2026-10-08 (weeks 1-4 scored) the samples are QB 18, RB 49, WR 46, TE 21, K 10, D/ST 10, so every constant is
-  still the prior. A scored week adds about 12 RB, 12 WR, 4-5 QB and TE, 2-3 K and D/ST: RB and WR cross 150 around
-  week 13-14 of 2026, QB and TE late in 2027, K and D/ST not before 2029 (pool them across positions or lower the bar
-  with a reason). When a row says `fit`: copy the printed pair into `model/projections.py` with the sample size and
+  of 2026-10-20 (weeks 1-6 scored) the samples are QB 31, RB 70, WR 67, TE 31, K 16, D/ST 16, so every constant is
+  still the prior. A scored week adds about 11 RB, 11 WR, 5 QB and TE, 3 K and D/ST: RB and WR cross 150 once week
+  13-14 of 2026 is scored (the week-14 or week-15 log), QB and TE late in 2027, K and D/ST not before 2029 (pool them
+  across positions or lower the bar with a reason). Checked 2026-10-20: `ff accuracy --fit` printed `keep prior` on
+  every row, nothing to adopt; do not pick this item again before the week-14 log is in. When a row says `fit`: copy the printed pair into `model/projections.py` with the sample size and
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
