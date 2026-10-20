@@ -42,10 +42,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier C — operations
 
-- [ ] **C6 (XS). The trade-offer alert's body is still assembled by the LLM.** Step 5 of `.claude/skills/trade-offer/SKILL.md`
-  pastes offer.html into the Gmail connector and checks `wc -c`, the send step the briefing skill had before C5. Make it
-  `uv run ff email offer.md --html offer.html --subject ...` with the paste as the fallback, and extend
-  `tests/test_skill_prompts.py` `test_briefing_sends_with_ff_email_and_pastes_only_as_the_fallback` to that file.
+(none open)
 
 ## Tier D — where real edge would come from (after Tier A)
 
