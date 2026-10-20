@@ -36,6 +36,15 @@ Each matchup: `home`, `away` (team ids), both recorded scores, `playoff`, and bo
 `espn_id`, `name`, `pos`, `team`, `eligible` (starter slots only), `slot` (as set, `BE`/`IR` for the bench), `proj`,
 `actual`, `bye`. `version` is `REPLAY_VERSION`; `load_replay` refuses an older file.
 
+Version 2 (D12 step 2, 2026-10-20) adds `players`, the universe the scanner replay builds its wire and its
+rest-of-season prior from: every player in ESPN's ownership-sorted list (`espn.player_universe`, one
+`kona_player_info` pull at the current period, `limit` 1500, the stats filter naming periods 0-18), keyed by `espn_id`
+(an int after `load_replay`): `name`, `pos`, `team`, `eligible`, `proj_season` (the static preseason total),
+`bye_weeks`, and `weeks` (`{period: {"proj", "actual"}}` for every period the payload carries). `universe_size` is the
+pull's length and `universe_missing` the rostered players it does not hold (beyond the list, or with no `stats` block;
+such a player is left out and priced from his box-score rows alone). `docs/plans/scanner-replay.md` says what each
+field feeds. A version-1 file is refused; `ff replay-pull` again is the fix (the box-score half is unchanged).
+
 A completed season is not in the archive at all: every week of 2025 came back with scores and no roster on either side
 (`pull_replay` says so, `NO_LINEUPS`, instead of espn-api's KeyError). Only the current season replays.
 
@@ -123,4 +132,5 @@ are in `docs/accuracy.md`. The three things this plan could not know:
 
 - **D12**, the scanner replay (on the live season: a completed season has no lineups, above): planned 2026-10-20 in
   `docs/plans/scanner-replay.md` (the player universe as the pool, the chart off, `scan_hits` and `claim_hits`, five steps);
-  the first step is the probe of ESPN's past-period player list, `scripts/probe_replay_pool.py`.
+  the probe of ESPN's past-period player list (`scripts/probe_replay_pool.py`) and the universe pull (replay version 2,
+  above) are done; the two scorers and the first tables are open.

@@ -7,6 +7,7 @@ What the model does with priority today is wording: `rank_free_agents` tags each
 status, the packet carries `waiver_rank` and a `faab_remaining` of None, and the checklist row says `claim (waivers,
 you are priority #N)` or `add`. Nothing prices the cost of spending priority #N; that is TODO D3, not a bug here.
 """
+import json
 from types import SimpleNamespace
 
 from ff import report
@@ -148,6 +149,34 @@ def _pool_league(players, fail=False):
             raise RuntimeError("ESPN said no")
         return {"players": players}
     return SimpleNamespace(espn_request=SimpleNamespace(league_get=league_get))
+
+
+def test_player_universe_asks_for_the_whole_list_with_every_period_and_parses_the_stats():
+    """One pull, no status filter, `limit` 1500, the stats filter naming periods 0-18 (the D12 probe: without it only
+    the pull's own period comes back, and period 0 is the season total); the entries come back as espn-api Players."""
+    seen = {}
+
+    def league_get(params, headers):
+        seen["params"], seen["filter"] = params, json.loads(headers["x-fantasy-filter"])["players"]
+        return {"players": [{"id": 7, "onTeamId": 0, "status": "FREEAGENT",
+                             "player": {"id": 7, "fullName": "Wire Guy", "proTeamId": 25, "defaultPositionId": 2, "eligibleSlots": [2, 23, 20],
+                                        "ownership": {"percentOwned": 3.0},
+                                        "stats": [{"seasonId": 2026, "scoringPeriodId": 0, "statSplitTypeId": 0, "statSourceId": 1, "appliedTotal": 88.5},
+                                                  {"seasonId": 2026, "scoringPeriodId": 3, "statSplitTypeId": 1, "statSourceId": 1, "appliedTotal": 6.1},
+                                                  {"seasonId": 2026, "scoringPeriodId": 3, "statSplitTypeId": 1, "statSourceId": 0, "appliedTotal": 2.4},
+                                                  {"seasonId": 2025, "scoringPeriodId": 3, "statSplitTypeId": 1, "statSourceId": 0, "appliedTotal": 99.0}]}}]}
+
+    lg = SimpleNamespace(espn_request=SimpleNamespace(league_get=league_get), year=2026, _get_pro_schedule=lambda w: {})
+    players = espn.player_universe(lg, 7)
+    assert seen["params"] == {"view": "kona_player_info", "scoringPeriodId": 7}
+    f = seen["filter"]
+    assert "filterStatus" not in f and f["limit"] == espn.UNIVERSE_LIMIT == 1500
+    assert f["filterStatsForCurrentSeasonScoringPeriodId"]["value"] == list(range(19))
+    assert f["sortPercOwned"] == {"sortPriority": 1, "sortAsc": False}
+    (p,) = players
+    assert (p.playerId, p.name, p.position, p.proTeam, p.projected_total_points) == (7, "Wire Guy", "RB", "SF", 88.5)
+    assert p.stats[3] == {"projected_points": 6.1, "projected_breakdown": {}, "projected_points_breakdown": {}, "projected_avg_points": 0,
+                          "points": 2.4, "breakdown": {}, "points_breakdown": {}, "avg_points": 0}   # last season's row is dropped
 
 
 def test_waiver_statuses_keeps_only_the_two_pool_states():

@@ -1,12 +1,12 @@
 # Plan: the scanner replay (every trade row and every claim row of every replayed week, graded)
 
-Status: step 1 done (TODO D12), the rest planned. Written 2026-10-20 in a session without `leagues.toml`; the probe
+Status: steps 1 and 2 done (TODO D12), the rest planned. Written 2026-10-20 in a session without `leagues.toml`; the probe
 (`scripts/probe_replay_pool.py`, the free-agent pool of a past week) ran later that day on all three leagues and its
 findings are under "What the probe found" below, with the one change they make to the pull. The harness this extends:
 `docs/plans/backtest.md` (D8, D11).
-Written: 2026-10-20 against `main` at 4a67182; the probe's findings added 2026-10-20 against 4230107.
-TODO ids: D12 (steps 2-5, in order, in TODO.md).
-Still open: D12 steps 2-5.
+Written: 2026-10-20 against `main` at 4a67182; the probe's findings added against 4230107, the universe pull against eafbcf0.
+TODO ids: D12 (steps 3-5, in order, in TODO.md).
+Still open: D12 steps 3-5.
 
 For an agent building or reading the scanner replay: the part of the backtest that grades the trade scan (`model/trades.py`
 `scan`) and the waiver ranking (`model/waivers.py` `rank_free_agents`) rather than the lineup. ROADMAP item 8's second
@@ -59,13 +59,25 @@ among themselves, a later step if the acceptance score ever needs grading).
 `pull_replay` adds `players`, the universe: one row per player in the ownership-sorted `kona_player_info` pull (the
 whole list, about 1050 players at `limit` 1500: every player rostered in any week plus the wire, the probe below),
 keyed by `espn_id`: `name`, `pos`, `team`, `eligible`, `proj_season` (the preseason total), `bye_weeks`, and `weeks`:
-`{period: {"proj": x, "actual": y}}` for every period the payload carries (the filter below makes that every period). The matchup rows keep their version-1 shape. `REPLAY_VERSION` becomes 2 and
-`load_replay` refuses a version-1 file (re-pull; the box-score half is unchanged, only the universe is new).
+`{period: {"proj": x, "actual": y}}` for every period the payload carries (the filter below makes that every period;
+a period with a projection and no final yet carries `proj` alone). The matchup rows keep their version-1 shape.
+`REPLAY_VERSION` becomes 2 and `load_replay` refuses a version-1 file (re-pull; the box-score half is unchanged, only
+the universe is new). JSON strings the `players` and `weeks` keys; `load_replay` turns both back into ints, so
+`rep["players"][espn_id]["weeks"][w]` reads as written.
 
 `pull_replay` records `universe_size` and `universe_missing`: how many players on any week's roster are absent from
-the universe pull (a player rostered in week 3, cut, and now below the ownership cut-off). The probe says how deep the
-pull must go for that to be zero; a missing player is priced from his box-score rows alone (this week's `proj` only,
-no season prior), and counted.
+the universe pull (a player rostered in week 3, cut, and now below the ownership cut-off, or one the list carries
+with no `stats` block at all: he has neither a season total nor a period, so he is left out of `players` and
+counted). The probe says the list ends before the ownership cut-off bites; a missing player is priced from his
+box-score rows alone (this week's `proj` only, no season prior).
+
+Built 2026-10-20 (step 2): `espn.player_universe` is the pull (`UNIVERSE_LIMIT` 1500, `UNIVERSE_PERIODS` 0-18, no
+status filter, espn-api `Player` objects so the per-period `stats` parse as everywhere else), `backtest._universe_row`
+and `backtest.universe` the rows and the two counts, `pull_replay` calls it once at `league.current_week` after the
+box scores. The synthetic replay (`tests/test_backtest.py` `synthetic_replay`) carries a universe: every rostered
+player with his box-score week and a draw of the same shape in every other week, plus `WIRE_PER_POS` free agents per
+position, everyone with a preseason total. Step 3 may reshape the synthetic rosters (today each team-week draws fresh
+players, so a week-w package has no later weeks of its own players to grade) when it needs them to persist.
 
 ## The two scorers
 
@@ -150,10 +162,11 @@ projection shape, every player with a preseason total and actuals in every week.
 
 1. **The probe** (XS, done 2026-10-20): `uv run python scripts/probe_replay_pool.py --league L1 --week <a past
    week>`; its four answers and the pull's shape are under "What the probe found".
-2. **The universe pull** (S): `REPLAY_VERSION` 2, `players` in the replay from one `kona_player_info` pull at the
-   current period with `limit` 1500 and `filterStatsForCurrentSeasonScoringPeriodId` 0..18 (the probe), `universe_size`
-   and `universe_missing` (a player with no `stats` block counts as missing), `load_replay` refusing version 1; the
-   synthetic replay grows the universe; `ff replay-pull --season 2026` re-run on the three leagues.
+2. **The universe pull** (S, done 2026-10-20): `REPLAY_VERSION` 2, `players` in the replay from one `kona_player_info`
+   pull at the current period with `limit` 1500 and `filterStatsForCurrentSeasonScoringPeriodId` 0..18 (the probe),
+   `universe_size` and `universe_missing` (a player with no `stats` block counts as missing), `load_replay` refusing
+   version 1; the synthetic replay grows the universe. The re-pull of the three leagues (`ff replay-pull --season 2026`)
+   needs the cookies and is the first thing step 3 does: the version-1 files under `data/replay/` are refused until then.
 3. **`scan_hits`** (M): `replay_proj`, `standings_at`, the pool, the sim, the scan per team-week, the two realized
    scores, the tables, `ff backtest --scan`; the three synthetic properties as tests.
 4. **`claim_hits`** (S): the claim rows per team-week, the two realized scores, the managers' actual adds, `ff

@@ -320,7 +320,9 @@ def replay_pull(season: int = typer.Option(..., "--season", help="The season to 
         rep = backtest.pull_replay(ref, lg, season)
         path = backtest.save_replay(rep)
         skipped = f"; skipped the two-week matchup weeks {rep['skipped_weeks']}" if rep["skipped_weeks"] else ""
-        rprint(f"[green]{ref.name}: {len(rep['weeks'])} weeks, {sum(len(w['matchups']) for w in rep['weeks'])} matchups -> {path}{skipped}[/]")
+        missing = f"; {rep['universe_missing']} rostered players the universe pull does not reach" if rep["universe_missing"] else ""
+        rprint(f"[green]{ref.name}: {len(rep['weeks'])} weeks, {sum(len(w['matchups']) for w in rep['weeks'])} matchups, "
+               f"{len(rep['players'])} players in the universe -> {path}{skipped}{missing}[/]")
 
 
 @app.command()

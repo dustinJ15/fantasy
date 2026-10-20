@@ -19,6 +19,9 @@ from ff.model.projections import _sigma
 
 SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}
 PLAN = (("QB", 2, 18), ("RB", 4, 12), ("WR", 4, 11), ("TE", 2, 7), ("K", 1, 8), ("D/ST", 1, 7))
+# The synthetic wire: this many free agents per position in the universe, projected a few points under the rostered
+# depth so a claim is sometimes, not always, an upgrade.
+WIRE_PER_POS = 24
 
 
 def _roster(rng: random.Random, draw, pid: int, lazy: bool, week: int) -> tuple[list[dict], int]:
@@ -65,9 +68,37 @@ def synthetic_replay(weeks: int = 60, teams: int = 12, sigma_mult: float = 1.0, 
             matchups.append({"home": h, "away": a, "home_score": score(hr), "away_score": score(ar), "playoff": False,
                              "home_roster": hr, "away_roster": ar})
         out.append({"week": w, "first_kickoff": f"2025-{9 + (w - 1) // 4:02d}-{1 + 7 * ((w - 1) % 4):02d}", "matchups": matchups})
+    players = _universe(out, weeks, rng, draw, pid)
     return {"version": bt.REPLAY_VERSION, "season": 2025, "league": "syn", "pulled": "2026-10-20",
             "settings": {"name": "Synthetic", "team_count": teams, "lineup_slots": SLOTS, "ppr": 1.0, "reg_season_weeks": weeks, "playoff_weeks": []},
-            "skipped_weeks": [], "weeks": out}
+            "skipped_weeks": [], "weeks": out, "universe_size": len(players), "universe_missing": 0, "players": players}
+
+
+def _universe(out: list[dict], weeks: int, rng: random.Random, draw, pid: int) -> dict[int, dict]:
+    """The synthetic universe (the replay file's `players`): every rostered player, his box-score `proj` and `actual`
+    on the week he was rostered and a draw of the same shape on every other week, plus a wire of `WIRE_PER_POS` per
+    position; everyone with a preseason total (`proj_season`) and a projection and an actual in every week."""
+    players: dict[int, dict] = {}
+
+    def add(r: dict, mu: float, known: dict[int, dict]):
+        wk = {}
+        for w in range(1, weeks + 1):
+            p = known.get(w) or {"proj": round(max(mu + rng.gauss(0, 1.5), 0.5), 1)}
+            wk[w] = {"proj": p["proj"], "actual": p.get("actual", round(draw(r["pos"], p["proj"]), 2))}
+        players[r["espn_id"]] = {"espn_id": r["espn_id"], "name": r["name"], "pos": r["pos"], "team": r["team"],
+                                 "eligible": list(r["eligible"]), "proj_season": round(mu * weeks, 1), "bye_weeks": [], "weeks": wk}
+
+    for wk in out:
+        for m in wk["matchups"]:
+            for r in m["home_roster"] + m["away_roster"]:
+                add(r, r["proj"], {wk["week"]: {"proj": r["proj"], "actual": r["actual"]}})
+    for pos, _, base in PLAN:
+        for i in range(WIRE_PER_POS):
+            mu = round(max(base - 4 + rng.gauss(0, 3) - i / 6, 0.5), 1)
+            elig = [pos] + (["RB/WR/TE"] if pos in ("RB", "WR", "TE") else [])
+            add({"espn_id": pid, "name": f"W{pid}", "pos": pos, "team": "X", "eligible": elig}, mu, {})
+            pid += 1
+    return players
 
 
 def _pooled(bins: list[dict], lo: float) -> tuple[float, float]:
@@ -193,6 +224,13 @@ def _box(home, away, hs, as_, hl, al, playoff=False):
               home_score=hs, away_score=as_, home_lineup=hl, away_lineup=al, is_playoff=playoff)
 
 
+def _up(pid, name, pos, stats, total=100.0, schedule=None):
+    """A universe player as espn-api's Player carries him: `stats` keyed by period (0 the season row)."""
+    st = {0: {"projected_points": total, "points": 0.0}, **stats} if stats is not None else {}
+    return _P(playerId=pid, name=name, position=pos, proTeam="SF", eligibleSlots=[pos, "RB/WR/TE", "BE", "IR"] if pos != "QB" else ["QB", "BE"],
+              projected_total_points=total if stats is not None else 0, stats=st, schedule=schedule or {})
+
+
 def test_pull_keeps_the_box_scores_shape_and_skips_two_week_matchups_and_byes():
     kick = {1: datetime(2025, 9, 4, 18), 2: datetime(2025, 9, 11, 18)}
     boxes = {
@@ -206,9 +244,21 @@ def test_pull_keeps_the_box_scores_shape_and_skips_two_week_matchups_and_byes():
     settings = LeagueSettings(name="L", team_count=4, scoring={}, lineup_slots={"QB": 1, "RB": 1, "WR": 1}, bench_slots=5, ir_slots=1,
                               reg_season_weeks=2, playoff_team_count=2, playoff_weeks=[3], matchup_periods={1: [1], 2: [2], 3: [3, 4]},
                               faab=False, faab_budget=0, trade_deadline_ms=0, ppr=0.5)
-    with patch.object(bt.espn, "settings", lambda ref, lg: settings):
+    sched = {str(w): {} for w in range(1, 19) if w != 9}
+    uni = [_up(10, "A", "RB", {1: {"projected_points": 12.3, "points": 15.0}, 2: {"projected_points": 13.0, "points": 2.0}, 3: {"projected_points": 10.0}}, 180.5, sched),
+           _up(12, "C", "WR", {1: {"projected_points": 9.0, "points": 4.5}, 2: {"projected_points": 11.0, "points": 20.0}}, 150.0),
+           _up(11, "B", "QB", None),                                                     # rostered, no stats block: missing
+           _up(99, "Wire", "WR", {1: {"projected_points": 4.0, "points": 0.0}, 2: {"projected_points": 5.0, "points": 9.0}}, 60.0)]
+    pulled = []
+    with patch.object(bt.espn, "settings", lambda ref, lg: settings), \
+         patch.object(bt.espn, "player_universe", lambda lg, w: pulled.append(w) or uni):
         rep = bt.pull_replay(LeagueRef(name="L1", espn_id=7), league, 2025, today=__import__("datetime").date(2026, 10, 20))
+    assert pulled == [4]                                                                  # one pull, at the current period
     assert rep["version"] == bt.REPLAY_VERSION and (rep["season"], rep["league"], rep["pulled"]) == (2025, "L1", "2026-10-20")
+    assert (rep["universe_size"], rep["universe_missing"]) == (4, 1) and sorted(rep["players"]) == [10, 12, 99]   # D (13) is out with his bye matchup
+    assert rep["players"][10] == {"espn_id": 10, "name": "A", "pos": "RB", "team": "SF", "eligible": ["RB", "RB/WR/TE"], "proj_season": 180.5,
+                                  "bye_weeks": [9], "weeks": {1: {"proj": 12.3, "actual": 15.0}, 2: {"proj": 13.0, "actual": 2.0}, 3: {"proj": 10.0}}}
+    assert rep["players"][99]["weeks"][2] == {"proj": 5.0, "actual": 9.0} and rep["players"][12]["bye_weeks"] == []
     assert rep["settings"]["lineup_slots"] == {"QB": 1, "RB": 1, "WR": 1} and rep["settings"]["ppr"] == 0.5
     assert [w["week"] for w in rep["weeks"]] == [1, 2] and rep["skipped_weeks"] == [3, 4]
     w1 = rep["weeks"][0]
@@ -225,10 +275,33 @@ def test_save_and_load_round_trip_and_version_check(tmp_path):
     rep = synthetic_replay(weeks=1, teams=4)
     with patch.object(bt, "REPLAY_DIR", tmp_path):
         path = bt.save_replay(rep)
-        assert path == tmp_path / "2025-syn.json" and bt.load_replay(path) == rep
-    (tmp_path / "old.json").write_text('{"version": 0}')
-    with pytest.raises(SystemExit):
+        back = bt.load_replay(path)
+        assert path == tmp_path / "2025-syn.json" and back == rep
+        pid = next(iter(back["players"]))
+        assert isinstance(pid, int) and all(isinstance(w, int) for w in back["players"][pid]["weeks"])   # JSON strings the keys; the load undoes it
+    (tmp_path / "old.json").write_text('{"version": 1, "weeks": []}')
+    with pytest.raises(SystemExit, match="version 1, this code reads 2 .*player universe"):
         bt.load_replay(tmp_path / "old.json")
+
+
+def test_the_synthetic_universe_holds_every_rostered_player_and_a_wire_with_every_week():
+    rep = synthetic_replay(weeks=3, teams=4)
+    rostered = {r["espn_id"] for wk in rep["weeks"] for m in wk["matchups"] for r in m["home_roster"] + m["away_roster"]}
+    assert rostered <= set(rep["players"]) and rep["universe_missing"] == 0 and rep["universe_size"] == len(rep["players"])
+    wire = [p for pid, p in rep["players"].items() if pid not in rostered]
+    assert len(wire) == WIRE_PER_POS * len(PLAN) and {p["pos"] for p in wire} == {pos for pos, _, _ in PLAN}
+    for p in rep["players"].values():
+        assert sorted(p["weeks"]) == [1, 2, 3] and p["proj_season"] > 0
+        assert all({"proj", "actual"} <= set(v) for v in p["weeks"].values())
+    r = rep["weeks"][1]["matchups"][0]["home_roster"][0]                                 # the box score and the universe agree on his week
+    assert rep["players"][r["espn_id"]]["weeks"][2] == {"proj": r["proj"], "actual": r["actual"]}
+
+
+def test_a_player_without_a_stats_block_is_left_out_of_the_universe_and_counted():
+    uni, size, missing = bt.universe([_up(1, "A", "RB", {1: {"projected_points": 3.0}}), _up(2, "B", "RB", None)], {1, 2, 3})
+    assert (size, missing, sorted(uni)) == (2, 2, [1])                                    # B has no stats, 3 is beyond the pull
+    assert uni[1]["weeks"] == {1: {"proj": 3.0}} and uni[1]["proj_season"] == 100.0
+    assert bt.universe([], set()) == ({}, 0, 0)
 
 
 def test_a_season_espn_serves_without_lineups_fails_with_the_finding_not_a_key_error():

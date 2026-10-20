@@ -6,6 +6,7 @@ from typing import Any
 
 from espn_api.football import League
 from espn_api.football.constant import POSITION_MAP
+from espn_api.football.player import Player
 from espn_api.requests.espn_requests import ESPNAccessDenied, ESPNInvalidLeague
 
 from ..config import LeagueRef, LeagueSettings, env
@@ -230,6 +231,33 @@ def waiver_statuses(league: League, week: int, size: int = 300) -> dict[int, str
     except Exception:
         return {}
     return {int(e["id"]): e["status"] for e in data.get("players", []) if e.get("status") in ("WAIVERS", "FREEAGENT")}
+
+
+# The whole ownership-sorted player list ends around 1050 players (the D12 probe, 2026-10-20: 1054 in L1), so this
+# `limit` takes all of it; nothing to tune. ESPN's per-period stats come back for every period only when the filter
+# names them, and period 0 is the season row (`projected_total_points`), so it stays in the list.
+UNIVERSE_LIMIT = 1500
+UNIVERSE_PERIODS = list(range(0, 19))
+
+
+def player_universe(league: League, week: int, size: int = UNIVERSE_LIMIT) -> list:
+    """Every player ESPN lists for the league (`kona_player_info`, no status filter, ownership order), as espn-api
+    Players with `stats` for every scoring period: the replay's universe (`backtest.pull_replay`, TODO D12).
+
+    One pull at the current period carries every period: with `filterStatsForCurrentSeasonScoringPeriodId` in the
+    filter, each player's `stats` holds `projected_points` for periods 1-18 (the past ones frozen as of their
+    kickoff, the box score's number) and `points` for every played period; without it only the pull's own period
+    comes back. The past-period payload is otherwise today's (ownership, designation, team), so nothing but the
+    stats and the static season total is read from it. Read-only."""
+    import json as _json
+    filters = {"players": {"filterSlotIds": {"value": []}, "limit": size,
+                           "filterStatsForCurrentSeasonScoringPeriodId": {"value": UNIVERSE_PERIODS},
+                           "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+                           "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "STANDARD"}}}
+    data = league.espn_request.league_get(params={"view": "kona_player_info", "scoringPeriodId": week},
+                                          headers={"x-fantasy-filter": _json.dumps(filters)})
+    schedule = league._get_pro_schedule(week)
+    return [Player(e, league.year, schedule) for e in data.get("players", [])]
 
 
 def free_agent_rows(league: League, week: int, size: int = 300) -> list[PlayerRow]:
