@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: plan only.
+Status: B12 implemented 2026-10-20 (§1); the rest plan only.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B12, B14, B15, B16, B17, B18, B19, in that order (B12, B14, B15 in series, same file).
+Still open: B14, B15, B16, B17, B18, B19, in that order (B14, B15 in series, same file).
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each

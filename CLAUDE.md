@@ -40,8 +40,8 @@ offer executes, next kickoff) as each league's `deadlines` block; claim and offe
 optimizer (`MIN_WIN_GAIN` keeps the highest-points lineup under 1.5pp); `projections.py` the blend (`season_pg`, `wind_mult`,
 `QUESTIONABLE_BY_WEEKDAY`); `clock.py` locks players from kickoff; `waivers.py` `priority_cost` prices the priority a claim spends in a rolling
 league. `packet.py` builds the DecisionPacket (`apply_accepted_trades` moves an accepted trade's players before anything is priced; `title_deltas`
-re-sims on the baseline's seed). `ledger.py` is the roster-spot ledger behind the checklist: `Spots` hands out open spots and drops (an open bench
-spot first, then the cheapest unnamed drop) and counts bodies against `settings.position_limits`; `drop_order` / `drop_note` rank and word a cut.
+re-sims on the baseline's seed). `ledger.py` is the roster-spot ledger behind the checklist: `Spots` hands out spots and drops (an open spot, the spot an IR
+row frees, a Drop-verdict player at cost 0, then the cheapest drop), counts bodies against `settings.position_limits`; `drop_order` / `drop_note` rank and word a cut.
 `report.py` renders markdown and owns the checklist; one `_*_items` builder per row kind over the shared ledger, `todos` is the order (roster moves
 first, the lineup row after them), the push selection and the ids, `apply_reads` folds Claude's per-row verdicts in, `read_lint` catches a typo'd id
 or an unruled trade. A row is two tiers: `text` is the click in one sentence, held under `MAX_ROW_WORDS` by `tests/test_card.py` (the lineup row is

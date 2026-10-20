@@ -38,16 +38,9 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-The Oct 20 card is the evidence for B12-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
+The Oct 20 card is the evidence for B14-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
 causes and the fixtures. Take them in order.
 
-- [ ] **B12 (M). A freed spot goes to a depth add before the rows that need one.** `injuries.decide` ends with
-  `fill_spot` on every `ir`/`drop` row, `report._ledger` and `todos` reserve those players, and `ledger.bench` skips
-  K/D/ST, so the Cover K row cut Henderson / Shakir / Juwan Johnson while the Drop row dropped the kicker on IR for
-  "best body on the wire, depth only", and that body was the wire's top QB, so the Waiver row claimed the second one.
-  Fix: a Drop-verdict player is the ledger's first drop at cost 0 (the row folds like an activation's), an IR move
-  credits an open spot, depth adds print only for spots still open after the waiver/cover rows and never a QB/K/D/ST
-  when two are held. Plan §1.
 - [ ] **B14 (S). Three rows for one kicker.** `_stream_items` ignores `added` and the cover row, and prints
   `delta_over_starter` (rest of season) as "this week". One row per position: the stream names the specialist it
   replaces as its drop, prints `delta_week`, and is the cover row when the current K/D/ST is out or on bye. Plan §2.
