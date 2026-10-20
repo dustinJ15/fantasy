@@ -1,8 +1,13 @@
 # Plan: what to do with an injured player (hold / IR / drop / trade)
 
-Status: implemented in the same PR, under the recommendation on each open question below. Written 2026-09-23 against
-`main` at 72ee11c (75 tests passing); two things moved during the build and are noted under **Deviations** at the end.
-Every finding below was re-run in this checkout with a probe script; the container had no ESPN cookies, no
+Status: implemented 2026-09-23 in one PR, under the recommendation on each question that was open at the time (closed
+below under **Questions, as decided**); what moved during the build is under **Deviations** at the end.
+Written: 2026-09-23 against `main` at 72ee11c (75 tests passing).
+TODO ids: none open (the per-position variance the drop margin leans on is D2).
+Still open: none. For an agent working on `model/injuries.py`: the design and the worked examples here are the
+calibration set; the rule's constants and the failure rows that changed it since are in the code and `docs/failures.md`.
+
+Every finding below was re-run in that checkout with a probe script; the container had no ESPN cookies, no
 `leagues.toml` and no `data/cache`, so anything that needs a live ESPN pull is marked **needs live pull**.
 
 ## The answer in five lines
@@ -239,7 +244,7 @@ Evaluated in this order; the first match wins:
    adds Y/week, hold.
 
 The margin is asymmetric on purpose. A drop is final and a rival can claim him; a hold is re-evaluated tomorrow.
-Both constants are tunable and named in the open questions.
+Both constants are tunable; see question 5 under **Questions, as decided**.
 
 ### Worked examples (17 matchup periods, playoffs 15-17, my playoff odds 60%)
 
@@ -384,29 +389,25 @@ lint wants a ruling on a `drop` row and not on a `hold` row; a `skip` ruling str
 Estimated size: steps 1-2 about 60 lines of source plus tests; step 4 about 120; steps 3, 5, 6 about 100
 together. Two or three sessions.
 
-## Open questions for Dustin
+## Questions, as decided
 
-Each has a recommendation so the work can start under it; the answer changes the code in the place named.
+Each was open for Dustin when this was written, with a recommendation so the work could start under it. None is open
+now; the queue is TODO.md.
 
-1. **IR eligibility in your three leagues.** ESPN's default lets `IR` and `OUT` designations into the IR slot; a
-   league can be set to IR only. The snapshot cannot tell (see finding 5). Recommendation: assume both, one
-   constant `IR_ELIGIBLE` in `injuries.py`, and run the step 0 probe once to see whether `eligibleSlots` carries
-   a real signal. If it does, the constant goes away.
-2. **Market lag: feature or trap.** Recommendation: discount the give side and label the row (option two above).
-   The alternative is that the scan proposes nothing until FantasyCalc catches up.
-3. **`mu_mult` semantics.** Recommendation: leave it this-week only and add `ros_mult`, rather than reorder the
-   override block and let half of it leak into the season. Overrides written so far keep meaning what they meant.
-4. **Timelines are not persisted; Claude re-states `weeks_out` daily.** Recommendation: accept, and lean on
-   Sleeper's `notes`. The alternative (a ledger on the `projlog` branch) puts state on Claude's side of the line.
-5. **The drop margin (3 season points or 25% of hold value, whichever is larger) and the playoff weighting (flat
-   `playoff_pct` per playoff week).** Recommendation: ship these, watch two weeks of cards, tune. The worked
-   examples are the calibration set.
-6. **Should a `drop` verdict require your explicit ruling in `reads.json`, like trade rows?** Recommendation:
-   yes, because it is the one irreversible move the card can suggest and its single largest input (`weeks_out`)
-   is Claude's research.
-7. **The `proj_season` question.** If the step 0 probe shows ESPN's number is full-season, do you want that fixed
-   in this PR (it changes every ROS number, so trade and waiver output shifts for everyone) or in a separate one
-   first? Recommendation: separate, first, because this plan's tests assert ROS numbers.
+1. **IR eligibility in your three leagues.** Decided: assume both, as `IR_ELIGIBLE` in `model/injuries.py`, with
+   `scripts/probe_injuries.py` to narrow it per league when the app refuses a move (the CLAUDE.md row "card says
+   move a player to IR and the app refuses"); activation keys off `ir_eligible`, never the guessed return week.
+2. **Market lag: feature or trap.** Decided: discount the give side (`max(avail_ros, 0.25)`, see Deviations) and
+   label the row; the scan keeps proposing.
+3. **`mu_mult` semantics.** Decided: `mu_mult` stays this-week only and `ros_mult` carries the rest of the season.
+4. **Timelines are not persisted; Claude re-states `weeks_out` daily.** Decided: accept it; the code's own memory of
+   an IR exit (`ir_moves.json`, 2026-10-07) is what stops the tag from bouncing, not a persisted timeline.
+5. **The drop margin and the playoff weighting.** Decided: shipped as `DROP_MARGIN` / `DROP_RATIO`; the flat
+   `playoff_pct` weighting became odds × `TITLE_RUN_MULT` per playoff week (TODO D4, 2026-10-08).
+6. **Should a `drop` verdict require an explicit ruling in `reads.json`?** Decided: `read_lint` demands a verdict on
+   every `trade` row; a `drop` row is ruled on like any row (`skip` strikes it) and is not required.
+7. **The `proj_season` question.** Decided: separate PR, as recommended; closed 2026-10-08 (TODO A1, `season_pg` in
+   `model/projections.py`).
 
 ## Not in scope
 

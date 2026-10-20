@@ -1,7 +1,9 @@
-<!-- Web research gathered 2026-10-07 for docs/plans/trade-acceptance.md. Claims are the cited sources' words, not
-measurements made here; the report says where a number is an analyst's rule of thumb rather than data. -->
-
 # Research report: what makes redraft trade offers get accepted (and how to encode it)
+
+Status: research only, feeding `docs/plans/trade-acceptance.md`; nothing here is a measurement made in this repo.
+Written: 2026-10-07 (web research gathered for that plan, same day).
+TODO ids: none.
+Still open: none.
 
 Scope note: this is web research only; no code was touched. Two of the three requested empirical sources do not exist in findable form: I could not locate any published dataset or study giving **acceptance rates by offer type** (1-for-1 vs 2-for-1, by position, etc.), and reddit.com is blocked to the search tool, so no r/fantasyfootball "I tracked N offers" posts could be verified. Everything below that is quantitative is from analysts' stated rules, tool documentation, or behavioral-economics literature, and is cited as such. Where a number is a rule of thumb rather than data, I say so.
 

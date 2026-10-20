@@ -3,7 +3,7 @@
 Findings from the 2026-10-08 line-by-line review, ordered by how much each one changes the numbers Dustin acts on.
 ROADMAP.md says where the model should go; this file says what to do next and how to know it is done. Pick the
 top unchecked item in the highest tier, make one PR, delete it, add a row to the CLAUDE.md failure table if the fix
-closes a failure mode. Line numbers are as of commit 82c3480.
+closes a failure mode. Name functions and constants, never line numbers; they drift.
 
 Sizes: XS under an hour, S a morning, M a day or two, L a week with a plan in `docs/plans/`.
 
@@ -69,8 +69,8 @@ causes and the fixtures. Take them in order.
 
 ## Tier C — operations
 
-- [ ] **C5 (S). The email body is assembled by the LLM.** `briefing/SKILL.md:99-103` has the model paste the
-  HTML into the Gmail tool and check `wc -c`. `ff email` already exists (`src/ff/mail.py`); give the cloud env
+- [ ] **C5 (S). The email body is assembled by the LLM.** The send step of `.claude/skills/briefing/SKILL.md` has the
+  model paste the HTML into the Gmail tool and check `wc -c`. `ff email` already exists (`src/ff/mail.py`); give the cloud env
   `GMAIL_USER`/`GMAIL_APP_PASSWORD` and make the skill call it, with the paste as the fallback.
 
 ## Tier D — where real edge would come from (after Tier A)
@@ -90,15 +90,11 @@ causes and the fixtures. Take them in order.
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
 - [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.
+- [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
+  (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
+  the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only
+  once the sim runs 10k for the top three, which the `MUST_TRY_PPW` comment says it cannot today. After B16.
 
 ## Tier E — tests that would catch model errors
 
 (none open)
-
-## Docs
-
-- [ ] **Docs-1 (S). One shape for the markdown, and a CLAUDE.md under 90 lines.** Take this before any tier: every
-  session loads CLAUDE.md, so every line cut here is paid back each run. Spec and done-when in
-  `docs/ralph-loop.md` under "Docs-1": a `docs/README.md` index, the fixed rows of the failure table to
-  `docs/failures.md`, Operations to `docs/operations.md`, ROADMAP marks items 4 and 7 done, the plans' open questions
-  become TODO lines or are closed, one status header on every plan.
