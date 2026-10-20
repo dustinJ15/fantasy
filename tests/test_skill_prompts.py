@@ -63,3 +63,15 @@ def test_trade_offer_read_rules_on_the_row():
 def test_prompts_never_hand_claude_a_projection_number():
     for text in (BRIEFING, TRADE_OFFER):
         assert "`mu`" not in text and "mu_ros" not in text.replace("mu_ros_active", "")
+
+
+def test_briefing_sends_with_ff_email_and_pastes_only_as_the_fallback():
+    """C5: the send step calls `ff email` (code puts the files on the wire); the Gmail connector paste, with its
+    `wc -c` check, is the fallback when the SMTP credentials are missing, never the first path."""
+    send_step = BRIEFING[BRIEFING.index("7. "):BRIEFING.index("8. ")]
+    assert "ff email briefing.md --html briefing.html" in send_step
+    assert send_step.index("ff email") < send_step.index("Gmail connector"), "ff email comes before the connector paste"
+    fallback = send_step[send_step.index("Gmail connector"):]
+    assert "GMAIL_USER" in send_step[:send_step.index("Gmail connector")], "the step says which env vars make the first path work"
+    assert "wc -c" in fallback and "wc -c" not in send_step[:send_step.index("Gmail connector")]
+    assert re.search(r"fall(s)? back|fallback", send_step[:send_step.index("wc -c")]), "the paste is named as the fallback"

@@ -7,8 +7,10 @@ every session needs. Trigger ids, the env id, routine URLs and the recipient add
 
 - Routine "FF daily briefing": cron `CRON_TZ=America/Denver 59 5 * * *` (5:59 AM Denver year-round; it was `0 12 * * *` UTC
   until 2026-10-08, which drifts an hour at each DST change), cloud env `fantasy` (network Full, env vars
-  ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/LEAGUES_TOML), model `claude-opus-5`. `scripts/cloud_setup.sh` writes `.env` and
-  `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO`. A second routine, "FF Sunday lineup check"
+  ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/GMAIL_USER/GMAIL_APP_PASSWORD/LEAGUES_TOML), model `claude-opus-5`.
+  `scripts/cloud_setup.sh` writes `.env` and `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO` by
+  `ff email` (Gmail SMTP, `src/ff/mail.py`, the app password from Google account > Security > App passwords; `ff doctor`
+  prints which path the run will take); the skill pastes the files into the Gmail connector only when that fails (C5). A second routine, "FF Sunday lineup check"
   (`CRON_TZ=America/Denver 45 9 * * 0`, same env and prompt with a preface: inactives are out, research only my questionable
   starters, email the final lineups as `FF Sunday check — Week N — <date>`, skip waivers, trades and the MLB step 0), runs
   after the 11:30 ET inactives. The routines UI stores a plain cron in UTC; a timezone needs the **Custom** trigger with the

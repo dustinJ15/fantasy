@@ -49,6 +49,8 @@ def doctor():
     for name, age in cache.freshness().items():
         t.add_row(name, f"{age/3600:.1f}")
     rprint(t)
+    from . import mail
+    rprint(f"[{'green' if mail.configured() else 'yellow'}]{mail.status()}[/]")
     if not ok:
         raise typer.Exit(2)
 
@@ -259,8 +261,8 @@ def email(file: str = typer.Argument(..., help="markdown file to send"), subject
     from . import mail
     body = open(file).read()
     subj = subject or f"FF briefing — {date.today().isoformat()}"
-    mail.send(subj, body, to, html=open(html).read() if html else None)
-    rprint(f"[green]sent '{subj}' to {to or 'self'}[/]")
+    sent_to = mail.send(subj, body, to, html=open(html).read() if html else None)
+    rprint(f"[green]sent '{subj}' to {sent_to}[/]")
 
 
 @app.command("log-projections")
