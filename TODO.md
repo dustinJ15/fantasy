@@ -38,13 +38,9 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-The Oct 20 card is the evidence for B14-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
+The Oct 20 card is the evidence for B16-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
 causes and the fixtures. Take them in order.
 
-- [ ] **B15 (M). The lineup seats zeros.** `lineup.optimize` keeps `mu > 0` bodies (Grupe on IR at K) and the
-  per-slot fallback seats a bye QB instead of EMPTY, so the row read "Lawrence: QB → bench · Herbert: bench → QB"
-  and the header's P(win) counted two empty slots the card fills Wednesday. Fix: `ev > 0 and not bye` to start,
-  EMPTY otherwise, the claim named on the lineup row at an empty slot, and `lineup_after` in the header. Plan §3.
 - [ ] **B16 (S). Trade candidates in the detail with no row and no reason.** `_detail_trades` prints the scan's top
   three with no `sendable` flag; `sendable` never reads the title delta; no warning for this week's opponent.
   Plan §4.

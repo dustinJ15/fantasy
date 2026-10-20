@@ -878,3 +878,63 @@ def test_a_stream_with_nobody_to_swap_out_takes_a_spot_from_the_ledger():
     lg["roster"][2]["locked"] = True  # his game has kicked off: ESPN will not let him go until Tuesday
     row = by_id(lg)["stream:chris-boswell"]
     assert row["text"] == "swap in Chris Boswell at K; drop Bench WR"
+
+
+# ---------- B15: the lineup row at an empty slot ----------
+
+EMPTY = "(EMPTY — no eligible player)"
+
+
+def two_bye_qbs(**kw):
+    """The Oct 20 Mile High card: Lawrence in the QB slot and Herbert on the bench, both on bye, Nix and Rodgers on
+    the wire (Tuesday: everything is a claim). The lineup row read "Lawrence: QB -> bench, Herbert: bench -> QB"."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Trevor Lawrence", pos="QB", slot="QB", bye=True, mu=0.0, p0=1.0),
+                        player("Justin Herbert", pos="QB", bye=True, mu=0.0, p0=1.0), player("Bench WR", ros=3.0)],
+                lineup_win={"slots": {"QB": [EMPTY], "WR": ["Starter WR"]}, "p_win": 0.25, "mu": 80.0, "sd": 20.0, "bench": ["Trevor Lawrence", "Justin Herbert"]},
+                open_spots=1,
+                waivers=[waiver("Bo Nix", pos="QB", slot="QB", week_slot="QB", delta_week=15.0, delta_over_starter=0.0, score=5.0,
+                                on_waivers=True, lands="Wed 1:00 AM")])
+    lg.update(kw)
+    return lg
+
+
+def test_an_empty_slot_names_the_claim_that_fills_it_and_moves_no_zero():
+    rows = by_id(two_bye_qbs())
+    assert "waiver:bo-nix" in rows
+    assert rows["lineup"]["moves"] == ["QB: nobody plays this week (Trevor Lawrence, Justin Herbert on bye); Bo Nix once the claim lands Wed 1:00 AM"]
+    assert "→ bench" not in rows["lineup"]["text"] and "bench → QB" not in rows["lineup"]["text"]
+
+
+def test_an_empty_slot_a_free_agent_fills_says_once_the_add_is_through():
+    lg = two_bye_qbs()
+    lg["waivers"][0].update(on_waivers=False, lands=None)
+    assert by_id(lg)["lineup"]["moves"] == ["QB: nobody plays this week (Trevor Lawrence, Justin Herbert on bye); Bo Nix once the add above is through"]
+
+
+def test_an_empty_slot_nobody_fills_says_pick_one_up():
+    lg = two_bye_qbs(waivers=[])
+    assert by_id(lg)["lineup"]["moves"] == ["QB: nobody plays this week (Trevor Lawrence, Justin Herbert on bye); pick one up"]
+
+
+def test_the_cover_row_still_fires_at_an_empty_k_slot_and_the_lineup_row_names_its_body():
+    """With the IR kicker no longer seated, the K slot is empty: the cover row is the need (it used to read the risky
+    starter off the slot) and the lineup row says who fills it and when."""
+    lg = grupe_league()
+    lg["roster"][2]["slot"] = "IR"
+    lg["lineup_win"]["slots"]["K"] = [EMPTY]
+    rows = by_id(lg)
+    cover = rows["cover:k"]
+    assert "Chris Boswell" in cover["text"] and cover["text"].endswith("; drop Blake Grupe") and "your only K" in cover["text"]
+    assert rows["lineup"]["moves"] == ["K: nobody plays this week (Blake Grupe on IR); Chris Boswell once the add above is through"]
+
+
+def test_the_header_prints_the_p_win_with_the_cards_adds_in_when_it_moves():
+    lg = two_bye_qbs(lineup_after={"p_win": 0.45, "adds": ["Bo Nix", "Chris Boswell"]})
+    assert report.win_note(lg) == "win 25% today, ~45% once Bo Nix and Chris Boswell are in"
+    lg = two_bye_qbs(lineup_after={"p_win": 0.255, "adds": ["Bo Nix"]})
+    assert report.win_note(lg) == "win 25%"
+    assert report.win_note(two_bye_qbs()) == "win 25%"
+    card = report.action_card({"generated": "2026-10-20", "shared": {"injury_watchlist": [], "injured": [], "exposure": {}, "unmatched_ids": []},
+                               "leagues": [two_bye_qbs(lineup_after={"p_win": 0.45, "adds": ["Bo Nix"]}, odds={},
+                                                       opponent={"name": "Them", "mu": 90.0, "sd": 20.0})]})
+    assert "win 25% today, ~45% once Bo Nix is in" in card

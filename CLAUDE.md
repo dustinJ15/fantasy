@@ -70,7 +70,7 @@ the synthetic league. Tests: `uv run pytest`; the Apps Script doorbell: `node sc
 | No email and healthchecks.io alert | routine never ran / VM failed | `RemoteTrigger get` to check enabled + next_run_at; `run` manually; check run log |
 | `uv sync` network timeout in cloud | flaky PyPI download | cloud_setup.sh retries with UV_HTTP_TIMEOUT=300; re-run if it still fails |
 | "usage metrics unavailable: Read timed out" | nflverse GitHub release download slow | NFLREADPY_TIMEOUT=120 is set in cloud_setup.sh; harmless, usage columns just blank |
-| Lineup shows a slot as EMPTY | no healthy eligible player | expected; the checklist tells Dustin to pick one up |
+| Lineup shows a slot as EMPTY | nobody I hold for it can play (bye, IR, `p_zero` at `NEVER_STARTS_AT`); the optimizer never seats a zero | expected; the lineup row names the slot, who I hold there and why, and the add or claim that fills it; the header prints the P(win) once he is in (`lineup_after`). If the line says "pick one up" with a body on the wire, check `week_slot` on him in the packet's `waivers` |
 | Monday email suggests moving players who played Sunday | `model/clock.py` locks players by kickoff/points; check `lines` (vegas scoreboard cache) has kickoffs and `actual_week` is populated | `ff sync --force`; look at `week_state` in the packet |
 | Sleeper projections missing for many players | crosswalk join | `Crosswalk.sleeper_id()`; check `shared.unmatched_ids` in the packet |
 | Agent sent >1 email or investigated git/Gmail history | skill scope drift | SKILL.md step 10 forbids it; tighten wording if it recurs |

@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, drop_verdict_note, handcuff_for, market_value, sit_note, weeks_left, weeks_word
 from .model import waivers as waivers_model
 from .model.injuries import fill_spot
+from .model.lineup import EMPTY_SLOT, NEVER_STARTS_AT
 
 HOME_TZ = ZoneInfo("America/Denver")   # Dustin's clock, for the times ESPN stamps on a trade
 
@@ -71,17 +72,76 @@ def due_note(day: str | None) -> str:
     return " (Mon)" if day == "Mon" else ""
 
 
+def is_empty(name: str) -> bool:
+    """The EMPTY marker `lineup.to_dict` prints for a seat nobody startable could fill (older packets spelled it
+    the same way, in parentheses)."""
+    return name == EMPTY_SLOT or name.startswith("(")
+
+
+def sit_word(p: dict) -> str:
+    """Why he scores nothing this week, in two words: "on bye", "on IR", "out" (a designation or a researched scratch
+    at `NEVER_STARTS_AT`), else the sit risk as a percentage."""
+    if p.get("bye"):
+        return "on bye"
+    if p.get("slot") == "IR" or "INJURY_RESERVE" in str((p.get("sources") or {}).get("espn_status") or ""):
+        return "on IR"
+    if (p.get("p_zero") or 0.0) >= NEVER_STARTS_AT:
+        return "out"
+    return f"{p.get('p_zero') or 0.0:.0%} to sit"
+
+
+def _slot_positions(slot: str) -> set[str]:
+    """The positions a slot seats: "RB/WR/TE" is three, "OP" is a QB or a flex body, a plain slot is itself."""
+    if slot == "OP":
+        return {"QB", "RB", "WR", "TE"}
+    return set(slot.split("/"))
+
+
+def _empty_slot_lines(lg: dict, fills: list[dict]) -> list[str]:
+    """One line per slot the lineup leaves empty: who I hold for it and why none of them plays, then what the card
+    does about it. "QB: nobody plays this week (Trevor Lawrence, Justin Herbert on bye); Bo Nix once the claim lands
+    Wed 1:00 AM"; a free agent reads "once the add above is through"; with no row adding a body, "pick one up".
+    `fills` are the bodies the rows above add whose this-week slot is one of the empty ones (B15)."""
+    rec_names = {n for names in lg["lineup_win"]["slots"].values() for n in names}
+    out = []
+    for slot, names in lg["lineup_win"]["slots"].items():
+        n_empty = sum(1 for n in names if is_empty(n))
+        if not n_empty:
+            continue
+        pos = _slot_positions(slot)
+        held = [p for p in lg["roster"] if p["pos"] in pos and p["name"] not in rec_names
+                and (p.get("bye") or (p.get("p_zero") or 0.0) >= NEVER_STARTS_AT or (p.get("mu") or 0.0) <= 0)]
+        groups: dict[str, list[str]] = {}
+        for p in held:
+            groups.setdefault(sit_word(p), []).append(p["name"])
+        why = ", ".join(f"{', '.join(ns)} {w}" for w, ns in groups.items())
+        line = f"{slot}: nobody plays this week" + (f" ({why})" if why else "")
+        mine = [w for w in fills if (w.get("week_slot") or w["pos"]) == slot][:n_empty]
+        if mine:
+            line += "; " + " and ".join(
+                f"{w['name']} once the claim lands {w.get('lands') or 'on waiver day'}" if w.get("on_waivers")
+                else f"{w['name']} once the add above is through" for w in mine)
+        else:
+            line += "; pick one up"
+        out.append(line)
+    return out
+
+
 def _lineup_changes(lg: dict) -> list[str]:
     """Explicit moves to get from the current ESPN slots to the recommended lineup, as an ordered chain:
     'X: bench -> FLEX' or 'Y: WR -> FLEX', with slots freed in an order that works in the app. Inside each group the
-    earliest kickoff goes first and a Thursday player's move says so (`due_note`); the groups keep the app order."""
+    earliest kickoff goes first and a Thursday player's move says so (`due_note`); the groups keep the app order.
+    A slot the lineup leaves empty is `_empty_slot_lines`' business (the lineup row prints those last), and a zero
+    sitting in it today is not moved to the bench: nobody replaces him, so the click changes nothing (Oct 20:
+    "Lawrence: QB → bench · Herbert: bench → QB", both on bye)."""
     cur = {p["name"]: p["slot"] for p in lg["roster"]}
     day = {p["name"]: (p.get("odds_line") or {}).get("day") for p in lg["roster"]}
-    rec = {n: s for s, names in lg["lineup_win"]["slots"].items() for n in names if not n.startswith("(")}
+    rec = {n: s for s, names in lg["lineup_win"]["slots"].items() for n in names if not is_empty(n)}
+    empty = {s for s, names in lg["lineup_win"]["slots"].items() if any(is_empty(n) for n in names)}
     by_day = lambda n: DAY_ORDER.get(day.get(n), DAY_ORDER["Sun"])  # noqa: E731
     moves = []
-    # starters who are dropped entirely
-    for n in sorted((n for n, s in cur.items() if s not in NON_STARTER and n not in rec), key=by_day):
+    # starters who are dropped entirely (not the zero in a slot that stays empty: benching him changes nothing)
+    for n in sorted((n for n, s in cur.items() if s not in NON_STARTER and n not in rec and s not in empty), key=by_day):
         moves.append(f"{n}: {cur[n]} → bench{due_note(day.get(n))}")
     # starters changing slot
     for n in sorted((n for n, s in rec.items() if cur.get(n) not in NON_STARTER and cur.get(n) != s), key=by_day):
@@ -89,9 +149,6 @@ def _lineup_changes(lg: dict) -> list[str]:
     # bench players coming in
     for n in sorted((n for n in rec if cur.get(n) in NON_STARTER), key=by_day):
         moves.append(f"{n}: bench → {rec[n]}{due_note(day.get(n))}")
-    empties = [s for s, names in lg["lineup_win"]["slots"].items() if any(n.startswith("(") for n in names)]
-    if empties:
-        moves.append("EMPTY SLOT: " + ", ".join(empties) + " (no healthy player; pick one up)")
     return moves
 
 
@@ -245,6 +302,10 @@ def _cover_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
             continue
         risky = [by_name[n] for n in rec.get(pos, []) if n in by_name and not by_name[n].get("locked")
                  and (by_name[n]["p_zero"] >= RISKY_TO_SIT or by_name[n]["bye"])]
+        # The lineup leaves the slot empty when nobody I hold there can play (B15): the need is the same, and the
+        # body I hold for it (on IR, on bye) is the one the row names.
+        if any(is_empty(n) for n in rec.get(pos, [])):
+            risky += [p for p in lg["roster"] if p["pos"] == pos and p["name"] not in starters]
         if not risky:
             continue
         if any(p["pos"] == pos and p["name"] not in starters and p["mu_ros"] > 0 and p["p_zero"] < RISKY_TO_SIT
@@ -268,7 +329,7 @@ def _cover_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         if fa is not None:
             added.add(fa["name"])
         out.append({"kind": "cover", "id": f"cover:{slug(pos)}", "label": f"Cover {pos}",
-                    "text": f"{who['name']} is {risk} and your only {pos}: {plan}{click}", "detail": detail})
+                    "text": f"{who['name']} is {risk} and your only {pos}: {plan}{click}", "detail": detail, "add": fa})
     return out
 
 
@@ -427,12 +488,19 @@ def _pickup_move(lg: dict, w: dict) -> str:
             + due_note(w.get("kickoff_day")))
 
 
-def _lineup_item(lg: dict, pickups: list[dict] = ()) -> dict:
+def _lineup_item(lg: dict, above: list[dict] = ()) -> dict:
     """The lineup row: the moves in app order before kickoff, only the unplayed slots mid-week, a pointer to next
-    week once the week is final. `pickups` are the free agents the waiver rows above add who start this week; their
-    move prints last, conditional on the add (`_pickup_move`), so the lineup is set once, after the roster moves."""
+    week once the week is final. `above` are the rows before it; the bodies they add (`add`) reach the lineup row two
+    ways. A free agent the START NOW waiver row adds is a move printed last, conditional on the add (`_pickup_move`),
+    so the lineup is set once, after the roster moves; a claim at a filled slot is not (he lands on waiver day, and
+    the lineup above still stands). An add at a slot the lineup left empty is named on that slot's line whether he is
+    a free agent or a claim: nothing stands there (`_empty_slot_lines`, B15)."""
     ph = (lg.get("week_state") or {}).get("phase", "pre")
-    ch = (_lineup_changes(lg) + [_pickup_move(lg, w) for w in pickups]) if ph != "final" else []
+    empty = {s for s, names in lg["lineup_win"]["slots"].items() if any(is_empty(n) for n in names)}
+    adds = [(r["kind"], r["add"]) for r in above if r.get("add")]
+    fills = [w for _, w in adds if (w.get("week_slot") or w["pos"]) in empty]
+    pickups = [w for k, w in adds if k == "waiver" and not w.get("on_waivers") and w not in fills]
+    ch = (_lineup_changes(lg) + [_pickup_move(lg, w) for w in pickups] + _empty_slot_lines(lg, fills)) if ph != "final" else []
     # a player an accepted trade brings in is on the bench the morning it processes; his move waits for that
     arriving = {p["name"] for p in lg.get("roster") or [] if p.get("pending_trade") == "in"}
     ch = [f"{c} (once the accepted trade processes)" if c.split(":")[0] in arriving else c for c in ch]
@@ -450,8 +518,8 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
     ledger and goes into `added` so no row below brings him in again. A claim in a rolling-priority league also says
     whether the priority it spends is worth it (`_priority_note`). The wire moves between the sync and the click
     (Oct 10: the pickup was on another roster by noon), so each row names the next body on the list as the fallback.
-    A free agent who starts this week comes back on the row as `pickup`, for the lineup row to fold in; a claim
-    lands on waiver day, so his start is next card's business."""
+    Every row carries the body it adds as `add`; the lineup row folds a free agent who starts this week in as a
+    move, and names any add at a slot the lineup left empty (`_lineup_item`)."""
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]
     ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= waivers_model.CLAIM_WORTHY_PPW and w not in starts and w["name"] not in added]
     out = []
@@ -465,7 +533,7 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_week']:.0f} this week)")
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']}{click}",
-                    "detail": detail, "pickup": None if w.get("on_waivers") else w})
+                    "detail": detail, "add": w})
     for w in ups[:1]:
         drop, suffix = spots.take(adding=w["pos"], lands_ts=w.get("lands_ts"))
         click, spot = _spot_words(drop, suffix)
@@ -475,7 +543,7 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         if nxt:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_over_starter']:.1f}/wk)")
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
-                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}){click}", "detail": detail})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}){click}", "detail": detail, "add": w})
     return out
 
 
@@ -537,7 +605,7 @@ def _stream_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         added.add(w["name"])
         pos_added.add(pos)
         out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream", "text": text,
-                    "detail": [f"+{w['delta_week']:.1f} this week{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w), *detail]})
+                    "detail": [f"+{w['delta_week']:.1f} this week{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w), *detail], "add": w})
     return out
 
 
@@ -717,7 +785,7 @@ def todos(lg: dict) -> list[dict]:
     out += left
     _depth_adds(lg, [i for i in inj if i["verdict"] == "ir"] + left, spots, added)
     out += _open_spot_items(lg, spots, added)
-    out += [_lineup_item(lg, [i["pickup"] for i in wv if i.get("pickup")])]
+    out += [_lineup_item(lg, out)]
     out += _sent_items(lg, spots)
     out += _trade_items(lg, spots, _pushed(lg))
     out += [i for i in inj if i["verdict"] == "trade"]
@@ -807,6 +875,28 @@ def why_parts(lg: dict) -> list[str]:
 
 def game_script(p_win: float) -> str:
     return "underdog, favor upside" if p_win < 0.42 else ("favorite, play it safe" if p_win > 0.58 else "coin flip")
+
+
+def win_after_note(lg: dict) -> str:
+    """"~45% once Bo Nix and Chris Boswell are in": the P(win) with the card's pickups in the seats the lineup left
+    empty (`packet.lineup_after`), when it differs from today's by a point or more; empty otherwise, or on an older
+    packet without the number. Both renderers print it next to today's P(win) so "win 25%" on a card that fills
+    two slots by Wednesday is not the number Dustin remembers (B15)."""
+    lw, after = lg["lineup_win"], lg.get("lineup_after") or {}
+    pw, pa, adds = lw.get("p_win"), after.get("p_win"), after.get("adds") or []
+    if pw is None or pa is None or not adds or abs(pa - pw) < 0.01:
+        return ""
+    names = adds[0] if len(adds) == 1 else ", ".join(adds[:-1]) + " and " + adds[-1]
+    return f"~{pa:.0%} once {names} {'is' if len(adds) == 1 else 'are'} in"
+
+
+def win_note(lg: dict) -> str:
+    """"win 25%", or "win 25% today, ~45% once Bo Nix is in" when the card's adds move it (`win_after_note`)."""
+    pw = lg["lineup_win"].get("p_win")
+    if pw is None:
+        return "win ?"
+    after = win_after_note(lg)
+    return f"win {pw:.0%} today, {after}" if after else f"win {pw:.0%}"
 
 
 def win_gain_note(lw: dict) -> str:
@@ -974,11 +1064,10 @@ def action_card(packet: dict, reads: dict | None = None, show_ids: bool | None =
     reads = reads or {}
     for lg in packet["leagues"]:
         me = lg["odds"].get(str(lg["my_team_id"])) or {}
-        opp = lg["opponent"]; lw = lg["lineup_win"]
-        pw = f"{lw['p_win']:.0%}" if lw.get("p_win") is not None else "?"
+        opp = lg["opponent"]
         final = (lg.get("week_state") or {}).get("phase") == "final"
         L.append(f"## {lg['league_name']}")
-        L.append(f"_{lg['my_record']} · vs {opp.get('name')}{'' if final else ' · win ' + pw} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%_")
+        L.append(f"_{lg['my_record']} · vs {opp.get('name')}{'' if final else ' · ' + win_note(lg)} · playoffs {me.get('playoff_pct', '?')}% · title {me.get('title_pct', '?')}%_")
         pl = phase_line(lg)
         if pl:
             L.append(f"**{pl}**")

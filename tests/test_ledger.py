@@ -55,7 +55,7 @@ def test_todos_is_the_order_over_the_builders_and_one_shared_ledger():
     manual += left
     report._depth_adds(lg, [i for i in inj if i["verdict"] == "ir"] + left, spots, added)
     manual += report._open_spot_items(lg, spots, added)
-    manual += [report._lineup_item(lg, [i["pickup"] for i in wv if i.get("pickup")])]
+    manual += [report._lineup_item(lg, manual)]
     manual += report._sent_items(lg)
     manual += report._trade_items(lg, spots, report._pushed(lg))
     manual += [i for i in inj if i["verdict"] == "trade"]
