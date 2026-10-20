@@ -47,6 +47,12 @@ SCORE_TOL = 0.05
 # A P(win) lineup that differs from the highest-points lineup is the only place the objective can earn or lose anything;
 # `optimizer.differs` scores those weeks alone, and this is the sample under which the row says so.
 DIFFERS_MIN_N = 20
+# ESPN keeps a completed season's scores but not its lineups: every week of 2025 came back without a roster on either
+# side (checked 2026-10-20 on all three leagues with the mMatchupScore, mScoreboard, mBoxscore and mMatchup views, the
+# leagueHistory endpoint, and mRoster, which returns the final roster whatever `scoringPeriodId` says). espn-api raises
+# a KeyError from inside its box score for that; `pull_replay` turns it into this, so the finding reads as a finding.
+NO_LINEUPS = ("{name}: ESPN serves no lineups for {season} (week {week} came back without a roster), only the scores. "
+              "A completed season cannot be replayed; the current season replays up to last week (--season <this year>).")
 
 
 def replay_path(season: int, name: str) -> Path:
@@ -90,7 +96,13 @@ def pull_replay(ref: LeagueRef, league, season: int, weeks: list[int] | None = N
         if w not in single:
             continue
         matchups, players = [], []
-        for b in league.box_scores(w, player_team_cache=cache):
+        try:
+            boxes = league.box_scores(w, player_team_cache=cache)
+        except KeyError as exc:
+            if "rosterForCurrentScoringPeriod" not in str(exc):
+                raise
+            raise SystemExit(NO_LINEUPS.format(name=ref.name, season=season, week=w)) from exc
+        for b in boxes:
             home, away = _team_id(b.home_team), _team_id(b.away_team)
             if home is None or away is None or not b.home_lineup or not b.away_lineup:
                 continue   # a bye in the fantasy schedule
