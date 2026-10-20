@@ -346,9 +346,9 @@ def _league_detail(lg: dict) -> str:
         body += _muted(f"Pure-points lineup differs{_e(report.win_gain_note(lw))}: " + _e("; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"])), 12)
     body += _muted("Bench: " + _e(", ".join(lw["bench"])), 12)
 
-    body += _h("Roster") + _muted("Wk = projected points this week · ROS = rest-of-season per game · Q/D = questionable/doubtful · "
+    body += _h("Roster") + _muted("Wk = expected points this week (0 on a bye or an Out) · ROS = rest-of-season per game · Q/D = questionable/doubtful · "
                                   "under the name: opponent, Vegas implied total, kickoff day, usage (target share, carries/g) or the 30-day market move", 11)
-    rows = [[_player_cell(p), _e(p["pos"]), f"{p['mu']:.1f}", f"{p['mu_ros']:.1f}", _status_cell(p)] for p in lg["roster"]]
+    rows = [[_player_cell(p), _e(p["pos"]), f"{report.week_ev(p):.1f}", f"{p['mu_ros']:.1f}", _status_cell(p)] for p in lg["roster"]]
     body += _table(["Player", "Pos", "Wk", "ROS", "Status"], rows, "llrrl", 12)
 
     body += _h("Waivers")

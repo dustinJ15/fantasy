@@ -19,11 +19,25 @@ def slug(text: str) -> str:
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", str(text).lower())).strip("-")
 
 
+def week_ev(p: dict) -> float:
+    """What he is expected to score this week: `ev` from the packet (`mu × (1 − p_zero)`), 0 on a bye; an older
+    packet without the field gets the same product. The roster table prints this, not μ, so 17.84 never sits next
+    to an Out designation (B17)."""
+    if p.get("bye"):
+        return 0.0
+    if p.get("ev") is not None:
+        return float(p["ev"])
+    return float(p.get("mu") or 0.0) * (1.0 - (p.get("p_zero") or 0.0))
+
+
 def _flags(p: dict) -> str:
     f = [x for x in p.get("flags", []) if not x.startswith("fp:")]
     g = p["sources"].get("grade")
     if g:
         f.append(g)
+    # The μ the wk column no longer prints, for a body likely to sit: what the slot gets if he does play.
+    if not p.get("bye") and (p.get("p_zero") or 0.0) >= RISKY_TO_SIT and (p.get("mu") or 0.0) > 0:
+        f.append(f"μ {p['mu']:.1f} if he plays")
     if (p.get("weeks_out") or 0) >= 1:
         f.append(f"out ~{p['weeks_out']:.0f}w" + (f", back wk {p['return_week']}" if p.get("return_week") else " (season)"))
     return ", ".join(f)
@@ -317,7 +331,7 @@ def _cover_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         who = risky[0]
         pool = [w for w in lg["waivers"] if w["pos"] == pos and w["name"] not in added]
         fa = next((w for w in pool if not w.get("on_waivers")), pool[0] if pool else None)
-        risk = "on bye" if who["bye"] else f"{who['p_zero']:.0%} to sit"
+        risk = sit_word(who)  # "on IR" / "out" when the designation is the reason, the percentage for a researched Questionable (B17)
         drop, suffix = spots.take(adding=pos, lands_ts=(fa or {}).get("lands_ts"))
         click, detail = _spot_words(drop, suffix)
         if fa is None:
@@ -425,7 +439,11 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
                     detail += more
         elif v == "drop":
             text = f"drop {who}"
-            detail = [f"{horizon}, worth ~{r['hold_value']:.0f} pts the rest of the way"]
+            cuff = handcuff_for(lg, r["name"])
+            # The Handcuffs line lists him and the Drop row cuts him: say both (the handcuff value is already in
+            # `drop_cost`; the words were missing, B17).
+            detail = [f"{horizon}, handcuff for {cuff}, but worth ~{r['hold_value']:.0f} pts the rest of the way even then" if cuff
+                      else f"{horizon}, worth ~{r['hold_value']:.0f} pts the rest of the way"]
         elif v == "trade":
             t = r["trades"][0]
             text = f"the offer to {t['rival']} for {', '.join(t['get'])} ships {who}; else hold"
@@ -909,7 +927,7 @@ def why_parts(lg: dict) -> list[str]:
     flagged.sort(key=lambda p: -p["p_zero"])
     why = []
     if flagged:
-        why.append("; ".join(f"{p['name']} " + ("on bye" if p["bye"] else f"{p['p_zero']:.0%} to sit") for p in flagged[:2]))
+        why.append("; ".join(f"{p['name']} {sit_word(p)}" for p in flagged[:2]))
     ph = (lg.get("week_state") or {}).get("phase", "pre")
     # P(win) is already a badge at the top of the card. The game script only earns a line when it actually changed
     # something: that is exactly when the P(win) lineup differs from the plain highest-points one.
@@ -955,13 +973,16 @@ def watchlist(packet: dict) -> list[dict]:
     """Cross-league injury watch, one row per player instead of one per (player, league).
 
     Only two kinds of row survive: someone in this week's lineup, and someone the research actually turned up
-    something on. A bare designation on a bench player is the injury report, not a briefing.
+    something on. A bare designation on a bench player is the injury report, not a briefing. A player on the Out
+    line (`shared.injured`, a return timeline with a number) is not also a watch: Mike Evans read Doubtful in Watch
+    and "out ~1 wk" in Out on the same card (B17).
     """
     starters = {lg["name"]: {n for ns in lg["lineup_win"]["slots"].values() for n in ns} for lg in packet["leagues"]}
+    out = {w["name"] for w in packet["shared"].get("injured") or []}
     rows: dict[str, dict] = {}
     for w in packet["shared"]["injury_watchlist"]:
-        if w.get("locked"):
-            continue  # already played this week; nothing to decide
+        if w.get("locked") or w["name"] in out:
+            continue  # already played this week, or on the Out line; nothing to decide here
         starting = w["name"] in starters.get(w["league"], set())
         if not starting and not w.get("override_note"):
             continue
@@ -990,17 +1011,22 @@ def injured_list(packet: dict) -> list[dict]:
     return sorted(rows.values(), key=lambda r: (-(r["weeks_out"] or 0), r["name"]))
 
 
+def note_word(w: dict) -> str:
+    """" — <Claude's note>" without its trailing period: the Watch and Out lines are joined with "; ", and a note
+    ending in "." printed "back around week 12.;" (B17). Empty when there is no note."""
+    note = (w.get("override_note") or "").strip().rstrip(".")
+    return f" — {note}" if note else ""
+
+
 def watch_line(w: dict) -> str:
     """One watchlist entry with the override note (Claude's research) if there is one."""
-    s = f"{w['name']} {w['status'].title()} ({', '.join(w.get('leagues') or [w['league']])})"
-    return s + (f" — {w['override_note']}" if w.get("override_note") else "")
+    return f"{w['name']} {w['status'].title()} ({', '.join(w.get('leagues') or [w['league']])}){note_word(w)}"
 
 
 def injured_line(w: dict) -> str:
     when = "the season" if w.get("return_week") is None and (w.get("weeks_out") or 0) >= 4 else f"~{w['weeks_out']:.0f} wk{'s' if w['weeks_out'] >= 1.5 else ''}"
     back = f", back wk {w['return_week']}" if w.get("return_week") else ""
-    s = f"{w['name']} out {when}{back} ({', '.join(w.get('leagues') or [w['league']])})"
-    return s + (f" — {w['override_note']}" if w.get("override_note") else "")
+    return f"{w['name']} out {when}{back} ({', '.join(w.get('leagues') or [w['league']])}){note_word(w)}"
 
 
 AI_TELLS = [
@@ -1207,7 +1233,7 @@ def _detail_shared(packet: dict) -> list[str]:
     if sh["injury_watchlist"]:
         L.append("## Injury watchlist (ambiguous designations on my rosters)")
         for w in sh["injury_watchlist"]:
-            risk = "already played this week" if w.get("locked") else f"{w['p_zero']:.0%} chance to sit"
+            risk = "already played this week" if w.get("locked") else sit_word(w)
             L.append(f"- **{w['name']}** ({w['pos']}, {w['team']}) — {w['status']} in *{w['league']}*; {risk}" + (f"; {w['notes']}" if w.get("notes") else "") + (f"; {w['override_note']}" if w.get("override_note") else ""))
         L.append("")
     if sh["exposure"]:
@@ -1255,7 +1281,7 @@ def _detail_matchup(lg: dict) -> list[str]:
         L.append(f"Playoff odds **{me['playoff_pct']}%** · title odds **{me['title_pct']}%** · expected wins {me['exp_wins']}{playoff_weight_note(lg)}")
     opp = lg["opponent"]
     if opp.get("name"):
-        theirs = "their set lineup" if opp.get("lineup") == "set" else "their proj"
+        theirs = "their set lineup" if opp.get("lineup") == "set" else "their projected lineup"
         L.append(f"\n## Matchup vs {opp['name']} ({theirs} {opp['mu']} ± {opp['sd']})")
     lw, le = lg["lineup_win"], lg["lineup_ev"]
     L.append(f"Recommended lineup (max P(win){' = ' + str(lw['p_win']) if lw.get('p_win') is not None else ''}), proj {lw['mu']} ± {lw['sd']}; current ESPN lineup proj {lg['current_lineup_mu']}")
@@ -1272,9 +1298,9 @@ def _detail_matchup(lg: dict) -> list[str]:
 
 def _detail_roster(lg: dict) -> list[str]:
     """The roster table, the waiver table and the handcuffs."""
-    L = ["\n## My roster (this week μ · ROS/g · game · usage · flags)", "| player | pos | wk μ | ROS/g | game | usage | flags |", "|---|---|---|---|---|---|---|"]
+    L = ["\n## My roster (this week expected pts · ROS/g · game · usage · flags)", "| player | pos | wk | ROS/g | game | usage | flags |", "|---|---|---|---|---|---|---|"]
     for p in lg["roster"]:
-        L.append(f"| {p['name']} | {p['pos']} | {p['mu']} | {p['mu_ros']} | {game_note(p)} | {usage_note(p)} | {_flags(p)} |")
+        L.append(f"| {p['name']} | {p['pos']} | {week_ev(p):.1f} | {p['mu_ros']} | {game_note(p)} | {usage_note(p)} | {_flags(p)} |")
 
     L.append("\n## Waivers")
     if lg["waivers"]:

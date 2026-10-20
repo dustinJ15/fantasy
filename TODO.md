@@ -41,9 +41,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 The Oct 20 card is the evidence for B17-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
 causes and the fixtures. Take them in order.
 
-- [ ] **B17 (XS). Words that contradict the state**: "100% to sit" for a player on IR, Evans in Watch and Out at
-  once, "week 12.;", the roster table's μ next to "100% to sit", "their set lineup" on a Tuesday, a Drop row on a
-  listed handcuff. Plan §5.
 - [ ] **B18 (S). Noise-level lineup swaps**: `MIN_SWAP_GAIN` for a swap between two healthy starters (Caleb for
   Kyler at +0.8, with a Thursday deadline). Plan §6. After B12-B17.
 - [ ] **B19 (S). A lint on the card as a whole** (`report.card_lint`, run by `ff render-email`): one add per body,
