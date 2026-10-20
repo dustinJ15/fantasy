@@ -138,3 +138,77 @@ def test_one_empty_seat_in_a_two_seat_slot_prints_one_marker(roster, slots):
         r.append(q)
     d = optimize(r, slots, objective="ev").to_dict()
     assert d["slots"]["RB"] == ["RB1", EMPTY_SLOT] and d["slots"]["RB/WR/TE"] != [EMPTY_SLOT]
+
+
+# ---------- B18: a swap between two healthy starters under MIN_SWAP_GAIN is noise ----------
+
+def _two_qbs(cur_mu: float, bench_mu: float, roster):
+    """The Oct 20 Denver card: Caleb Williams (Thu, 18.7) in the QB slot today, Kyler Murray (Sun, 19.5) on the
+    bench. `roster` from conftest sits everyone in slot "" (no current lineup), so this seats the rest where the
+    optimizer would put them anyway and the QB slot is the only question."""
+    from tests.conftest import P
+    r = [p for p in roster if p.pos != "QB"]
+    cur = P(1, "Caleb Williams", "QB", cur_mu, 6)
+    cur.slot = "QB"
+    other = P(11, "Kyler Murray", "QB", bench_mu, 6)
+    other.slot = "BE"
+    return r + [cur, other]
+
+
+def test_a_sub_point_swap_between_healthy_starters_keeps_the_current_one(roster, slots):
+    from ff.model.lineup import MIN_SWAP_GAIN
+    assert 0 < MIN_SWAP_GAIN <= 1.5
+    r = _two_qbs(18.7, 19.5, roster)
+    L = optimize(r, slots, objective="ev", hold=True)
+    assert L.to_dict()["slots"]["QB"] == ["Caleb Williams"]
+    assert L.held == [{"name": "Caleb Williams", "slot": "QB", "for": "Kyler Murray", "gain": 0.8}]
+    assert L.to_dict()["held"] == L.held
+    assert abs(L.mu - (optimize(r, slots, objective="ev").mu - 0.8 * (1 - 0.02))) < 1e-6  # the forgone EV is the hold
+    # the same roster against an opponent: the P(win) search returns the held lineup too
+    W = optimize(r, slots, opp_mu=110, opp_var=300, hold=True)
+    assert W.to_dict()["slots"]["QB"] == ["Caleb Williams"] and W.held == L.held
+
+
+def test_a_swap_worth_the_floor_or_more_still_happens(roster, slots):
+    r = _two_qbs(18.7, 21.0, roster)
+    L = optimize(r, slots, objective="ev", hold=True)
+    assert L.to_dict()["slots"]["QB"] == ["Kyler Murray"] and L.held == []
+
+
+def test_without_the_flag_the_search_is_exact(roster, slots):
+    """Rest-of-season pricing (trades, the injury rule, the wire) wants the best lineup, not the fewest clicks."""
+    r = _two_qbs(18.7, 19.5, roster)
+    L = optimize(r, slots, objective="ev")
+    assert L.to_dict()["slots"]["QB"] == ["Kyler Murray"] and L.held == []
+
+
+def test_a_bye_an_out_or_an_empty_seat_is_never_held(roster, slots):
+    from tests.conftest import P
+    r = _two_qbs(18.7, 19.0, roster)
+    cur = next(p for p in r if p.name == "Caleb Williams")
+    cur.bye = True
+    assert optimize(r, slots, objective="ev", hold=True).to_dict()["slots"]["QB"] == ["Kyler Murray"]
+    cur.bye, cur.p_zero = False, 1.0
+    assert optimize(r, slots, objective="ev", hold=True).to_dict()["slots"]["QB"] == ["Kyler Murray"]
+    # the current K is out and the bench K is 0.3 better than nobody at all: an empty seat is not a hold
+    r2 = [p for p in roster if p.pos != "K"] + [P(9, "K out", "K", 8, 3, p0=1.0), P(12, "K bench", "K", 0.3, 3)]
+    r2[-2].slot, r2[-1].slot = "K", "BE"
+    assert optimize(r2, slots, objective="ev", hold=True).to_dict()["slots"]["K"] == ["K bench"]
+
+
+def test_a_hold_at_one_slot_does_not_hold_a_real_upgrade_at_another(roster, slots):
+    """Two swaps on one card: the sub-point QB swap is held, the three-point flex upgrade is not."""
+    from tests.conftest import P
+    r = _two_qbs(18.7, 19.5, roster)
+    for p in r:
+        if p.slot == "":
+            p.slot = "BE"
+    rb3 = next(p for p in r if p.name == "RB3")
+    rb3.slot = "RB/WR/TE"  # 9.0 in the flex today; WR2 (11) takes the flex once a 12-point bench WR takes his WR seat
+    r.append(P(13, "WR4", "WR", 12, 5))
+    r[-1].slot = "BE"
+    L = optimize(r, slots, objective="ev", hold=True)
+    d = L.to_dict()
+    assert d["slots"]["QB"] == ["Caleb Williams"]
+    assert "RB3" in d["bench"] and {"WR4", "WR2"} <= {n for ns in d["slots"].values() for n in ns}
+    assert [h["name"] for h in L.held] == ["Caleb Williams"]

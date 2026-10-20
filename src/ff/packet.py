@@ -176,8 +176,10 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         opp_mu, opp_var = opp_week.mu, opp_week.var
 
     mine = by_team.get(my_id, [])
-    ev_lu = optimize(mine, slots, objective="ev")
-    win_lu = optimize(mine, slots, opp_mu=opp_mu, opp_var=opp_var) if opp_mu is not None else ev_lu
+    # This week's lineup is the one Dustin clicks: a healthy starter the exact search benches for under
+    # `MIN_SWAP_GAIN` keeps his seat (`hold`, B18). Everything priced for the season below runs the exact search.
+    ev_lu = optimize(mine, slots, objective="ev", hold=True)
+    win_lu = optimize(mine, slots, opp_mu=opp_mu, opp_var=opp_var, hold=True) if opp_mu is not None else ev_lu
     current = {p.slot: [] for p in mine}
     for p in mine:
         current.setdefault(p.slot, []).append(p)
@@ -413,7 +415,8 @@ def _lineup_after(mine: list[PlayerProj], fas: list[PlayerProj], waivers: list[d
         fills.append(by_id[w["espn_id"]])
     if not fills:
         return None
-    after = optimize(mine + fills, slots, opp_mu=opp_mu, opp_var=opp_var) if opp_mu is not None else optimize(mine + fills, slots, objective="ev")
+    after = (optimize(mine + fills, slots, opp_mu=opp_mu, opp_var=opp_var, hold=True) if opp_mu is not None
+             else optimize(mine + fills, slots, objective="ev", hold=True))
     return {**after.to_dict(), "adds": [p.name for p in fills]}
 
 
