@@ -227,3 +227,15 @@ def test_an_accepted_trade_stays_open_through_the_review_period_and_closes_as_ac
     assert record_outcomes(pk, path, d2) == ["L1|b: accepted"]
     h = history(load_outcomes(path), "L1", d3)
     assert h[4]["recent_decline"] is False and h[4]["n"] == 2 and h[4]["prior"] == 0.833
+
+
+def test_an_opened_offer_remembers_the_scans_delta_for_the_backtest(tmp_path):
+    """`backtest.trade_hits` needs the predicted side: the scan's `my_delta_ppw` for the same package, when the scan
+    produced it that morning; None otherwise, never a guess."""
+    path = tmp_path / "o.json"
+    p = _packet([offer("a", ["Montgomery"], ["Dak"]), offer("b", ["Coker"], ["Warren"], rid=5)])
+    p["leagues"][0]["trades"] = [{"give": ["Dak"], "get": ["Montgomery"], "my_delta_ppw": 9.9},     # the mirror image is not it
+                                 {"give": ["Montgomery"], "get": ["Dak"], "my_delta_ppw": 2.4}]
+    record_outcomes(p, path, date(2026, 10, 7))
+    outs = load_outcomes(path)
+    assert outs["L1|a"]["predicted_ppw"] == 2.4 and outs["L1|b"]["predicted_ppw"] is None

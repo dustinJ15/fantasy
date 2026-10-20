@@ -1,0 +1,118 @@
+# Plan: the backtest harness
+
+Status: harness built 2026-10-20 in one PR (TODO D8): `src/ff/backtest.py`, `ff replay-pull`, `ff backtest`; no real
+season has been replayed yet (the container had no cookies), so every number below is from the synthetic check.
+Written: 2026-10-20 against `main` at 5d705c1.
+TODO ids: D8 (the harness); D11 (the live replay of 2025 and 2026, the first real numbers); D12 (the scanner replay).
+Still open: D11, D12.
+
+For an agent running or extending the backtest, or reading its tables before changing a constant in `model/lineup.py`
+or `model/projections.py`. ROADMAP item 8 in one line: replay a season with the same code and measure, so a model
+change is a number, not a vibe.
+
+## The question, split in two
+
+The card makes two kinds of claim a season can grade. "This lineup wins 71% of the time" is a probability; over a
+season of matchups the 70% bin should win about 70%, and if it wins 58% the sigma under every P(win) is too small.
+"Give X for Y, +2.1 a week" is a forecast of a points difference; the weeks after the trade say what it was.
+
+Both need the same thing the live pipeline throws away every Tuesday: every roster in the league as it stood before
+kickoff, the projection each player carried then, and what he scored. ESPN keeps exactly that in the box score of
+every past week (`projected_points` per scoring period is the number it showed before that week's games, `points`
+the final, `lineupSlotId` the seat the manager chose), for every season since 2019, in the league's own scoring.
+
+## The replay file
+
+`ff replay-pull --season 2025` writes `data/replay/2025-<league>.json` per league in `leagues.toml` (`backtest.pull_replay`,
+read-only, the cookies as for any ESPN read; `espn.connect(ref, season)` opens the past season). One week is one
+scoring period that is a whole matchup period: every week of the regular season, and a playoff round that is one
+week. A two-week final is skipped (`skipped_weeks`): ESPN's per-period box score carries the period's roster but the
+matchup's running total, and nothing in it says which half of the points is which. A week nobody has played yet is
+left out, so `--season 2026` replays the current season up to last week. Each week records `first_kickoff` (the
+earliest game date among its players) so a trade's close date can be placed on it.
+
+Each matchup: `home`, `away` (team ids), both recorded scores, `playoff`, and both rosters, one row per entry:
+`espn_id`, `name`, `pos`, `team`, `eligible` (starter slots only), `slot` (as set, `BE`/`IR` for the bench), `proj`,
+`actual`, `bye`. `version` is `REPLAY_VERSION`; `load_replay` refuses an older file.
+
+What the archive lost, so the replay is read for what it scores and not more:
+
+| the live model has | the replay has | so the replay scores |
+|---|---|---|
+| ESPN + Sleeper blend, FantasyPros fallback, the Vegas and wind multipliers | ESPN's number alone | the P(win) arithmetic and the sigma prior on ESPN's number, not the blend (the projlog and `ff accuracy` score the blend on the live season) |
+| the week's designation (`P_ZERO`, `QUESTIONABLE_BY_WEEKDAY`), Claude's `p_zero` | the designation as of today, which is not the week's; the replay keeps none | nothing about sit risk: everyone sits at the floor, and ESPN's zero on a game week reads as a certain zero (`row_proj`), since ESPN projects zero for a player it knew was out |
+| the opponent's lineup as set from Saturday, projected before | the opponent's set lineup | what the live packet uses from Saturday on (`LINEUP_SET_DAYS`); the Tuesday number is not replayed |
+| `hold` (`MIN_SWAP_GAIN`) on this week's card | the exact search | the objective, not the churn rule |
+
+## Scorer one: `lineup_calibration`
+
+`ff backtest` (every file under `data/replay/`, or `--replay` paths; `--json` for the dict). Per replay:
+
+- **Calibration.** One row per matchup: the model's P(win) for the home side's set lineup against the away side's
+  (`lineup.as_set` on both, `win_prob`), against who won (a tie is 0.5). The away side is the same row mirrored and is
+  not counted twice. `brier` (0.25 is a coin flip), `log_loss`, `ece` (the n-weighted gap between what each bin
+  predicted and what it won) and the ten `bins` with n. A bin that promises 0.8 and wins 0.6 is the sigma reading
+  too small; one that promises 0.8 and wins 0.9 is too wide. The prior under every number is `BASE_SIGMA` and
+  `CV_FLOOR`, so this table and `ff accuracy --fit` are two views of the same question; the fit sees each player,
+  this sees the sum.
+- **Optimizer.** One row per team-week: the set lineup, the highest-points lineup and the P(win) lineup against the
+  opponent's set lineup, each scored with the players' actuals against the opponent's recorded score. `pts` and
+  `win_rate` for the three; `ev_over_set` is what the manager left on the bench by the projections' own ranking (the
+  cheapest edge there is: in the synthetic check a manager who benches his best RB every week leaves 5.3 a week and
+  9 points of win rate); `differs` is the team-weeks where the P(win) lineup was not the highest-points lineup, the
+  only weeks the objective can earn or lose anything, with both lineups' win rates there, the P(win) the model said it
+  was buying (`gain_promised`, the mean `win_gain`) and what it bought (`gain_realized`). Under `DIFFERS_MIN_N`
+  (20) of those weeks the row says it is not a verdict. This is where `MIN_WIN_GAIN` (1.5pp) gets its number: if
+  `gain_realized` tracks `gain_promised`, the floor can come down; if it does not, the floor is doing its job.
+- `score_mismatch` counts a side whose starters' actuals do not sum to ESPN's score within `SCORE_TOL`: a roster
+  entry the box score did not carry. It is counted, never patched.
+
+## Scorer two: `trade_hits`
+
+`ff backtest --trades`: every offer of mine ESPN executed (`status: accepted` in `data/projlog/offer_outcomes.json`,
+the projlog branch restored first) against its league's replay. `week_after` places the `closed` date on the first
+replayed week whose kickoff is after it; from there to the last replayed week, each week's points of the players I got
+minus the players I gave, averaged into `realized_ppw`. A week any of them was on nobody's roster is `missing`, not
+a zero. `predicted_ppw` is the scan's `my_delta_ppw` for the same package the morning the offer was seen
+(`rulings.predicted_ppw`, written into the outcome from this PR on; earlier entries have none), and `hit` is the two
+agreeing in sign. The replay must be the same season as the trade (`--season 2026` for this season's offers).
+
+As of 2026-10-20 the outcome log holds one executed offer (L1, 2026-10-14, Hubbard for Rodriguez, Tuten and Coker)
+and no prediction on it, so the first row will show a realized number only. The hit rate is a number worth quoting
+at ten or so executed trades, which is seasons away at this rate; the scanner replay (D12) is where a sample comes
+from before then.
+
+## The synthetic check (what `tests/test_backtest.py` holds the harness to)
+
+A 12-team, 60-week replay whose actuals are drawn from the model's own mixture (`p_zero` 0.02, the house sigma):
+360 matchups, Brier 0.20, ECE 0.07 (sampling noise at 36 a bin), the bins at 0.7 and above promising 0.81 and
+winning 0.83. The same replay with actuals three times as wide: Brier 0.26, ECE 0.16, the same bins promising 0.81
+and winning 0.59. That is the signature of a sigma too small, and what the first real table is read against. Managers
+who set the highest-points lineup leave 0.0 a week; one who benches his best RB leaves 5.3 and 0.09 of win rate.
+
+## Leakage rules (the harness keeps them; a change to it must too)
+
+- A lineup is chosen on `proj` and scored on `actual`; no actual is read before a choice is made.
+- The opponent's distribution is his set lineup's projection, never his score.
+- `row_proj` goes through `projections.blend` with ESPN as the only source, so the sigma and the floor are the live
+  code's, not a copy; a change to the prior changes the backtest the same morning.
+- The replay is never written by the briefing run and never committed (`data/replay/` is ignored); it is pulled by
+  hand, once per season per league, and re-pulled when `REPLAY_VERSION` moves.
+
+## Still to do
+
+- **D11**, the live replay: pull 2025 and 2026 for the three leagues (cookies; the 2025 box scores are still served
+  for the same league ids), run `ff backtest` and `ff backtest --trades`, put the tables in `docs/accuracy.md` next
+  to the projlog's, and decide two constants from them: the sigma prior if the 0.7+ bins are off by more than the
+  bin's sampling noise in the same direction in all three leagues (take the direction, not a fitted value: the fitter
+  in `projlog.sigma_fit` owns the value), and `MIN_WIN_GAIN` only if `differs` reaches `DIFFERS_MIN_N` and
+  `gain_realized` reads at least half of `gain_promised`. Things the first run will find out and this plan could not:
+  whether `box_scores` on a past season returns every week (espn-api says "most recent season" in its docstring but
+  gates only on year 2019), whether the archived `projected_points` is the pre-kickoff number or a later revision
+  (compare one week against a projlog `espn_pts` row: 2026 week 6, any player), and how often `score_mismatch` fires.
+- **D12**, the scanner replay: each week of a replayed season, build the rosters and the wire from the replay, price
+  every rival package with `model/trades.py` and every claim with `model/waivers.py`, and score each against the
+  weeks that followed. Needs what the replay does not yet carry: the free-agent pool per week (`kona_player_info`
+  with a past `scoringPeriodId`, to probe), a season prior per player at the time (ESPN's preseason total is
+  static, so that one is fine) and the market values (FantasyCalc has no archive; price without them and say so).
+  Plan it first; it is the sample the trade and waiver hit rates need before the outcome log has one.
