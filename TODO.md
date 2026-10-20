@@ -46,10 +46,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier D — where real edge would come from (after Tier A)
 
-- [ ] **D1 (M-L). In-season rest-of-season projection.** Season-to-date points per game, target and carry share
-  from `model/usage.py` (computed, rendered nowhere, moves no number), and the weekly blend, with the
-  preseason total as a prior that fades by week 6. This is ROADMAP item 1 and the only private edge; plan in
-  `docs/plans/`.
 - [ ] **D2 (S, waiting on data). Adopt the fitted variance** per position. The fitter exists since 2026-10-08
   (`ff accuracy --fit`, `projlog.sigma_fit`): it fits `BASE_SIGMA` and `CV_FLOOR` in `model/projections.py` to the blend
   residuals in the optimizer's own shape and refuses a position under `projlog.FIT_MIN_N` (150) scored forecasts. As
@@ -61,6 +57,12 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
 - [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.
+- [ ] **D10 (L, after D8). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
+  play-by-play 2016-2025, per-player weekly points ~ f(opportunity share, team implied total, opponent
+  schedule-adjusted points allowed, recent usage trend), blended with consensus by out-of-sample error. Its first
+  deliverable is the fitted weight that replaces `OPPORTUNITY_WEIGHT` (0.5) and the clip in `model/projections.py`
+  (`docs/plans/in-season-projection.md`), and a pass-attempt term so QB stops reading 1.0; the backtest harness (D8)
+  is how it is scored. Plan in `docs/plans/` first.
 - [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
   (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
   the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only

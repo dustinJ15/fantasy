@@ -49,6 +49,18 @@ NFL_GAMES = 17
 # game, gone after this many.
 PRIOR_FADE_GAMES = 6
 
+# What his opportunity says he should have scored, against what he did (D1). `model/usage.py` prices a season's
+# targets, carries and air yards at league-average PPR values (`xfp_lite`); its ratio to his actual PPR points is
+# unitless, so it scales ESPN's league-scoring points per game without a scoring table. The public xFP work
+# (ffopportunity, the PFF and Fantasy Points expected-points pieces) agrees that points over expected regress hard
+# from one stretch to the next while opportunity persists, so a season-to-date read that is half opportunity and
+# half production is the prior here; the backtest (TODO D8) is where a fitted weight would come from. QB, K and
+# D/ST read 1.0: the proxy prices no pass attempt and nflverse has no kicks. The ratio is clipped, since a two-game
+# sample or a nflverse row that disagrees with ESPN's game count can say 2x, and nothing says 2x.
+OPPORTUNITY_WEIGHT = {"RB": 0.5, "WR": 0.5, "TE": 0.5}
+OPPORTUNITY_RATIO_CLIP = (0.7, 1.4)
+OPPORTUNITY_MIN_GAMES = 2
+
 
 @dataclass
 class PlayerProj:
@@ -164,6 +176,22 @@ def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None) -> float
     return w_prior * prior_pg + (1 - w_prior) * ytd_pg
 
 
+def opportunity_mult(pos: str, usage: dict | None) -> float:
+    """The multiplier on a player's season-to-date points per game that moves it toward what his opportunity says
+    (`usage.signals`: `xfp_pg` over `ppg`, both nflverse PPR, over `games`): 1.0 for a position the proxy does not
+    price, a sample under OPPORTUNITY_MIN_GAMES games or a missing number; otherwise `1 - w + w * ratio` with the
+    ratio clipped to OPPORTUNITY_RATIO_CLIP, so a receiver scoring 20% over his targets reads 10% under his average."""
+    w = OPPORTUNITY_WEIGHT.get(pos, 0.0)
+    if not w or not usage:
+        return 1.0
+    ppg, xfp, games = _num(usage.get("ppg")), _num(usage.get("xfp_pg")), int(usage.get("games") or 0)
+    if not ppg or ppg <= 0 or xfp is None or xfp <= 0 or games < OPPORTUNITY_MIN_GAMES:
+        return 1.0
+    lo, hi = OPPORTUNITY_RATIO_CLIP
+    ratio = min(max(xfp / ppg, lo), hi)
+    return 1.0 - w + w * ratio
+
+
 def per_game(season: float | None, weekly: float, plays_this_week: bool) -> float:
     """Rest-of-season per-game expectation: the season level shrunk halfway toward this week's projection when he is
     expected to play it (this week's number carries the freshest read on his role), the season level alone when
@@ -188,13 +216,15 @@ def _num(x) -> float | None:
 
 def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None,
           sleeper_pts: float | None = None, implied_total: float | None = None, week: int | None = None,
-          weekday: int | None = None, weather: dict | None = None) -> PlayerProj:
+          weekday: int | None = None, weather: dict | None = None, usage: dict | None = None) -> PlayerProj:
     """
     row: PlayerRow dict from sources.espn. fp: matched fp_latest_weekly row. sleeper: injury_table row.
     sleeper_pts: Sleeper/Rotowire stat projection in this league's scoring. implied_total: Vegas implied team total.
     week: the current matchup week, used only to date `return_week`. weekday: today (Monday = 0), which scales a
     Questionable early in the week; None means the Friday number. weather: the kickoff forecast for his game
     (`sources.weather.forecast`), None when unknown; only its wind moves a number (`wind_mult`), this week only.
+    usage: his season-to-date opportunity (`model/usage.py` `signals`), None when nflverse has nothing on him; it
+    moves the rest-of-season level only (`opportunity_mult`), never this week and never the rival's `espn_pg`.
 
     Overrides (Claude's parameters, never decisions): `p_zero` and `mu_mult` are this week only; `weeks_out` (a number,
     or "season") and `ros_mult` are the rest of the season. Code owns the arithmetic between them.
@@ -251,16 +281,21 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                   or "p_zero" in ov)
 
     # Rest-of-season per-game expectation (the healthy, when-he-plays number): his season so far per game played,
-    # ESPN's full-season total per NFL game as the fading prior, shrunk toward this week's matchup-neutral blend when
-    # he is expected to play this week. `weeks_remaining` is not in the denominator: ESPN's total is a season figure,
-    # not what is left of it. `espn_pg` is the same arithmetic on ESPN's own numbers: what a rival's app shows him.
+    # moved toward what his opportunity says he should have scored (`opportunity_mult`), ESPN's full-season total per
+    # NFL game as the fading prior, shrunk toward this week's matchup-neutral blend when he is expected to play this
+    # week. `weeks_remaining` is not in the denominator: ESPN's total is a season figure, not what is left of it.
+    # `espn_pg` is the same arithmetic on ESPN's own numbers, opportunity left out: what a rival's app shows him.
     games = int(row.get("games_played") or 0)
     ytd_pg = float(row.get("actual_season") or 0) / games if games > 0 else None
     prior_pg = float(row.get("proj_season") or 0) / NFL_GAMES or None
     plays = inj_p0 < 0.5 and not row.get("bye")
-    level = season_pg(ytd_pg, games, prior_pg)
+    opp_mult = opportunity_mult(pos, usage) if ytd_pg is not None else 1.0
+    level = season_pg(ytd_pg * opp_mult if ytd_pg is not None else None, games, prior_pg)
+    espn_level = season_pg(ytd_pg, games, prior_pg)
     mu_ros_active = per_game(level, mu_neutral, plays)
-    espn_pg = per_game(level, espn_pts, plays) if level is not None else None
+    espn_pg = per_game(espn_level, espn_pts, plays) if espn_level is not None else None
+    if abs(opp_mult - 1.0) >= 0.05:
+        flags.append(f"opp:x{opp_mult:.2f}")
     if "p_zero" in ov and not row.get("bye"):
         p0 = float(ov["p_zero"]); flags.append("llm:p_zero")
     if "mu_mult" in ov:
@@ -294,6 +329,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
+                 # the opportunity read on his season so far: xFP-lite over actual, weighted (1.0 when it has no say)
+                 "opp_mult": round(opp_mult, 3),
                  "actual_prev": row.get("actual_prev_week"),   # ESPN's final for last week: the accuracy log's truth
                  "pos_rank": row.get("pos_rank"),
                  "ecr": fp.get("ecr") if fp else None, "fp_sd": fp_sd,
