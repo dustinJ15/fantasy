@@ -1,10 +1,14 @@
 # Plan: trades a rival would actually accept
 
 Status: implemented 2026-10-07 in three PRs (#10 stop the bleeding, #11 the model, #12 learning), 188 tests passing;
-see **Deviations** at the end for what moved during the build. Written the same morning against `main` at 24ae9a8
-(164 tests passing). The container
-had no ESPN cookies, so the two rows from this morning's email were reconstructed from the projlog branch
-(`pushed_trades.json`, `skipped_trades.json`, the week 5 projection log) and live FantasyCalc values pulled today.
+what moved during the build is under **Deviations** at the end, and the questions that were open are closed under
+**Questions, as decided**.
+Written: 2026-10-07 against `main` at 24ae9a8 (164 tests passing). Research behind it: `docs/research/trade-acceptance.md`.
+TODO ids: D9 (the variance sign on `my_gain`, from question 4 below).
+Still open: D9.
+
+The container had no ESPN cookies, so the two rows from that morning's email were reconstructed from the projlog branch
+(`pushed_trades.json`, `skipped_trades.json`, the week 5 projection log) and live FantasyCalc values pulled that day.
 Anything that needs a live ESPN pull is marked **needs live pull**.
 
 ## The answer in six lines
@@ -290,15 +294,14 @@ changes; `transactionCounter` in the snapshot. Tests: the full 3.7 bench and the
 **PR 3, learning (one session, then it runs itself).** 3.6 outcome log; per-rival prior; 3.9 fallbacks and counters;
 `ff trades --explain` printing the scorecard per row so a bad morning can be diagnosed from the email.
 
-## Open questions
+## Questions, as decided
 
-1. **Which QB did the math find on Hawk Tua's roster?** Needs one live `ff trades --league L3` with a probe that
-   prints his QB rows (`weeks_out`, `avail_ros`, `slot`). If it is an IR stash, 3.3 is the fix. If his roster
-   genuinely has one QB, the scan could not have produced +0.3 and the row came from somewhere else, which would be a
-   different bug. Recommendation: run the probe before PR 1 so the regression test encodes the real mechanism.
-2. **Tax or convex weight?** Both refuse the Chase package. The tax (10% / 25%) is a published convention; the convex
-   weight (rest at 0.6) tracks FantasyCalc's own curve more closely at the top. Recommendation: the tax now, because
-   the row can say "he'd want 10% over on a 2-for-1 and this is 23% under", and revisit after twenty logged outcomes.
+1. **Which QB did the math find on Hawk Tua's roster?** Settled by the build rather than the probe: 3.3 prices his IR
+   and bye bodies at zero in the weeks they miss, and `startable_qbs` asks a QB only of a roster with two startable
+   ones, so the mechanism no longer matters. The 2026-10-13 rows in `docs/failures.md` (`rival_after`,
+   `streams_this_week`) are the follow-ups.
+2. **Tax or convex weight?** Decided: the tax (`CONSOLIDATION_TAX`, `fairness`), with the fair band at 10% rather than
+   5% (see Deviations). Revisit after twenty logged outcomes in `offer_outcomes.json`.
 3. **Does ESPN's history view expose a terminal trade status?** Answered 2026-10-08 (B10, live probe of all three
    leagues): the proposal itself stays PENDING in `mTransactions2`, but ESPN appends records that point back at it
    through `relatedTransactionId`. A decline is a `TRADE_DECLINE` from the rival plus a `CANCELED` copy of the
@@ -306,13 +309,10 @@ changes; `transactionCounter` in the snapshot. Tests: the full 3.7 bench and the
    no team, 51 s after `expirationDate`. A withdrawal by me was not observed (the repo never writes to ESPN); by the
    same pattern it is the `CANCELED` copy under my member id with no decline, and that is what
    `espn.trade_resolutions` reads as `withdrawn`. The activity feed (`kona_league_communication`) was not needed.
-4. **Should the sim's title odds replace points per week as `my_gain`?** They are the honest objective (an underdog
-   should buy variance and a favorite should buy floor, and only the sim sees that; the research cites Skinner's
-   result that an underdog must accept a lower mean for a higher variance), but at 1500 sims the delta is noise of
-   the same size as the threshold (the `MUST_TRY_PPW` comment says so). Recommendation: keep ppw for the gate and
-   the ranking, title odds for the tiebreak and the row text, until the sim is cheap enough to run at 10k for the
-   top three. The variance sign can come in cheaply as a term on `my_gain`: a consolidation (fewer, bigger starters)
-   gets +10% when my playoff odds are under 40% and -10% when they are over 70%.
+4. **Should the sim's title odds replace points per week as `my_gain`?** Decided as recommended: ppw for the gate and
+   the ranking, title odds (on common random numbers since A3) for the tiebreak and the row text. The part not built,
+   a variance-sign term on `my_gain` (a consolidation gets +10% when my playoff odds are under 40% and -10% over 70%,
+   after Skinner's result in the research) and title odds as the objective once the sim is cheap at 10k, is TODO D9.
 
 ## Deviations from the brief
 

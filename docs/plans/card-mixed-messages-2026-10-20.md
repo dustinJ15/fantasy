@@ -1,9 +1,13 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: plan only, written 2026-10-20 against `main` at 705ac88 (391 tests passing). The packet behind the email is
-not in the repo (`data/packets/` is untracked), so every finding below is read off the email itself and traced to
-the function that wrote the line; each fix names the fixture a test needs to reproduce it. Items are in TODO.md as
-B12-B17 in the order to take them.
+Status: plan only.
+Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
+TODO ids: B12, B14, B15, B16, B17, B18, B19.
+Still open: B12, B14, B15, B16, B17, B18, B19, in that order (B12, B14, B15 in series, same file).
+
+For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
+untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
+fix names the fixture a test needs to reproduce it.
 
 ## What Dustin read this morning
 

@@ -1,6 +1,7 @@
 # Roadmap — making the analysis genuinely sharp
 
-The ordered, actionable backlog is `TODO.md` (one PR per item, each with its evidence and a done-when). This file is the direction.
+For Dustin and anyone deciding what to build next. The ordered, actionable backlog is `TODO.md` (one PR per item, each with its
+evidence and a done-when); this file is the direction only, and a finished item is marked done in one line with its TODO id.
 
 Honest status of the model and what would move the needle, in priority order. Current standing in all three leagues: not yet
 dominant, which the model attributes to variance.
@@ -21,42 +22,7 @@ dominant, which the model attributes to variance.
   averaging beats accuracy-weighting because source accuracy doesn't persist year to year.
 - `ff log-projections` records every source daily to `data/projlog/` (committed by the routine); `ff accuracy` reports MAE
   and bias by source × position once weeks complete. Re-weight or drop a source only if it trails the blend by >5% for 6+ weeks.
-  Scoring (fixed 2026-10-08, TODO A2): each player's last pre-kickoff row against ESPN's actual in that league's scoring,
-  one row per league; before that the harness scored Monday's banked points against themselves (blend MAE 0.11 at TE).
-  Weeks 1-4 of 2026, scored honestly:
-
-  | pos | source | n | MAE | bias |
-  |---|---|---|---|---|
-  | D/ST | espn_pts | 10 | 4.46 | -0.98 |
-  | D/ST | blend | 10 | 4.78 | -0.37 |
-  | D/ST | fp_pts | 10 | 5.21 | -0.21 |
-  | D/ST | sleeper_pts | 10 | 5.21 | 0.23 |
-  | K | sleeper_pts | 10 | 4.5 | 0.17 |
-  | K | fp_pts | 10 | 4.56 | 0.64 |
-  | K | espn_pts | 10 | 4.77 | 1.81 |
-  | K | blend | 10 | 4.83 | 1.07 |
-  | QB | sleeper_pts | 18 | 8.22 | 4.29 |
-  | QB | espn_pts | 18 | 8.43 | 3.92 |
-  | QB | blend | 18 | 8.48 | 4.21 |
-  | QB | fp_pts | 18 | 8.68 | 4.3 |
-  | RB | blend | 49 | 5.79 | -0.77 |
-  | RB | fp_pts | 49 | 5.8 | -0.78 |
-  | RB | sleeper_pts | 49 | 5.85 | -0.82 |
-  | RB | espn_pts | 49 | 5.95 | -0.45 |
-  | TE | fp_pts | 21 | 6.45 | -3.81 |
-  | TE | espn_pts | 21 | 6.87 | -4.28 |
-  | TE | sleeper_pts | 21 | 6.93 | -3.9 |
-  | TE | blend | 21 | 6.97 | -4.05 |
-  | WR | sleeper_pts | 46 | 5.9 | -0.41 |
-  | WR | espn_pts | 46 | 6.01 | -0.74 |
-  | WR | fp_pts | 46 | 6.01 | -0.47 |
-  | WR | blend | 46 | 6.16 | -0.35 |
-
-  Read: no source trails the blend by 5% anywhere; the sources sit within a few tenths of each other and of the blend,
-  which is noise at n of 18-49 (one week is 10-15 rows per position). QBs were over-projected (bias +4) and TEs
-  under-projected (-4) in these four weeks, a calibration question for A5/D2, not a sourcing one. The pre-fix logs lose
-  Monday-night players and anyone the stale clock locked at zero (see `projlog.py`); logs from 2026-10-08 on carry
-  `actual_prev` and score everyone.
+  The measurement to date (weeks 1-4 of 2026, scored 2026-10-08) and how to read it: `docs/accuracy.md`.
 - Considered and skipped: CBS/Yahoo scraping (ToS), NFL.com (game discontinued for 2026), numberFire (dead).
   Optional paid upgrade: FantasyPros official API ($8.99/mo) for the true stat consensus; Subvertadown for K only.
 
@@ -65,17 +31,16 @@ dominant, which the model attributes to variance.
 - **Variance is a prior, not fitted.** Per-position sigma is a guess scaled by consensus disagreement.
 - **Usage / expected-points signals are thin** until ~week 4 (one-game samples now). No 2026 snap counts in nflverse yet.
 - **K / DST** use consensus, which is weak there; implied team totals from Vegas are fetched but not yet fed into K/DST projections.
-- **Weather** is fetched per game but not applied to projections.
 
 ## Improvements, in order of expected value
 
 1. **Fitted projection model (week 4+).** Train on nflverse play-by-play 2016–2025: per-player weekly points ~ f(opportunity share, team implied total, opponent schedule-adjusted points allowed, recent usage trend). Blend with consensus by out-of-sample error. Expected gain: the only place a real, private edge exists.
 2. **Calibrated variance.** Fit per-position projection-to-actual error (STDpa) from FantasyPros historical ECR archive (`db_fpecr.parquet` in dynastyprocess/data) vs actual points. Replace `BASE_SIGMA` / `CV_FLOOR` priors. Improves every P(win) and title-odds number.
 3. **Expected fantasy points (xFP) properly.** Port ffverse/ffopportunity logic (situation-based expected points per target/carry) instead of the flat 1.55/target proxy in `usage.py`. Sharper buy-low / sell-high flags.
-4. **Weather into projections** (Vegas is done). Apply wind >15 mph penalty to passing/K; calibrate `VEGAS_K` from the projection log after ~6 weeks.
+4. **Weather into projections.** Done 2026-10-08 (TODO D5): `model/projections.py` `wind_mult` discounts QB/WR/TE and K when the kickoff forecast (`sources/weather.py`, Open-Meteo at the home stadium) is over `WIND_MPH_START`, linearly to `WIND_PENALTY_AT_CAP` at `WIND_MPH_CAP`; domes and a missing forecast read 1.0. Calibrating `VEGAS_K` from the projection log is still open and waits on the same sample D2 waits on.
 5. **Playoff schedule weighting.** Done 2026-10-08 (TODO D4) as odds weighting: `model/season.py` `week_weight` prices each of the league's playoff weeks (`settings.playoff_weeks`, never a hard-coded 15–17) at my playoff odds × `TITLE_RUN_MULT` (1.5), so a dead team prices a week-16 bye or return at nothing and a lock above a regular week; the hold / drop rule uses the same number and the card prints "playoff weeks 15-17 weighted ×1.4". The schedule-adjusted points-allowed factor (capped at ±10%) is still open; it needs the fitted model (item 1) for a defense strength number worth trusting.
 6. **League-mate behavior model.** From ESPN transaction history: who trades, who overreacts to a bad week, who bids on hype. Use to rank trade partners and to time offers (e.g., pitch after their loss).
-7. **Waiver-priority strategy** (all three leagues use priority, not FAAB): value of *holding* #1 priority vs using it; only recommend a claim when the target clears a threshold relative to expected future claims.
+7. **Waiver-priority strategy.** Done 2026-10-08 (TODO D3): `model/waivers.py` `priority_cost` prices holding priority #N against holding last over the wire's claim-worthy upgrades (`RIVAL_CLAIM_P` per team ahead, discounted over the weeks left), and a claim row in a rolling-priority league says "worth it" or "pass" with both numbers; a weekly reset costs nothing and prints nothing.
 8. **Backtesting harness.** Replay 2025 with the same code; measure lineup P(win) calibration, trade evaluator hit rate, and waiver recommendations vs. actual outcomes. Without this, model changes are vibes.
 9. **Discord delivery + trash talk.** `DISCORD_WEBHOOK` per league; Claude drafts recaps and the trade pitch, Dustin approves before posting.
 10. **Speed.** Packet build is now ~6s per league. Monte Carlo could be vectorized further if sims are raised above 5000.
