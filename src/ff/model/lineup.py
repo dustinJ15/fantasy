@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import erf, sqrt
 
 from .projections import PlayerProj
@@ -12,6 +12,17 @@ from .projections import PlayerProj
 # FantasyPros rank-sd fudge, not a fitted number, so a 0.3pp edge from it is noise and the points are real. The floor
 # comes down once variance is fitted from the projlog residuals (TODO D2).
 MIN_WIN_GAIN = 0.015
+
+# What an empty starter slot prints as (the packet, the card and the email all read it by this string).
+EMPTY_SLOT = "(EMPTY — no eligible player)"
+# A player this likely to sit scores zero for lineup purposes: on bye, out, on IR, or a researched scratch. He never
+# starts, even into an otherwise empty slot; the slot reads EMPTY and the card says who fills it (B15).
+NEVER_STARTS_AT = 0.99
+
+
+def startable(p: PlayerProj) -> bool:
+    """Worth a starter slot this week: has a game and some expectation of playing it."""
+    return p.ev > 0 and not p.bye and p.p_zero < NEVER_STARTS_AT
 
 
 def phi(z: float) -> float:
@@ -33,10 +44,13 @@ class Lineup:
     # P(win) bought over the highest-points lineup against the same opponent: 0.0 when this is that lineup (including
     # when the search found a better P(win) but under MIN_WIN_GAIN), None when there was no P(win) search.
     win_gain: float | None = None
+    # Seats per slot nobody startable could fill (a two-RB slot with one healthy RB has one): `to_dict` prints one
+    # EMPTY marker per seat, so the card sees every hole, not only a slot with nobody in it.
+    holes: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
-            "slots": {s: ([p.name for p in ps] or ["(EMPTY — no eligible player)"]) for s, ps in self.assignment.items()},
+            "slots": {s: ([p.name for p in ps] + [EMPTY_SLOT] * self.holes.get(s, 0)) or [EMPTY_SLOT] for s, ps in self.assignment.items()},
             "mu": round(self.mu, 2), "sd": round(self.var**0.5, 2),
             "p_win": round(self.p_win, 3) if self.p_win is not None else None,
             "win_gain": round(self.win_gain, 3) if self.win_gain is not None else None,
@@ -86,7 +100,10 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
         pw = win_prob(pin_mu, pin_var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
         return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, pw,
                       [p for p in players_all if p not in pin_list], win_gain=0.0 if ev_lineup is not None else None)
-    avail = [p for p in players if p.ev > 0 or p.mu > 0]
+    # Only a body who can score: a bye, an IR stash or a certain scratch stays out even when nobody else fits the
+    # slot. Before (Oct 20) `mu > 0` let the IR kicker start at K and the fallback below seated a bye QB, so the card
+    # swapped one zero for another and the header's P(win) counted two empty slots as filled.
+    avail = [p for p in players if startable(p)]
     # Candidate pool per slot: exact search over the top few eligible players. For the E[points]
     # objective the answer is nearly greedy, so a small pool is enough; the win-prob objective
     # needs a wider pool because a lower-EV / higher-variance player can be optimal.
@@ -96,27 +113,36 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
         flex = "/" in s or s == "OP"
         k = (counts[s] + (3 if flex else 1)) if not use_win else (counts[s] + (5 if flex else 3))
         el = sorted([p for p in avail if s in p.eligible], key=lambda p: -p.ev)[:k]
-        if not el:
-            # Nobody projectable for this slot (e.g. only TE is out). Try anyone eligible, else leave it empty
-            # rather than failing the whole lineup; the report shows it as a hole.
-            el = sorted([p for p in players if s in p.eligible], key=lambda p: -p.ev)[:k] or [None]
+        # Nobody startable for this slot (both QBs on bye, the only K on IR): the seat stays empty rather than hold a
+        # zero, and the card names the pickup that fills it. A slot with fewer startable bodies than seats also needs
+        # the empty seat as a choice, or the search finds no legal combo at all.
+        if len(el) < counts[s]:
+            el = el + [None]
         cands.append(el)
 
-    best = None
-    seen = set()
-    for combo in itertools.product(*cands):
-        ids = [p.espn_id for p in combo if p is not None]
-        if len(set(ids)) != len(ids):
-            continue
-        key = tuple(sorted(ids))
-        if key in seen:
-            continue
-        seen.add(key)
-        mu = pin_mu + sum(p.ev for p in combo if p is not None)
-        var = pin_var + sum(p.var for p in combo if p is not None)
-        score = win_prob(mu, var, opp_mu, opp_var or 0.0) if use_win else mu
-        if best is None or score > best[0] + 1e-12 or (abs(score - best[0]) < 1e-12 and mu > best[1]):
-            best = (score, mu, var, combo)
+    def search(cands: list[list[PlayerProj | None]]):
+        best = None
+        seen = set()
+        for combo in itertools.product(*cands):
+            ids = [p.espn_id for p in combo if p is not None]
+            if len(set(ids)) != len(ids):
+                continue
+            key = tuple(sorted(ids))
+            if key in seen:
+                continue
+            seen.add(key)
+            mu = pin_mu + sum(p.ev for p in combo if p is not None)
+            var = pin_var + sum(p.var for p in combo if p is not None)
+            score = win_prob(mu, var, opp_mu, opp_var or 0.0) if use_win else mu
+            if best is None or score > best[0] + 1e-12 or (abs(score - best[0]) < 1e-12 and mu > best[1]):
+                best = (score, mu, var, combo)
+        return best
+
+    best = search(cands)
+    if best is None and any(None not in el for el in cands):
+        # Every combo doubled a body (two RBs for RB and the flex, say): seats that looked filled were not. Rare, so
+        # the wider search with every seat optional runs only here.
+        best = search([el if None in el else el + [None] for el in cands])
     if best is None:
         return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, None, [p for p in players_all if p not in pin_list])
     score, mu, var, combo = best
@@ -126,14 +152,17 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
             ev_lineup.win_gain = 0.0
             return ev_lineup
     assignment: dict[str, list[PlayerProj]] = {s_: list(ps) for s_, ps in pinned.items()}
+    holes: dict[str, int] = {}
     for s, p in _settle(slots, combo):
         assignment.setdefault(s, [])
         if p is not None:
             assignment[s].append(p)
+        else:
+            holes[s] = holes.get(s, 0) + 1
     chosen = {p.espn_id for p in combo if p is not None} | {p.espn_id for p in pin_list}
     bench = [p for p in players_all if p.espn_id not in chosen]
     pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
-    return Lineup(assignment, mu, var, pw, bench, win_gain=pw - ev_lineup.p_win if ev_lineup is not None else None)
+    return Lineup(assignment, mu, var, pw, bench, win_gain=pw - ev_lineup.p_win if ev_lineup is not None else None, holes=holes)
 
 
 def as_set(players: list[PlayerProj], lineup_slots: dict[str, int],

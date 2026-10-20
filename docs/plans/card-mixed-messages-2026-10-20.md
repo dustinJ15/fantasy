@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: B12 (§1) and B14 (§2) implemented 2026-10-20; the rest plan only.
+Status: B12 (§1), B14 (§2) and B15 (§3) implemented 2026-10-20; the rest plan only.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B15, B16, B17, B18, B19, in that order.
+Still open: B16, B17, B18, B19, in that order.
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
@@ -120,6 +120,17 @@ than a point of P(win).
 **Test** (`tests/test_lineup.py`, `tests/test_card.py`): two bye QBs → QB slot EMPTY, no QB swap on the row, the
 claim named; a K with `p_zero` 1.0 → K slot EMPTY; `lineup_after` beats `lineup_win` when a claim fills an empty
 slot.
+
+Implemented (B15): `lineup.startable` (`ev > 0`, not on bye, `p_zero < NEVER_STARTS_AT`) gates `avail`; a slot
+short of startable bodies gets `None` as a seat and `Lineup.holes` counts the seats nobody filled, which `to_dict`
+prints as one `EMPTY_SLOT` marker each. `rank_free_agents(lineup_slots=)` scores an empty seat as zero, so the wire
+body at it reads START NOW for his whole EV. `report._empty_slot_lines` writes the slot's line from the bodies I hold
+for it (`sit_word`) and the add rows above (`add` on every waiver, cover and stream row); a zero sitting in a slot
+that stays empty is not moved to the bench. `_cover_items` reads an empty K/D/ST/QB seat as the need. `packet
+._lineup_after` re-runs `optimize` with the first waiver-table body per empty seat and `report.win_note` /
+`win_after_note` print "win 25% today, ~45% once Nix and Boswell are in" in both renderers when it moves a point.
+Tests under "B15" in `tests/test_lineup.py`, `tests/test_waivers.py`, `tests/test_card.py`,
+`tests/test_packet_synthetic.py`.
 
 ### 4. Trade candidates with no row and no reason (B16)
 

@@ -13,7 +13,7 @@ from .model import usage as usage_mod
 from .model.clock import apply_clock, kickoff_day, week_state
 from .model.injuries import decide as decide_injuries
 from .model.injuries import fill_spot
-from .model.lineup import as_set, compare, is_complete, optimize
+from .model.lineup import Lineup, as_set, compare, is_complete, optimize
 from .model.projections import PlayerProj, blend
 from .model.season import TITLE_RUN_MULT, SeasonCtx
 from .model.sim import simulate
@@ -225,7 +225,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     else:
         budget, rival_max = 0, None
     waivers = rank_free_agents(fas, my_lineup, my_bench, repl, weeks_remaining, budget, trending, rival_max,
-                               week_lineup=win_lu.assignment)
+                               week_lineup=win_lu.assignment, lineup_slots=slots)
     for w in waivers:
         w["kickoff_day"] = kickoff_day((lines or {}).get(w["team"]))  # a Thursday pickup has to be in before Thursday
     # the league's clocks: when a claim placed now lands, when an offer accepted now executes, when the trade processes
@@ -240,6 +240,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         w["lands"], w["lands_ts"] = deadlines.word(lands), deadlines.ms(lands)
     my_rbs = [p for p in my_lineup.get("RB", [])]
     cuffs = handcuffs(my_rbs, pool)
+    lineup_after = _lineup_after(mine, fas, waivers, win_lu, slots, opp_mu, opp_var)
 
     # trades
     values = fantasycalc.by_espn_id(num_teams=s["team_count"], ppr=s["ppr"])
@@ -372,6 +373,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "roster": [enrich(p) for p in sorted(mine, key=lambda p: (-p.ev))],
         "current_lineup_mu": round(cur_mu, 1),
         "lineup_ev": ev_lu.to_dict(), "lineup_win": win_lu.to_dict(), "lineup_diff": compare(ev_lu, win_lu),
+        "lineup_after": lineup_after,
         "replacement": repl,
         "waivers": waivers, "handcuffs": cuffs, "trades": trades, "injuries": injuries,
         "open_spots": open_spots, "open_spot_adds": open_adds, "ir_events": ir_events,
@@ -385,6 +387,32 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "standings": sorted([{"name": t["name"], "record": f"{t['wins']}-{t['losses']}", "pf": round(t["points_for"], 1), "faab_left": (s["faab_budget"] - t["faab_spent"]) if s["faab"] else None, "waiver_rank": t["waiver_rank"], "is_me": tid == my_id}
                              for tid, t in teams.items()], key=lambda x: -x["pf"]),
     }
+
+
+def _lineup_after(mine: list[PlayerProj], fas: list[PlayerProj], waivers: list[dict], win_lu: Lineup,
+                  slots: dict[str, int], opp_mu: float | None, opp_var: float | None) -> dict | None:
+    """The week's lineup once the card's pickups are in: `optimize` again with a wire body in each seat the
+    recommended lineup left empty (both QBs on bye, the only K on IR), plus `adds`, the names. The header prints its
+    P(win) next to today's (`report.win_note`), so "win 25%" on a card that fills two slots by Wednesday is not the
+    number Dustin remembers. None when no seat is empty or the wire has nobody for it.
+
+    The body per seat is the first in the waiver table (the list the rows read, in its order) whose this-week slot is
+    that seat, free agent or claim: the same choice the START NOW, cover and stream rows make at an empty slot."""
+    open_seats = dict(win_lu.holes)
+    if not open_seats:
+        return None
+    by_id = {p.espn_id: p for p in fas}
+    fills: list[PlayerProj] = []
+    for w in waivers:
+        ws = w.get("week_slot")
+        if not ws or open_seats.get(ws, 0) <= 0 or w["espn_id"] not in by_id:
+            continue
+        open_seats[ws] -= 1
+        fills.append(by_id[w["espn_id"]])
+    if not fills:
+        return None
+    after = optimize(mine + fills, slots, opp_mu=opp_mu, opp_var=opp_var) if opp_mu is not None else optimize(mine + fills, slots, objective="ev")
+    return {**after.to_dict(), "adds": [p.name for p in fills]}
 
 
 def _sleeper_projections(season: int, week: int) -> dict:

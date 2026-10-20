@@ -85,9 +85,12 @@ def claim_worth_it(gain_ppw: float, cost_ppw: float) -> bool:
 def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj]], my_bench: list[PlayerProj],
                      repl: dict[str, float], weeks_remaining: int, budget_remaining: int, trending: dict[str, int],
                      league_max_remaining: int | None = None, top: int = 15,
-                     week_lineup: dict[str, list[PlayerProj]] | None = None) -> list[dict]:
+                     week_lineup: dict[str, list[PlayerProj]] | None = None,
+                     lineup_slots: dict[str, int] | None = None) -> list[dict]:
     """my_lineup: rest-of-season optimal starters (drives long-run value). week_lineup: this week's recommended
-    starters with injury-adjusted EV, so a pickup that beats an OUT starter *this week* is flagged as an immediate start."""
+    starters with injury-adjusted EV, so a pickup that beats an OUT starter *this week* is flagged as an immediate start.
+    lineup_slots: seats per slot, so a seat the optimizer left empty (nobody startable: both QBs on bye) counts as a
+    zero the free agent beats by his whole EV; without it a slot is only as short as it is empty."""
     worst_bench = min((p.mu_ros for p in my_bench), default=0.0)
     out = []
     for p in fas:
@@ -104,9 +107,11 @@ def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj
                     # beating his (already banked) score is not an available move. If every body in the slot has
                     # played, the slot is closed for the week however good the free agent looks.
                     movable = [s for s in starters if not s.locked]
-                    weakest = min((s.ev for s in movable), default=None)
-                    if weakest is None:
+                    seats = (lineup_slots or {}).get(ws, len(starters))
+                    if starters and not movable and len(starters) >= seats:
                         continue
+                    # an empty seat scores zero, so the free agent's edge over it is everything he projects for
+                    weakest = 0.0 if len(starters) < seats else min(s.ev for s in movable)
                     d = p.ev - weakest
                     if d > d_week:
                         d_week, week_slot = round(d, 2), ws

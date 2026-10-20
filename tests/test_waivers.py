@@ -114,6 +114,32 @@ def test_a_kicker_who_may_sit_surfaces_a_replacement():
     assert [o["name"] for o in out] == ["healthy_k"]
 
 
+def test_an_empty_week_slot_is_the_whole_free_agents_points(slots):
+    """B15: the optimizer leaves a slot with no healthy body empty, so the week lineup has nobody at QB. The free
+    agent's edge over an empty seat is his whole EV; before, an empty slot was skipped and no QB read START NOW."""
+    fas = [P(20, "Nix", "QB", 15.0, tid=None)]
+    out = rank_free_agents(fas, {"QB": [P(3, "lawrence", "QB", 20)]}, [], {"QB": 10}, 12, 100, {},
+                           week_lineup={"QB": []}, lineup_slots=slots)
+    assert out[0]["delta_week"] == round(fas[0].ev, 2) and out[0]["week_slot"] == "QB"
+    assert any(w.startswith("START NOW") for w in out[0]["why"])
+
+
+def test_one_empty_seat_of_two_counts_as_zero_not_the_healthy_starters_number():
+    fas = [P(20, "wire_rb", "RB", 9.0, tid=None)]
+    out = rank_free_agents(fas, {"RB": [P(1, "rb", "RB", 12)]}, [], {"RB": 5}, 12, 100, {},
+                           week_lineup={"RB": [P(1, "rb", "RB", 12)]}, lineup_slots={"RB": 2})
+    assert out[0]["delta_week"] == round(fas[0].ev, 2) and out[0]["week_slot"] == "RB"
+
+
+def test_a_fully_locked_slot_stays_closed_even_when_the_slot_count_says_it_is_short():
+    played = P(2, "already_played", "WR", 3.0, tid=1)
+    played.locked, played.actual = True, 3.0
+    fas = [P(20, "vele", "WR", 9.0, tid=None)]
+    out = rank_free_agents(fas, {"WR": [P(3, "wr", "WR", 11)]}, [P(4, "bench", "WR", 4)], {"WR": 6}, 12, 100, {},
+                           week_lineup={"WR": [played]}, lineup_slots={"WR": 1})
+    assert all(o["delta_week"] == 0 for o in out)
+
+
 # ---------- the ESPN pool status ----------
 
 def _pool_league(players, fail=False):

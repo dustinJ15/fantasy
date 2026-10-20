@@ -1,4 +1,4 @@
-from ff.model.lineup import compare, optimize, win_prob
+from ff.model.lineup import EMPTY_SLOT, compare, optimize, win_prob
 
 
 def test_win_prob_symmetry():
@@ -63,7 +63,7 @@ def test_empty_slot_does_not_break_lineup(roster, slots):
     r = [p for p in roster if p.pos != "TE"] + [P(8, "TEout", "TE", 0.0, 0.0, p0=1.0)]
     L = optimize(r, slots, opp_mu=110, opp_var=300)
     assert L.mu > 90 and L.p_win is not None
-    assert L.to_dict()["slots"]["TE"] == ["(EMPTY — no eligible player)"] or L.to_dict()["slots"]["TE"] == ["TEout"]
+    assert L.to_dict()["slots"]["TE"] == [EMPTY_SLOT]
 
 
 def test_small_p_win_gain_keeps_the_ev_lineup(slots):
@@ -97,3 +97,44 @@ def test_gain_above_the_floor_deviates_and_states_it(slots):
     assert win.win_gain is not None and win.win_gain >= MIN_WIN_GAIN
     assert abs(win.win_gain - (win.p_win - win_prob(ev.mu, ev.var, 125, 200))) < 1e-9
     assert win.to_dict()["win_gain"] == round(win.win_gain, 3)
+
+
+# ---------- B15: a player who scores zero this week never starts ----------
+
+def test_a_bye_or_a_certain_sit_never_starts_and_the_slot_reads_empty(roster, slots):
+    """Oct 20: `avail` kept `mu > 0` bodies, so a kicker on IR (mu 8.4, ev 0) started at K, and the per-slot fallback
+    seated a bye QB rather than leave the slot open. The lineup then read "Lawrence: QB -> bench, Herbert: bench -> QB"
+    for two zeros and the header's P(win) counted both empty slots as filled."""
+    from tests.conftest import P
+    r = [p for p in roster if p.pos not in ("QB", "K")]
+    bye1, bye2 = P(1, "Lawrence", "QB", 20, 6), P(11, "Herbert", "QB", 18, 6)
+    bye1.bye = bye2.bye = True
+    ir_k = P(9, "Grupe", "K", 8.4, 3, p0=1.0)        # ev 0, mu > 0: the IR kicker
+    r += [bye1, bye2, ir_k]
+    L = optimize(r, slots, opp_mu=110, opp_var=300)
+    d = L.to_dict()
+    assert d["slots"]["QB"] == [EMPTY_SLOT] and d["slots"]["K"] == [EMPTY_SLOT]
+    assert {"Lawrence", "Herbert", "Grupe"} <= set(d["bench"])
+    assert sum(len(v) for v in L.assignment.values()) == sum(slots.values()) - 2
+    assert L.mu == sum(p.ev for ps in L.assignment.values() for p in ps)
+    ev = optimize(r, slots, objective="ev")
+    assert ev.to_dict()["slots"]["QB"] == [EMPTY_SLOT] and ev.to_dict()["slots"]["K"] == [EMPTY_SLOT]
+
+
+def test_a_near_certain_sit_is_a_zero_too(roster, slots):
+    """p_zero 0.99 leaves ev at a hundredth of mu: not a reason to start him over an empty slot the card fills."""
+    from tests.conftest import P
+    r = [p for p in roster if p.pos != "K"] + [P(9, "Doubtful K", "K", 8.0, 3, p0=0.99)]
+    assert optimize(r, slots, objective="ev").to_dict()["slots"]["K"] == [EMPTY_SLOT]
+
+
+def test_one_empty_seat_in_a_two_seat_slot_prints_one_marker(roster, slots):
+    """RB holds two; with one RB left healthy the slot reads the healthy one and one EMPTY marker, not a full slot."""
+    from tests.conftest import P
+    r = [p for p in roster if p.pos != "RB"] + [P(2, "RB1", "RB", 16, 6)]
+    for i, n in ((3, "RB2"), (4, "RB3")):
+        q = P(i, n, "RB", 12, 5)
+        q.bye = True
+        r.append(q)
+    d = optimize(r, slots, objective="ev").to_dict()
+    assert d["slots"]["RB"] == ["RB1", EMPTY_SLOT] and d["slots"]["RB/WR/TE"] != [EMPTY_SLOT]

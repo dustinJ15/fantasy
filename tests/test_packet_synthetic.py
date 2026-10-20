@@ -87,6 +87,30 @@ def test_p_zero_override_sits_the_starter(monkeypatch):
     assert star["name"] not in lineup["text"] and f"{star['name']}: bench → " not in lineup["text"]
 
 
+def test_two_bye_qbs_leave_the_slot_empty_and_the_header_counts_the_wire_body(monkeypatch):
+    """B15: both my QBs on bye. The lineup leaves QB empty rather than seat a zero, the waiver table flags the best wire
+    QB as a START NOW at QB, and `lineup_after` is the P(win) once he is in, which the card prints next to today's."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    snap = make_snapshot()
+    for r in snap["roster"]:
+        if r["fantasy_team_id"] == 1 and r["pos"] == "QB":
+            r["bye"] = True
+    blk = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=100)
+    assert blk["lineup_win"]["slots"]["QB"] == [report.EMPTY_SLOT] and blk["lineup_ev"]["slots"]["QB"] == [report.EMPTY_SLOT]
+    assert sum(len(v) for v in blk["lineup_win"]["slots"].values()) == 9  # the marker holds the seat
+    top_qb = max((w for w in blk["waivers"] if w["pos"] == "QB"), key=lambda w: w["delta_week"])
+    assert top_qb["week_slot"] == "QB" and 0.9 * top_qb["mu_week"] <= top_qb["delta_week"] <= top_qb["mu_week"]  # his whole EV
+    after = blk["lineup_after"]
+    assert after["adds"] == [top_qb["name"]] and after["p_win"] > blk["lineup_win"]["p_win"] + 0.01
+    assert after["slots"]["QB"] == [top_qb["name"]]
+    rows = {x["id"]: x for x in report.todos(blk)}
+    assert [x["id"] for x in rows.values() if (x.get("add") or {}).get("name") == top_qb["name"]]  # a row adds him
+    assert rows["lineup"]["moves"][-1].startswith("QB: nobody plays this week (") and " on bye)" in rows["lineup"]["moves"][-1]
+    assert f"{top_qb['name']} once the add above is through" in rows["lineup"]["moves"][-1]
+    assert not any(": QB → bench" in m or "bench → QB" in m for m in rows["lineup"]["moves"])
+    assert "today, ~" in report.win_note(blk)
+
+
 def _trade(rival: str, give: list[str], get: list[str], mine: float, theirs: float, **kw) -> dict:
     return {"rival": rival, "give": give, "get": get, "my_delta_ppw": mine, "their_delta_ppw": theirs, "sendable": theirs >= 0,
             "must_try": False, "pushed": None, "why": [], "drops": [], "accept_word": None, "p_accept": None,
