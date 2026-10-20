@@ -194,6 +194,13 @@ class Spots:
         self.note(drop=order[0])
         return order[0], f"; drop {order[0]}{drop_note(self.lg, order[0], excl)}"
 
+    def swap(self, adding: str, drop: str) -> None:
+        """A row that names its own drop (a stream swaps out the specialist it replaces): the spot is spent and the
+        drop is counted, so no row below names him again and a Drop row on him folds into this one."""
+        self.note(add_pos=adding, drop=drop)
+        if drop not in self.dropped:
+            self.dropped.append(drop)
+
     def fill(self, add_pos: str) -> bool:
         """Spend an open spot on a body at `add_pos` without naming a drop (the Open-spot row). False when none is left."""
         if self.open <= 0:

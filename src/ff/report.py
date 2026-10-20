@@ -230,8 +230,9 @@ def _cover_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
 
     The button has to work: the body named is a free agent when there is one (a player still on waivers clears on
     waiver day, not before kickoff; he is the fallback, worded as the claim he is), and the add spends a roster spot
-    on the ledger like every other pickup, so the row names the drop (B7). A row above that already adds a body at
-    the position is the cover; the row is skipped then.
+    on the ledger like every other pickup, so the row names the drop (B7). A waiver row above that already adds a
+    body at the position is the cover; the row is skipped then. The stream row runs after this one and steps aside
+    the same way, so a K or D/ST who is out, on IR or on bye gets one row, not a Cover and a Stream (B14).
     """
     slots = lg["settings"]["lineup_slots"]
     rec = lg["lineup_win"]["slots"]
@@ -501,12 +502,43 @@ def _priority_note(lg: dict, w: dict) -> str:
     return f"; pass: you'd give up priority #{lg['waiver_rank']} for +{gain:.1f}/wk (~{cost:.1f}/wk of future claims)"
 
 
-def _stream_items(lg: dict) -> list[dict]:
-    """The one streamer (K, D/ST, a bye-week QB) worth swapping in this week; a swap spends no spot."""
-    return [{"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream",
-             "text": f"swap in {w['name']} at {w['pos']}",
-             "detail": [f"+{w['delta_over_starter']:.1f} this week{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w)]}
-            for w in [w for w in lg["waivers"] if w["streamer"] and w["delta_over_starter"] >= 1.5][:1]]
+def _stream_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
+    """The one streamer (K, D/ST) worth swapping in this week at each position. A stream is a swap: the specialist
+    he replaces (the current starter at the slot) is the drop, named on the row and counted on the ledger, so no row
+    below names him again and a Drop verdict on him folds in here. The number is `delta_week`, this week's gap over
+    the body he replaces; `delta_over_starter` is the rest-of-season gap and belongs to the waiver table.
+
+    The cover row runs first (it is the need): a position it already brings a body in at, or a body a row above
+    adds, is never a second row. Oct 20 (B14): Boswell was the Stream row and the Cover row, three rows named the
+    kicker, and the Stream row printed +5.2 (rest of season) for a +8.4 week. When the current K or D/ST is out, on
+    IR or on bye, the cover row is the stream row. With nobody at the position to swap out (the slot is empty, or
+    he is locked), the add takes a spot from the ledger like any pickup.
+    """
+    rec = lg["lineup_win"]["slots"]
+    by_name = {p["name"]: p for p in lg["roster"]}
+    pos_added = {w["pos"] for w in lg["waivers"] if w["name"] in added}
+    out: list[dict] = []
+    for w in lg["waivers"]:
+        pos = w["pos"]
+        if not w["streamer"] or (w.get("delta_week") or 0.0) < 1.5 or w["name"] in added or pos in pos_added:
+            continue
+        # The starter at the slot first, then any other body I hold at the position: a row above may already have
+        # spent the starter (a Drop-verdict K is the free drop), and the swap still leaves one K, not two.
+        mine = [n for n in rec.get(pos, []) if n in by_name] + [p["name"] for p in lg["roster"] if p["pos"] == pos and p["name"] not in rec.get(pos, [])]
+        cur = next((n for n in mine if not by_name[n].get("locked") and n not in spots.reserved and n not in spots.dropped), None)
+        if cur is not None:
+            spots.swap(adding=pos, drop=cur)
+            _, detail = _spot_words(cur, f"; drop {cur}{drop_note(lg, cur)}")
+            text = f"swap in {w['name']} for {cur} at {pos}"
+        else:
+            drop, suffix = spots.take(adding=pos, lands_ts=w.get("lands_ts"))
+            click, detail = _spot_words(drop, suffix)
+            text = f"swap in {w['name']} at {pos}{click}"
+        added.add(w["name"])
+        pos_added.add(pos)
+        out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream", "text": text,
+                    "detail": [f"+{w['delta_week']:.1f} this week{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w), *detail]})
+    return out
 
 
 def _open_spot_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
@@ -677,8 +709,8 @@ def todos(lg: dict) -> list[dict]:
     added: set[str] = set()
     wv = _waiver_items(lg, spots, added)
     out += wv
-    out += _stream_items(lg)
-    out += _cover_items(lg, spots, added)
+    out += _cover_items(lg, spots, added)  # the need first: a stream at a position it covers is the same row (B14)
+    out += _stream_items(lg, spots, added)
     # A Drop row a pickup above took as its drop folded into that row (B12); the rest print, and then depth fills
     # whatever spot is still open: the IR moves' and these drops', then the ones that were open this morning.
     left = [i for i in inj if i["verdict"] == "drop" and i["name"] not in spots.dropped]

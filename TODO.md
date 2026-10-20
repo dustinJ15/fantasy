@@ -41,9 +41,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 The Oct 20 card is the evidence for B14-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
 causes and the fixtures. Take them in order.
 
-- [ ] **B14 (S). Three rows for one kicker.** `_stream_items` ignores `added` and the cover row, and prints
-  `delta_over_starter` (rest of season) as "this week". One row per position: the stream names the specialist it
-  replaces as its drop, prints `delta_week`, and is the cover row when the current K/D/ST is out or on bye. Plan §2.
 - [ ] **B15 (M). The lineup seats zeros.** `lineup.optimize` keeps `mu > 0` bodies (Grupe on IR at K) and the
   per-slot fallback seats a bye QB instead of EMPTY, so the row read "Lawrence: QB → bench · Herbert: bench → QB"
   and the header's P(win) counted two empty slots the card fills Wednesday. Fix: `ev > 0 and not bye` to start,

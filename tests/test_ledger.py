@@ -10,7 +10,7 @@ from tests.test_review_fixes import waiver
 def _rich_league():
     """One league that puts a row of every kind on the card: an offer, the lineup, an IR move, a drop, a hold, a hurt player shipped in a trade, a waiver who starts, a waiver who upgrades, a streamer, an open offer and
     two packages, one of them pushed by the math."""
-    stream = {**waiver("Backup K", pos="K", d_week=0.0, d_start=2.0), "streamer": True, "slot": "K"}
+    stream = {**waiver("Backup K", pos="K", d_week=2.0, d_start=2.0), "streamer": True, "slot": "K"}
     offer = {**trade(["Their RB"], ["Bench WR"], mine=-1.0, theirs=2.0), "verdict": "decline", "hours_left": 20.0}
     return league(
         roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Bench B", ros=5.0), player("Bench C", ros=6.0),
@@ -49,8 +49,8 @@ def test_todos_is_the_order_over_the_builders_and_one_shared_ledger():
     manual += [i for i in inj if i["verdict"] in ("ir", "activate")]
     wv = report._waiver_items(lg, spots, added)
     manual += wv
-    manual += report._stream_items(lg)
     manual += report._cover_items(lg, spots, added)
+    manual += report._stream_items(lg, spots, added)
     left = [i for i in inj if i["verdict"] == "drop" and i["name"] not in spots.dropped]
     manual += left
     report._depth_adds(lg, [i for i in inj if i["verdict"] == "ir"] + left, spots, added)

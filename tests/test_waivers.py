@@ -14,7 +14,7 @@ from ff.email_html import render_email
 from ff.model.waivers import faab_bid, rank_free_agents
 from ff.sources import espn
 from tests.conftest import P
-from tests.test_card import by_id, full, league
+from tests.test_card import by_id, full, league, player
 
 # ---------- FAAB sizing, as behaviour ----------
 
@@ -190,11 +190,13 @@ def test_a_faab_league_puts_the_bid_on_the_claim_instead_of_the_priority():
 
 
 def test_a_streamer_on_waivers_says_the_swap_lands_on_waiver_day():
-    lg = league(waivers=[_waiver("Wire K", pos="K", d_start=2.0, on_waivers=True, streamer=True)], waiver_rank=5)
+    roster = [player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Old K", pos="K", slot="K")]
+    lineup = {"slots": {"WR": ["Starter WR"], "K": ["Old K"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []}
+    lg = league(roster=roster, lineup_win=lineup, waivers=[_waiver("Wire K", pos="K", d_week=2.0, on_waivers=True, streamer=True)], waiver_rank=5)
     row = by_id(lg)["stream:wire-k"]
-    assert row["text"] == "swap in Wire K at K" and row["detail"] == ["+2.0 this week", "waivers: you are priority #5, lands on waiver day"]
-    lg = league(waivers=[_waiver("Wire K", pos="K", d_start=2.0, on_waivers=False, streamer=True)], waiver_rank=5)
-    assert by_id(lg)["stream:wire-k"]["text"] == "swap in Wire K at K" and by_id(lg)["stream:wire-k"]["detail"] == ["+2.0 this week"]
+    assert row["text"] == "swap in Wire K for Old K at K" and row["detail"] == ["+2.0 this week", "waivers: you are priority #5, lands on waiver day"]
+    lg = league(roster=roster, lineup_win=lineup, waivers=[_waiver("Wire K", pos="K", d_week=2.0, on_waivers=False, streamer=True)], waiver_rank=5)
+    assert by_id(lg)["stream:wire-k"]["text"] == "swap in Wire K for Old K at K" and by_id(lg)["stream:wire-k"]["detail"] == ["+2.0 this week"]
 
 
 # ---------- a priority league end to end ----------

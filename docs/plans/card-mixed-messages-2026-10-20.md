@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: B12 implemented 2026-10-20 (§1); the rest plan only.
+Status: B12 (§1) and B14 (§2) implemented 2026-10-20; the rest plan only.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B14, B15, B16, B17, B18, B19, in that order (B14, B15 in series, same file).
+Still open: B15, B16, B17, B18, B19, in that order.
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
@@ -94,6 +94,12 @@ skips a name in `added` and a position already covered. The stream row names the
 
 **Test**: K on IR, Boswell on the wire → exactly one row names Boswell and it names Grupe as the drop; a healthy K
 with a +2 streamer → one Stream row, no Cover row; a Stream row's number equals the waiver's `delta_week`.
+
+Implemented (B14): `_cover_items` runs before `_stream_items` in `todos`; `_stream_items(lg, spots, added)` gates
+on `delta_week >= 1.5`, skips a body in `added` or a position a row above brought one in at, names the specialist
+it replaces (the starter at the slot, else any body I hold at the position a row above has not spent) and books him
+through `Spots.swap`, so a Drop verdict on him folds into the row; with nobody to swap out (locked, or the slot is
+empty) the add takes a spot from the ledger like a pickup. Tests under "B14" in `tests/test_card.py`.
 
 ### 3. The lineup seats players who score zero, and prints the zero swap (B15)
 

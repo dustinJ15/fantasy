@@ -666,9 +666,11 @@ def test_waiver_row_carries_the_kickoff_day():
     lg = league(open_spots=1, waivers=[waiver(delta_week=0.5, delta_over_starter=1.2, kickoff_day="Thu")])
     row = by_id(lg)["waiver:now-guy"]
     assert row["text"] == "add Now Guy (WR)" and row["detail"] == ["+1.2/wk over your WR, set by Thu", "there is an open bench spot"]
-    lg = league(waivers=[waiver("Texans D/ST", pos="D/ST", streamer=True, delta_over_starter=2.6, kickoff_day="Thu")])
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Jags D/ST", pos="D/ST", slot="D/ST")],
+                lineup_win={"slots": {"WR": ["Starter WR"], "D/ST": ["Jags D/ST"]}, "p_win": 0.7, "mu": 100.0, "sd": 20.0, "bench": []},
+                waivers=[waiver("Texans D/ST", pos="D/ST", streamer=True, delta_week=2.6, delta_over_starter=0.4, kickoff_day="Thu")])
     row = by_id(lg)["stream:texans-d-st"]
-    assert row["text"] == "swap in Texans D/ST at D/ST" and row["detail"] == ["+2.6 this week, set by Thu"]
+    assert row["text"] == "swap in Texans D/ST for Jags D/ST at D/ST" and row["detail"] == ["+2.6 this week, set by Thu"]
 
 
 def test_waiver_row_without_a_kickoff_day_reads_as_before():
@@ -756,9 +758,10 @@ def test_a_drop_verdict_player_is_the_free_drop_for_the_row_that_needs_a_spot():
 def test_a_drop_row_nobody_took_prints_alone_with_a_depth_add_chosen_after_the_other_rows():
     lg = grupe_league()
     lg["roster"].append(player("Spare K", pos="K", p0=0.02, ros=7.0))  # a healthy K on the bench: no cover row
+    lg["waivers"][0].update(delta_week=1.0)  # and the streamer is not worth a swap this week: no stream row (B14)
     lg["waivers"].append({**waiver("Wire RB", pos="RB", slot="RB", week_slot="RB", delta_week=0.0, delta_over_starter=-2.0, score=3.0), "vorp": -1.0})
     rows = by_id(lg)
-    assert "cover:k" not in rows
+    assert "cover:k" not in rows and not any(k.startswith("stream:") for k in rows)
     assert rows["injury:blake-grupe"]["text"] == "drop Blake Grupe (K); add Wire RB (RB)"
     assert rows["injury:blake-grupe"]["detail"] == ["out ~4 wks, back wk 11, worth ~0 pts the rest of the way", "Wire RB: best body on the wire, depth only"]
 
@@ -803,3 +806,75 @@ def test_depth_fills_only_a_spot_nobody_above_wanted():
     assert row["text"] == "move Hurt RB (RB) to IR, then add Depth RB (RB)"
     assert row["detail"] == ["out the season", "Depth RB: best body on the wire, depth only"]
     assert ids(lg) == ["injury:hurt-rb", "lineup"]
+
+
+# ---------- B14: one row per kicker, and the stream's number is this week's ----------
+
+def healthy_k_league(**kw):
+    """A healthy K starting, a streamer on the wire who beats him this week (`delta_week`) by more than he does the
+    rest of the way (`delta_over_starter`)."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Old K", pos="K", slot="K", mu=7.0, ros=7.5)],
+                lineup_win={"slots": {"K": ["Old K"], "WR": ["Starter WR"]}, "p_win": 0.6, "mu": 95.0, "sd": 20.0, "bench": []},
+                waivers=[waiver("Chris Boswell", pos="K", slot="K", week_slot="K", team="PIT", streamer=True, delta_week=2.0, delta_over_starter=0.6)])
+    lg.update(kw)
+    return lg
+
+
+def test_a_kicker_on_ir_gets_one_row_and_it_names_him_as_the_drop():
+    """The Oct 20 card: "Stream: swap in Boswell (+5.2 this week)", "Cover K: ... claim Boswell; drop Henderson",
+    "Drop: drop Grupe; add Rodgers". One row: the cover, with Grupe as its drop."""
+    rows = by_id(grupe_league())
+    named = [x for x in rows.values() if "Chris Boswell" in x["text"]]
+    assert len(named) == 1 and named[0]["id"] == "cover:k" and named[0]["text"].endswith("; drop Blake Grupe")
+    assert not any(k.startswith("stream:") for k in rows)
+
+
+def test_a_healthy_kicker_with_a_streamer_is_one_stream_row_that_swaps_him_out():
+    rows = by_id(healthy_k_league())
+    assert "cover:k" not in rows
+    row = rows["stream:chris-boswell"]
+    assert row["text"] == "swap in Chris Boswell for Old K at K" and row["detail"] == ["+2.0 this week"]
+    assert sum("Chris Boswell" in x["text"] for x in rows.values()) == 1
+
+
+def test_the_stream_row_prints_delta_week_not_the_rest_of_season_gap():
+    lg = healthy_k_league()
+    lg["waivers"][0].update(delta_week=8.4, delta_over_starter=5.2)
+    assert "+8.4 this week" in report.detail_line(by_id(lg)["stream:chris-boswell"]) and "5.2" not in full(by_id(lg)["stream:chris-boswell"])
+    lg["waivers"][0].update(delta_week=1.0, delta_over_starter=5.2)  # a rest-of-season gap alone is not a swap this week
+    assert not any(k.startswith("stream:") for k in by_id(lg))
+
+
+def test_a_kicker_on_bye_gets_the_cover_row_not_a_stream_row_too():
+    lg = healthy_k_league()
+    lg["roster"][2].update(bye=True, mu=0.0)
+    lg["waivers"][0].update(delta_week=7.0)
+    rows = by_id(lg)
+    assert "cover:k" in rows and "on bye" in rows["cover:k"]["text"] and "Chris Boswell" in rows["cover:k"]["text"]
+    assert not any(k.startswith("stream:") for k in rows)
+
+
+def test_the_stream_swap_is_the_drop_on_the_ledger_and_folds_a_drop_verdict_on_him():
+    """The swap spends the K it replaces: the Drop row on him folds into the stream row with his verdict note, and
+    the pickup below does not name him again."""
+    lg = grupe_league()
+    lg["roster"].append(player("Spare K", pos="K", p0=0.02, ros=7.0))  # a healthy K behind Grupe: no cover row
+    rows = by_id(lg)
+    stream = rows["stream:chris-boswell"]
+    assert stream["text"] == "swap in Chris Boswell for Blake Grupe at K"
+    assert stream["detail"] == ["+8.4 this week", "Blake Grupe: on IR, out ~4 wks, worth ~0 pts the rest of the way"]
+    assert "injury:blake-grupe" not in rows
+    # A pickup above takes Grupe as the free drop; the stream then swaps out the K still on the roster, and the
+    # healthy RB4 is nobody's cut.
+    lg["waivers"].append(waiver("Now Guy"))
+    rows = by_id(lg)
+    assert rows["waiver:now-guy"]["text"].endswith("; drop Blake Grupe")
+    assert rows["stream:chris-boswell"]["text"] == "swap in Chris Boswell for Spare K at K"
+    assert not any("Henderson" in full(x) for x in rows.values())
+
+
+def test_a_stream_with_nobody_to_swap_out_takes_a_spot_from_the_ledger():
+    lg = healthy_k_league()
+    lg["roster"][2]["locked"] = True  # his game has kicked off: ESPN will not let him go until Tuesday
+    row = by_id(lg)["stream:chris-boswell"]
+    assert row["text"] == "swap in Chris Boswell at K; drop Bench WR"
