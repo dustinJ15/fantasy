@@ -306,6 +306,74 @@ def accuracy(week: int | None = typer.Option(None, "--week", help="Score the wee
     rprint(t)
 
 
+@app.command("replay-pull")
+def replay_pull(season: int = typer.Option(..., "--season", help="The season to archive (a past one, or the current one up to last week)"),
+                league: str | None = LeagueOpt):
+    """Archive a season's box scores (every matchup, both lineups as set, ESPN's pre-kickoff projection and the actual
+    per player) into data/replay/ for `ff backtest`. Read-only; needs the cookies."""
+    from . import backtest
+    for ref in leagues(league):
+        try:
+            lg = espn.connect(ref, season)
+        except espn.CookieError as exc:
+            rprint(f"[red]{exc}[/]"); raise typer.Exit(1) from exc
+        rep = backtest.pull_replay(ref, lg, season)
+        path = backtest.save_replay(rep)
+        skipped = f"; skipped the two-week matchup weeks {rep['skipped_weeks']}" if rep["skipped_weeks"] else ""
+        rprint(f"[green]{ref.name}: {len(rep['weeks'])} weeks, {sum(len(w['matchups']) for w in rep['weeks'])} matchups -> {path}{skipped}[/]")
+
+
+@app.command()
+def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay file(s) from `ff replay-pull`; default: every file under data/replay/"),
+             trades: bool = typer.Option(False, "--trades", help="Score the offers ESPN executed (data/projlog/offer_outcomes.json) against the replays instead"),
+             as_json: bool = typer.Option(False, "--json", help="Print the result as JSON")):
+    """Replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set
+    (default), or the trades I made against what the players then scored (--trades). Offline, from the replay files."""
+    from . import backtest as bt
+    paths = [bt.load_replay(p) for p in (replay or sorted(str(p) for p in bt.REPLAY_DIR.glob("*.json")))]
+    if not paths:
+        rprint(f"no replay files under {bt.REPLAY_DIR}; run `ff replay-pull --season 2025` first"); raise typer.Exit(1)
+    if trades:
+        from .rulings import load_outcomes
+        rows = bt.trade_hits(load_outcomes(), {r["league"]: r for r in paths})
+        if as_json:
+            print(json.dumps(rows, indent=1)); return
+        if not rows:
+            rprint("no accepted offers in the outcome log"); return
+        t = Table("league", "gave", "got", "closed", "from wk", "weeks", "missing", "realized /wk", "predicted /wk", "hit")
+        for r in rows:
+            fmt = lambda x: "—" if x is None else f"{x:+.1f}"
+            t.add_row(r["league"], ", ".join(r["give"]), ", ".join(r["get"]), r["closed"] or "—", str(r["from_week"] or "—"),
+                      str(r["weeks"]), str(r["missing"]), fmt(r["realized_ppw"]), fmt(r["predicted_ppw"]),
+                      "—" if r["hit"] is None else ("yes" if r["hit"] else "no"))
+        rprint(t); return
+    results = [bt.lineup_calibration(r) for r in paths]
+    if as_json:
+        print(json.dumps(results, indent=1)); return
+    for res in results:
+        rprint(f"\n[bold]{res['league']} {res['season']}[/] weeks {res['weeks'][0] if res['weeks'] else '—'}-{res['weeks'][-1] if res['weeks'] else '—'}"
+               + (f"  [yellow]{res['score_mismatch']} lineup(s) whose starters' actuals do not sum to ESPN's score[/]" if res["score_mismatch"] else ""))
+        c = res["calibration"]
+        if not c:
+            rprint("  no matchups"); continue
+        rprint(f"  P(win) of the set lineups: n {c['n']}, Brier {c['brier']} (coin flip 0.25), log loss {c['log_loss']}, ECE {c['ece']}")
+        t = Table("P(win) bin", "n", "predicted", "won")
+        for b in c["bins"]:
+            t.add_row(f"{b['lo']:.1f}-{b['hi']:.1f}", str(b["n"]), "—" if b["p_mean"] is None else f"{b['p_mean']:.2f}",
+                      "—" if b["won"] is None else f"{b['won']:.2f}")
+        rprint(t)
+        o = res["optimizer"]
+        t = Table("lineup", "points /wk", "win rate")
+        for k, label in (("set", "as the manager set it"), ("ev", "highest points"), ("win", "P(win)")):
+            t.add_row(label, f"{o['pts'][k]:.1f}", f"{o['win_rate'][k]:.3f}")
+        rprint(t)
+        d = o["differs"]
+        rprint(f"  {o['team_weeks']} team-weeks; the highest-points lineup had {o['ev_over_set']:+.1f}/wk on the one set. "
+               f"P(win) lineup differed from it {d['n']} times" + (f" (under {d['min_n']}: not a verdict)" if d["n"] < d["min_n"] else "")
+               + (f": won {d['win_rate']['win']} vs {d['win_rate']['ev']}, promised {d['gain_promised']:+.3f}, realized {d['gain_realized']:+.3f}"
+                  if d["n"] else ""))
+
+
 @app.command()
 def heartbeat(fail: bool = typer.Option(False, "--fail", help="Report failure instead of success")):
     """Ping HEALTHCHECK_URL (healthchecks.io dead-man's switch). No-op if unset."""

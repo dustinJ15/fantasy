@@ -26,7 +26,7 @@ Claude returns *parameters and prose*, never *decisions or state*. Every number 
 Tuesday = waivers emphasis (bids due before Wednesday processing). Sunday morning = final lineup + inactives check.
 
 ## Commands
-`ff setup-check | doctor | sync | roster | lineup | waivers | trades | incoming | odds | packet | briefing | render-email` (all accept `--league <name>`);
+`ff setup-check | doctor | sync | roster | lineup | waivers | trades | incoming | odds | packet | briefing | render-email | replay-pull | backtest` (all accept `--league <name>`);
 `ff incoming` = offers other managers sent me, with an accept/decline/counter verdict (`--json --new-since 40m` is the poller path).
 
 ## Layout
@@ -49,14 +49,14 @@ exempt); `detail` is the reasons, clocks and numbers behind it (the email's grey
 changes the click. Game context on a row is a packet field put into words by one `report` helper both renderers call (`game_note` reads `odds_line`;
 `usage_note`, `due_note`, `accept_note`, `processes_note` likewise). `email_html.py` renders the HTML email from the packet. `rulings.py` is the
 memory on the `projlog` branch (skipped and pushed trades, offer outcomes, IR moves); `projlog.py` the projection log (`ff accuracy`). `demo.py` is
-the synthetic league. Tests: `uv run pytest`; the Apps Script doorbell: `node scripts/gmail_trade_doorbell.test.js` (run it after editing the `.gs`).
+the synthetic league. `backtest.py` replays a season's box scores (`ff replay-pull` → `data/replay/`) through the same code: P(win) calibration, the optimizer vs the set lineups, `--trades` (`docs/plans/backtest.md`). Tests: `uv run pytest`; the Apps Script doorbell: `node scripts/gmail_trade_doorbell.test.js` (run it after editing the `.gs`).
 
 ## Data gotchas and rules
 - nflreadpy installed from git (PyPI lags); no 2026 snap counts yet. FantasyPros via the dynastyprocess/data mirror; do not scrape
   fantasypros.com or keeptradecut.com. Player ID joins via `db_playerids.csv` + Sleeper; check `ff doctor` for unmatched names.
 - Questionable sit-risk is day-aware (`QUESTIONABLE_BY_WEEKDAY`: 15% Mon–Wed, 20% Thu, 30% from Fri); a `p_zero` override wins. An IR stash
   is activated only when ESPN's designation leaves the IR-eligible set, never from the guessed return week.
-- Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, reads.json, data/cache, data/packets, leagues.toml, ops.local.md.
+- Do not add ESPN writes. Do not commit briefing.md/html, overrides.json, reads.json, data/cache, data/packets, data/replay, leagues.toml, ops.local.md.
 
 ## Operations (the whole of it: `docs/operations.md`; trigger ids, env id, routine URLs and the recipient address: `ops.local.md`, untracked)
 - Debug a run: `RemoteTrigger list_runs` (trigger_id in ops.local.md) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.

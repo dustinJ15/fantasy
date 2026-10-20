@@ -220,7 +220,10 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
                 outs[key] = {"status": "open", "league": league, "rival": t.get("rival"), "rival_team_id": t.get("rival_team_id"),
                              "give": list(t.get("give") or []), "get": list(t.get("get") or []),
                              "opened": today.isoformat(), "expires": t.get("expires_iso"),
-                             "expires_ts": t.get("expires_ts"), "proposed_ts": t.get("proposed_ts")}
+                             "expires_ts": t.get("expires_ts"), "proposed_ts": t.get("proposed_ts"),
+                             # the scan's delta for the same package the morning it was seen: the predicted side of
+                             # `backtest.trade_hits` (None when the scan did not produce the package that morning)
+                             "predicted_ppw": predicted_ppw(lg, t)}
                 events.append(f"{key}: opened")
         if lg.get("pending_trades_error"):
             continue
@@ -252,6 +255,15 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(json.dumps(outs, indent=1))
     return events
+
+
+def predicted_ppw(lg: dict, offer: dict) -> float | None:
+    """`my_delta_ppw` of the scan candidate with this offer's players (both sides, as sets), else None."""
+    give, get = set(offer.get("give") or []), set(offer.get("get") or [])
+    for c in lg.get("trades") or []:
+        if set(c.get("give") or []) == give and set(c.get("get") or []) == get and c.get("my_delta_ppw") is not None:
+            return float(c["my_delta_ppw"])
+    return None
 
 
 def history(outs: dict[str, dict], league: str, today: date | None = None) -> dict[int, dict]:

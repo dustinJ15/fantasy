@@ -54,7 +54,7 @@ PRIOR_FADE_GAMES = 6
 # unitless, so it scales ESPN's league-scoring points per game without a scoring table. The public xFP work
 # (ffopportunity, the PFF and Fantasy Points expected-points pieces) agrees that points over expected regress hard
 # from one stretch to the next while opportunity persists, so a season-to-date read that is half opportunity and
-# half production is the prior here; the backtest (TODO D8) is where a fitted weight would come from. QB, K and
+# half production is the prior here; the backtest (`docs/plans/backtest.md`, TODO D12) is where a fitted weight would come from. QB, K and
 # D/ST read 1.0: the proxy prices no pass attempt and nflverse has no kicks. The ratio is clipped, since a two-game
 # sample or a nflverse row that disagrees with ESPN's game count can say 2x, and nothing says 2x.
 OPPORTUNITY_WEIGHT = {"RB": 0.5, "WR": 0.5, "TE": 0.5}

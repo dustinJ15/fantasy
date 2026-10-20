@@ -25,10 +25,11 @@ class CookieError(RuntimeError):
     pass
 
 
-def connect(ref: LeagueRef) -> League:
+def connect(ref: LeagueRef, season: int | None = None) -> League:
+    """The league for `season` (the `SEASON` in .env by default; a past season for `ff replay-pull`)."""
     e = env()
     try:
-        return League(league_id=ref.espn_id, year=e.season, espn_s2=e.espn_s2, swid=e.swid)
+        return League(league_id=ref.espn_id, year=season or e.season, espn_s2=e.espn_s2, swid=e.swid)
     except ESPNAccessDenied as exc:
         raise CookieError(f"{ref.name}: {COOKIE_HELP} ({exc})") from exc
     except ESPNInvalidLeague as exc:

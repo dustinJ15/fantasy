@@ -57,13 +57,24 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D8 (L). Backtest harness** (ROADMAP 8): replay 2025 for lineup P(win) calibration and trade hit rate.
-- [ ] **D10 (L, after D8). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
+- [ ] **D11 (S, needs cookies). Run the backtest on 2025 and 2026.** The harness is built (D8, 2026-10-20:
+  `docs/plans/backtest.md`, `ff replay-pull`, `ff backtest`) but no real season has gone through it. Pull
+  `ff replay-pull --season 2025` and `--season 2026` for the three leagues, run `ff backtest` and
+  `ff backtest --trades` (projlog branch restored), put the tables in `docs/accuracy.md` next to the projlog's, and
+  rule on the two constants the plan's "Still to do" names (the sigma prior's direction, `MIN_WIN_GAIN`). Done when
+  the tables are in the doc with the date and the three things the plan says the first run will find out are answered
+  (does `box_scores` serve every past week, is the archived `projected_points` the pre-kickoff number, how often
+  `score_mismatch` fires).
+- [ ] **D12 (L, after D11). The scanner replay.** `docs/plans/backtest.md` "Still to do": price every rival package
+  and every claim each replayed week with `model/trades.py` and `model/waivers.py` and score them against the weeks
+  that followed; the trade and waiver hit rates need this sample, the outcome log has one executed trade. Needs the
+  free-agent pool per past week (probe `kona_player_info` with a past `scoringPeriodId`). Plan in `docs/plans/` first.
+- [ ] **D10 (L, after D12). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
   play-by-play 2016-2025, per-player weekly points ~ f(opportunity share, team implied total, opponent
   schedule-adjusted points allowed, recent usage trend), blended with consensus by out-of-sample error. Its first
   deliverable is the fitted weight that replaces `OPPORTUNITY_WEIGHT` (0.5) and the clip in `model/projections.py`
-  (`docs/plans/in-season-projection.md`), and a pass-attempt term so QB stops reading 1.0; the backtest harness (D8)
-  is how it is scored. Plan in `docs/plans/` first.
+  (`docs/plans/in-season-projection.md`), and a pass-attempt term so QB stops reading 1.0; the backtest harness
+  (`docs/plans/backtest.md`) is how it is scored. Plan in `docs/plans/` first.
 - [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
   (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
   the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only

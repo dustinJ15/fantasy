@@ -3,6 +3,7 @@
 data/cache/
 data/packets/
 data/projlog/
+data/replay/
 __pycache__/
 *.pyc
 .pytest_cache/

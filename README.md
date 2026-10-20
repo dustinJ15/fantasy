@@ -168,6 +168,8 @@ uv run ff sync && uv run ff briefing
 | `ff render-email --packet p --reads f --out h --md m` | render the HTML email from an existing packet; records the trade rows Claude skipped or pushed |
 | `ff log-projections` | append today's per-source projections to `data/projlog/` |
 | `ff accuracy [--week N] [--fit]` | MAE and bias by source and position over scored weeks; `--fit` prints a fitted sigma per position next to the prior |
+| `ff replay-pull --season 2025` | archive a season's box scores (both lineups as set, ESPN's pre-kickoff projection and the actual per player) into `data/replay/` |
+| `ff backtest [--replay f] [--trades]` | replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set; `--trades` scores the offers ESPN executed against what the players then scored |
 | `ff email` / `ff heartbeat` | send a rendered briefing over Gmail SMTP; ping the healthchecks.io switch |
 
 All commands that read a league take `--league <name>`; `briefing`, `packet` and `incoming` take `--demo`.
