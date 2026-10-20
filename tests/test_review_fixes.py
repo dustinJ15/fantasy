@@ -139,15 +139,19 @@ def test_two_pickups_name_two_different_drops():
     assert rows["waiver:now-guy"]["text"].endswith("; drop Bench A") and rows["waiver:later-guy"]["text"].endswith("; drop Bench B")
 
 
-def test_a_drop_row_with_its_own_add_is_not_the_drop_for_a_pickup_too():
-    """Done Guy is cut and Pickup takes his spot; a start-worthy waiver add needs a spot of its own, so it names the
-    next cheapest body (Bench B), not Done Guy a second time. The position counts end up one down per drop, not two."""
+def test_a_drop_verdict_player_is_the_pickups_drop_and_his_drop_row_folds():
+    """Done Guy is already a cut, so he is the spot the start-worthy waiver add takes (one click, one drop); Bench B
+    stays and no second row drops Done Guy again (B12). The position counts end up one down, not two."""
     lg = league(roster=[player("Starter WR", slot="WR"), player("Done Guy", pos="RB", ros=0.5), player("Bench B", ros=5.0)],
                 injuries=[injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0, fa=("Pickup", 1.2))],
                 waivers=[waiver("Now Guy", d_week=3.0)])
     rows = by_id(lg)
-    assert rows["injury:done-guy"]["text"].endswith("; add Pickup (RB)")
-    assert rows["waiver:now-guy"]["text"].endswith("; drop Bench B")
+    assert "injury:done-guy" not in rows
+    assert rows["waiver:now-guy"]["text"].endswith("; drop Done Guy") and "Bench B" not in full(rows["waiver:now-guy"])
+    assert "Done Guy: out the season, worth ~29 pts the rest of the way" in report.detail_line(rows["waiver:now-guy"])
+    spots = report._Spots(lg, 0, set())
+    report._injury_items(lg, spots); report._waiver_items(lg, spots, set())
+    assert spots.dropped == ["Done Guy"] and spots.counts["RB"] == 1
 
 
 def test_a_drop_is_counted_once_even_when_the_ledger_hands_him_out():
@@ -162,17 +166,19 @@ def test_a_drop_is_counted_once_even_when_the_ledger_hands_him_out():
 
 
 def test_a_player_headed_to_ir_is_never_the_drop_for_a_pickup():
+    """The IR move frees a bench spot and the pickup takes it: Stash is never the drop, and neither is Bench B."""
     lg = league(roster=[player("Starter WR", slot="WR"), player("Stash", ros=0.5), player("Bench B", ros=5.0)],
                 injuries=[injury("Stash", "ir", weeks_out=15, return_week=None, avail=0.0, fa=("Pickup", 1.2))],
                 waivers=[waiver("Now Guy", d_week=3.0)])
-    assert by_id(lg)["waiver:now-guy"]["text"].endswith("; drop Bench B")
+    row = by_id(lg)["waiver:now-guy"]
+    assert "drop" not in row["text"] and "into the spot Stash's IR move frees" in report.detail_line(row)
 
 
-def test_a_pickup_the_injury_row_already_adds_is_not_a_second_row():
+def test_a_pickup_is_one_row_and_the_ir_row_above_never_adds_him_too():
     lg = league(roster=[player("Starter WR", slot="WR"), player("Stash", ros=0.5), player("Bench B", ros=5.0)],
                 injuries=[injury("Stash", "ir", weeks_out=15, return_week=None, avail=0.0, fa=("Now Guy", 1.2))],
                 waivers=[waiver("Now Guy", d_week=3.0)])
-    assert ids(lg).count("waiver:now-guy") == 0 and "then add Now Guy" in by_id(lg)["injury:stash"]["text"]
+    assert ids(lg).count("waiver:now-guy") == 1 and by_id(lg)["injury:stash"]["text"] == "move Stash (RB) to IR"
 
 
 def test_a_cap_with_nobody_to_drop_says_your_call_instead_of_naming_a_cut():

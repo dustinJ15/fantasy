@@ -55,6 +55,28 @@ def lock_note(p: dict) -> str:
     return "locked until the week rolls, his game has kicked off" if p.get("locked") else ""
 
 
+def weeks_word(r: dict) -> str:
+    """"~4 wks" or "the season" for an injury row's horizon."""
+    if r.get("return_week") is None and (r.get("avail_ros") or 0) == 0:
+        return "the season"
+    return f"~{r['weeks_out']:.0f} wk{'s' if r['weeks_out'] >= 1.5 else ''}"
+
+
+def drop_verdict_note(r: dict) -> str:
+    """"on IR, out ~4 wks, worth ~0 pts the rest of the way": why a Drop-verdict player is the free drop, for the
+    detail of whichever row takes him."""
+    on_ir = "on IR, " if (r.get("espn_status") or "").upper() in ("INJURY_RESERVE", "IR") else ""
+    return f"{on_ir}out {weeks_word(r)}, worth ~{r.get('hold_value') or 0:.0f} pts the rest of the way"
+
+
+def free_drops(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
+    """The players `model.injuries.decide` already said to drop, in its order (most valuable first). Each is a free
+    drop for any row that needs a spot, whatever his position: the K/D/ST exclusion in `bench` is for healthy
+    specialists, and a kicker on IR with a Drop verdict is a spot, not a body (B12: the cover row cut a healthy RB4
+    for a kicker while the Drop row dropped the kicker on IR for a depth body)."""
+    return [r["name"] for r in lg.get("injuries") or [] if r.get("verdict") == "drop" and r["name"] not in exclude]
+
+
 def bench(lg: dict, exclude: set[str] = frozenset()) -> list[dict]:
     starters = {n for names in lg["lineup_win"]["slots"].values() for n in names}
     return [p for p in lg["roster"] if p["name"] not in starters and p["pos"] not in ("K", "D/ST") and p.get("slot") != "IR"
@@ -62,8 +84,8 @@ def bench(lg: dict, exclude: set[str] = frozenset()) -> list[dict]:
 
 
 def drop_order(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
-    """Bench players cheapest first by `drop_cost` (rest-of-season value plus the market penalty), skipping K/DST,
-    the IR slot and `exclude`.
+    """The Drop-verdict players first at cost 0 (`free_drops`), then the bench cheapest first by `drop_cost`
+    (rest-of-season value plus the market penalty), skipping K/DST, the IR slot and `exclude`.
 
     `mu_ros` already nets out the games a hurt player will miss, so a season-ender is the cheapest cut and a
     four-week stash is not. The IR occupant is skipped because dropping him frees an IR slot, not a bench spot. The
@@ -74,7 +96,9 @@ def drop_order(lg: dict, exclude: set[str] = frozenset()) -> list[str]:
     on Tuesday, so he is named only when nobody else can go, and `drop_note` says he is locked. On a Monday that is
     everyone who played Sunday; the note is the signal to wait for Tuesday's card.
     """
-    return [p["name"] for p in sorted(bench(lg, exclude), key=lambda p: (bool(p.get("locked")), drop_cost(p, lg)))]
+    free = free_drops(lg, exclude)
+    rest = sorted(bench(lg, set(exclude) | set(free)), key=lambda p: (bool(p.get("locked")), drop_cost(p, lg)))
+    return free + [p["name"] for p in rest]
 
 
 def drop_candidate(lg: dict) -> str | None:
@@ -87,7 +111,11 @@ def drop_note(lg: dict, name: str, exclude: set[str] = frozenset()) -> str:
     week, and when a body cheaper by `mu_ros` alone was passed over (for his market price, or because he backs up
     my RB1), who he is and his numbers, so the card shows them side by side. Empty when the market does not list
     the drop, this week is not the reason, and nobody was passed over. A drop ESPN has locked (his game has kicked
-    off) says so, as does a cheaper body passed over only because he is locked."""
+    off) says so, as does a cheaper body passed over only because he is locked. A Drop-verdict player (the free drop)
+    gets his injury row's numbers instead: " (on IR, out ~4 wks, worth ~0 pts the rest of the way)"."""
+    verdict = next((r for r in lg.get("injuries") or [] if r.get("verdict") == "drop" and r["name"] == name), None)
+    if verdict is not None:
+        return f" ({drop_verdict_note(verdict)})"
     pool = {p["name"]: p for p in bench(lg, exclude)}
     p = pool.get(name)
     if p is None:
@@ -122,6 +150,7 @@ class Spots:
     def __init__(self, lg: dict, open_spots: int, reserved: set[str]):
         self.lg, self.open, self.reserved, self.dropped = lg, max(int(open_spots or 0), 0), set(reserved), []
         self.gone: set[str] = set()  # drops already counted off, so a body noted twice (a Drop row the ledger then hands out) is one body
+        self.freed: list[str] = []  # the IR moves above whose bench spot is open for the next row that needs one, in card order
         # Bodies per position as the rows above leave them, against ESPN's caps (the IR occupant counts).
         self.pos_of = {p["name"]: p["pos"] for p in lg["roster"]}
         self.counts = Counter(self.pos_of.values())
@@ -139,14 +168,21 @@ class Spots:
             self.gone.add(drop)
             self.counts[self.pos_of[drop]] -= 1
 
+    def free(self, name: str) -> None:
+        """An IR move above frees a bench spot: the next row that needs one takes it instead of naming a drop."""
+        self.freed.append(name)
+
     def take(self, for_whom: str | None = None, adding: str | None = None, lands_ts: int | None = None) -> tuple[str | None, str]:
-        """(drop name or None, suffix for the row text). Uses an open spot before naming a drop. `adding` is the
+        """(drop name or None, suffix for the row text). Uses an open spot, then the spot an IR move above frees,
+        before naming a drop; the first drop named is a Drop-verdict player (`free_drops`), at cost 0. `adding` is the
         position of the player the spot is for; `lands_ts` is when the add actually lands (a claim's waiver run), so
         a claim that lands after an accepted trade processes can take the spot the trade frees."""
         self.note(add_pos=adding)
         if self.open > 0:
             self.open -= 1
             return None, " (there is an open bench spot)"
+        if self.freed:
+            return None, f" (into the spot {self.freed.pop(0)}'s IR move frees)"
         if lands_ts and self.after_ts and self.after_open > 0 and lands_ts >= self.after_ts:
             self.after_open -= 1
             return None, " (it lands after the accepted trade processes, so the spot the trade frees covers it; no drop)"

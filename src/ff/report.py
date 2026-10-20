@@ -6,8 +6,9 @@ from collections import Counter
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, handcuff_for, market_value, sit_note, weeks_left
+from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, drop_verdict_note, handcuff_for, market_value, sit_note, weeks_left, weeks_word
 from .model import waivers as waivers_model
+from .model.injuries import fill_spot
 
 HOME_TZ = ZoneInfo("America/Denver")   # Dustin's clock, for the times ESPN stamps on a trade
 
@@ -294,12 +295,6 @@ INJURY_LABEL = {"ir": "IR", "hold": "Holding", "drop": "Drop", "trade": "Hurt (t
 INJURY_NEEDS_RULING = ("drop", "trade")
 
 
-def _weeks(r: dict) -> str:
-    if r.get("return_week") is None and (r.get("avail_ros") or 0) == 0:
-        return "the season"
-    return f"~{r['weeks_out']:.0f} wk{'s' if r['weeks_out'] >= 1.5 else ''}"
-
-
 def _stash_note(r: dict, drop: str | None) -> str:
     """", added when he was stashed Oct 3" when the drop an activation takes is the body that stash brought in."""
     st = r.get("stash") or {}
@@ -315,12 +310,19 @@ def _stash_note(r: dict, drop: str | None) -> str:
 def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
     """One row per hurt player, the verb decided by `model.injuries`; this only puts words on the numbers.
 
-    Rows lead with the click (move to IR, drop X and add Y) so the checklist reads as a sequence. A hold is not a
-    click, so it comes back as kind `hold` and the renderers print it below the list, not in it. An activation
-    needs a bench spot, so it draws on the ledger; when the drop it takes is a player who has his own Drop row, that
-    row folds into this one (one click, one drop). The ledger counts a drop or an add on the row that prints it."""
+    Rows lead with the click (move to IR, drop X) so the checklist reads as a sequence. A hold is not a click, so it
+    comes back as kind `hold` and the renderers print it below the list, not in it. The ledger is where the spots
+    go: an IR move credits the bench spot it frees (`Spots.free`), a Drop-verdict player is the ledger's first drop
+    for any row that needs one (`ledger.free_drops`), and an activation draws its spot here. When the drop an
+    activation takes is a player who has his own Drop row, that row folds into this one (one click, one drop); a
+    Drop row the rows below take folds the same way, in `todos`. Who takes a spot nobody wanted is `_depth_adds`,
+    after every other row."""
     spots = spots or Spots(lg, lg.get("open_spots") or 0, set())
     drop_rows = {r["name"]: r for r in lg.get("injuries") or [] if r["verdict"] == "drop"}
+    # An IR move frees a bench spot (a swap with the occupant frees nothing): credit it before any row draws one.
+    for r in lg.get("injuries") or []:
+        if r["verdict"] == "ir" and not r.get("ir_occupant"):
+            spots.free(r["name"])
     # Every activation draws its spot before any row prints. `injuries.decide` orders rows by `mu_ros_active`, so the
     # Drop row an activation folds in can come first; folding on the fly then printed "drop Dart" on both rows.
     taken = {r["name"]: spots.take(for_whom=r["name"]) for r in lg.get("injuries") or [] if r["verdict"] == "activate"}
@@ -333,18 +335,13 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
         if v == "hold" and r["weeks_out"] < 2:
             continue  # out one game and worth keeping: the lineup row already handles him, this would be the injury report
         back = f", back wk {r['return_week']}" if r.get("return_week") else ""
-        horizon = f"out {_weeks(r)}{back}"
-        add = r.get("add")
+        horizon = f"out {weeks_word(r)}{back}"
         kind = "injury"
         detail = [horizon]
         if v == "ir":
             text = f"move {who} to IR"
             if r.get("ir_occupant"):
                 text += f" in place of {r['ir_occupant']}"
-            elif add:
-                text += f", then add {add['name']} ({add['pos']})"
-                detail.append(f"{add['name']}: {add['why']}")
-                spots.note(add_pos=add["pos"])
         elif v == "activate":
             st = (r.get("espn_status") or "active").replace("_", " ").lower()
             text = f"move {who} off IR"
@@ -355,7 +352,7 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
             if drop in folded:
                 d = drop_rows[drop]
                 text += f"; drop {drop} to make room"
-                detail.append(f"{drop} ({d['pos']}): out {_weeks(d)}, worth ~{d['hold_value']:.0f} pts the rest of the way{came_in}")
+                detail.append(f"{drop} ({d['pos']}): {drop_verdict_note(d)}{came_in}")
             else:
                 click, more = _spot_words(drop, suffix)
                 text += (click + " to make room") if drop else ""
@@ -366,10 +363,6 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
         elif v == "drop":
             text = f"drop {who}"
             detail = [f"{horizon}, worth ~{r['hold_value']:.0f} pts the rest of the way"]
-            spots.note(drop=r["name"], add_pos=add["pos"] if add else None)
-            if add:
-                text += f"; add {add['name']} ({add['pos']})"
-                detail.append(f"{add['name']}: {add['why']}")
         elif v == "trade":
             t = r["trades"][0]
             text = f"the offer to {t['rival']} for {', '.join(t['get'])} ships {who}; else hold"
@@ -380,9 +373,35 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
             detail = [f"{games} at ~{r['mu_ros_active']:.0f}/g on return"]
             if r.get("why"):
                 detail.append(r["why"][0])
-        out.append({"kind": kind, "id": f"injury:{slug(r['name'])}", "label": INJURY_LABEL[v], "verdict": v, "text": text, "detail": detail,
-                    "trade_ids": [f"trade:{slug('-'.join(t['get']))}" for t in r.get("trades") or []]})
+        out.append({"kind": kind, "id": f"injury:{slug(r['name'])}", "label": INJURY_LABEL[v], "verdict": v, "name": r["name"], "pos": r["pos"],
+                    "text": text, "detail": detail, "trade_ids": [f"trade:{slug('-'.join(t['get']))}" for t in r.get("trades") or []]})
     return out
+
+
+def _depth_adds(lg: dict, rows: list[dict], spots: Spots, added: set[str]) -> None:
+    """Depth comes last: a body for each spot still open after every row that needs one, on the row that frees it.
+    An IR move whose spot nobody above took reads "move X to IR, then add Y"; a Drop row nobody took reads "drop X;
+    add Y" and counts the drop. `fill_spot` picks Y (an upgrade, a handcuff, else the best body by the waiver score)
+    off `added` and the live position counts, so it never names a body a row above adds and never a third QB/K/D/ST."""
+    by_name = {p["name"]: p for p in lg["roster"]}
+    handcuffs = lg.get("handcuffs") or []
+    for row in rows:
+        if row.get("verdict") == "ir" and row["name"] in spots.freed:
+            spots.freed.remove(row["name"])
+            lead = ", then add "
+        elif row.get("verdict") == "drop":
+            spots.dropped.append(row["name"])
+            spots.note(drop=row["name"])
+            lead = "; add "
+        else:
+            continue
+        a = fill_spot(row["pos"], (by_name.get(row["name"]) or {}).get("eligible"), lg.get("waivers") or [], handcuffs, added, spots.counts)
+        if not a:
+            continue
+        added.add(a["name"])
+        spots.note(add_pos=a["pos"])
+        row["text"] += f"{lead}{a['name']} ({a['pos']})"
+        row["detail"].append(f"{a['name']}: {a['why']}")
 
 
 def _offer_items(lg: dict) -> list[dict]:
@@ -633,8 +652,8 @@ def _ledger(lg: dict) -> Spots:
 
 def todos(lg: dict) -> list[dict]:
     """The literal things to do today in one league, in the order Dustin clicks through ESPN: answer an offer, the
-    roster moves (IR, pickups with their drop, the drops with their add), then the lineup once the roster is what it
-    will be, then trades to go send. Each item: {id, kind, label, text, moves?}. kind ∈ trade_in | lineup | injury |
+    roster moves (IR, pickups with their drop, the drops nobody took with their add), then the lineup once the roster
+    is what it will be, then trades to go send. Each item: {id, kind, label, text, moves?}. kind ∈ trade_in | lineup | injury |
     waiver | waiver_up | stream | cover | sent | trade | hold. Holds come last and the renderers print them as a
     footnote, not a step. Shared by both renderers.
 
@@ -643,7 +662,9 @@ def todos(lg: dict) -> list[dict]:
     moment the add went through. Now the pickup's start is a move on the lineup row, conditional on the add.
 
     This is only the order and the push selection: each row kind has its own builder above, and the builders share
-    one ledger (`ff.ledger.Spots`) so an activation and a pickup never spend the same drop.
+    one ledger (`ff.ledger.Spots`) so an activation and a pickup never spend the same drop. The ledger decides who
+    takes a freed spot, in the order the card prints: an IR move's spot and a Drop-verdict player go to the first
+    row that needs a spot (the waiver, the cover), and depth (`_depth_adds`) gets only what is still open after.
 
     `id` is stable for a given packet, so reads.json can rule on one row by name instead of arguing with the
     whole card in prose. Player names make the ids readable; `_unique_ids` keeps them unique within a league
@@ -651,17 +672,18 @@ def todos(lg: dict) -> list[dict]:
     """
     out = _offer_items(lg)
     spots = _ledger(lg)
-    inj = _injury_items(lg, spots)  # counts each drop and add on the ledger as its row prints it (a folded Drop row's add never does)
-    # A Drop row spends its spot on its own add, so he is not the drop for a pickup too (the card once cut one body
-    # for two adds). An activation may still have folded him in above; that spot is spent either way.
-    spots.reserved |= {r["name"] for r in lg.get("injuries") or [] if r["verdict"] == "drop" and r.get("add")}
+    inj = _injury_items(lg, spots)  # credits each IR move's spot and draws each activation's; the Drop-verdict players are the free drops
     out += [i for i in inj if i["verdict"] in ("ir", "activate")]
-    added = {r["add"]["name"] for r in lg.get("injuries") or [] if r.get("add")}
+    added: set[str] = set()
     wv = _waiver_items(lg, spots, added)
     out += wv
     out += _stream_items(lg)
     out += _cover_items(lg, spots, added)
-    out += [i for i in inj if i["verdict"] == "drop"]
+    # A Drop row a pickup above took as its drop folded into that row (B12); the rest print, and then depth fills
+    # whatever spot is still open: the IR moves' and these drops', then the ones that were open this morning.
+    left = [i for i in inj if i["verdict"] == "drop" and i["name"] not in spots.dropped]
+    out += left
+    _depth_adds(lg, [i for i in inj if i["verdict"] == "ir"] + left, spots, added)
     out += _open_spot_items(lg, spots, added)
     out += [_lineup_item(lg, [i["pickup"] for i in wv if i.get("pickup")])]
     out += _sent_items(lg, spots)

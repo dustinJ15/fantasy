@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import UTC, date, datetime
 
 from .cache import HOUR, cached_json
@@ -299,18 +299,19 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     open_after = max(roster_max - bodies_after, 0) if has_bench else 0
     open_spots = max(min(roster_max - (bodies_after + n_out - n_in), open_after), 0) if has_bench else 0
     spots_after = open_after - open_spots
-    used = {r["add"]["name"] for r in injuries if r.get("add")}
+    used: set[str] = set()
+    held = Counter(p.pos for p in mine)
     open_adds, after_adds = [], []
     for _ in range(open_spots):
-        a = fill_spot(None, waivers, cuffs, used)
+        a = fill_spot(None, None, waivers, cuffs, used, held)
         if not a:
             break
-        open_adds.append(a); used.add(a["name"])
+        open_adds.append(a); used.add(a["name"]); held[a["pos"]] += 1
     for _ in range(spots_after):
-        a = fill_spot(None, waivers, cuffs, used)
+        a = fill_spot(None, None, waivers, cuffs, used, held)
         if not a:
             break
-        after_adds.append(a); used.add(a["name"])
+        after_adds.append(a); used.add(a["name"]); held[a["pos"]] += 1
 
     # offers other managers sent me (and mine still open), from ESPN's pending transactions. A trade both sides have
     # accepted sits in the same view until ESPN processes it (the league's review period); it is a done deal waiting

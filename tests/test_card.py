@@ -295,24 +295,28 @@ def injury(name, verdict, pos="RB", weeks_out=4.0, return_week=7, avail=0.6, fa=
             "avail_ros": avail, "mu_ros_active": 14.0, "hold_ppw": 3.0, "hold_value": 29.4, "drop_value": 13.8,
             "back_eff": 9.8, "w_eff": 13.8, "ir_eligible": True, "ir_open": 1, "ir_occupant": occupant,
             "best_fa": {"name": fa[0], "pos": pos, "delta_over_starter": fa[1], "ppw": fa[1]} if fa else None,
-            "add": {"name": fa[0], "pos": pos, "kind": "upgrade", "why": f"+{fa[1]:.1f}/wk"} if fa and verdict in ("ir", "drop") and not occupant else None,
             "trades": list(trades), "market": None, "verdict": verdict, "why": []}
 
 
 def test_each_verdict_is_a_row_with_the_numbers_in_words():
+    wire = [waiver("Pickup", pos="RB", slot="RB", week_slot="RB", delta_week=0.0, delta_over_starter=0.5), waiver("Pickup B", pos="RB", slot="RB", delta_week=0.0, delta_over_starter=0.3)]
     lg = league(injuries=[injury("Ankle Guy", "hold"), injury("Knee Guy", "ir", weeks_out=15, return_week=None, avail=0.0),
                           injury("Done Guy", "drop", weeks_out=15, return_week=None, avail=0.0),
-                          injury("Sell Guy", "trade", trades=[{"rival": "Them", "get": ["Star"]}]),
-                          injury("Back Guy", "activate", weeks_out=1, return_week=4)])
+                          injury("Sell Guy", "trade", trades=[{"rival": "Them", "get": ["Star"]}])], waivers=wire)
     rows = by_id(lg)
     assert rows["injury:ankle-guy"]["kind"] == "hold" and rows["injury:ankle-guy"]["label"] == "Holding"
     assert rows["injury:ankle-guy"]["text"] == "Ankle Guy (RB) out ~4 wks, back wk 7" and rows["injury:ankle-guy"]["detail"] == ["10 games at ~14/g on return"]
-    assert rows["injury:knee-guy"]["text"] == "move Knee Guy (RB) to IR, then add Pickup (RB)" and rows["injury:knee-guy"]["detail"] == ["out the season", "Pickup: +1.2/wk"]
+    assert rows["injury:knee-guy"]["text"] == "move Knee Guy (RB) to IR, then add Pickup (RB)" and rows["injury:knee-guy"]["detail"] == ["out the season", "Pickup: +0.5/wk"]
     assert rows["injury:done-guy"]["label"] == "Drop"
-    assert rows["injury:done-guy"]["text"] == "drop Done Guy (RB); add Pickup (RB)"
-    assert rows["injury:done-guy"]["detail"] == ["out the season, worth ~29 pts the rest of the way", "Pickup: +1.2/wk"]
+    assert rows["injury:done-guy"]["text"] == "drop Done Guy (RB); add Pickup B (RB)"
+    assert rows["injury:done-guy"]["detail"] == ["out the season, worth ~29 pts the rest of the way", "Pickup B: +0.3/wk"]
     assert "the offer to Them for Star ships Sell Guy (RB)" in rows["injury:sell-guy"]["text"] and rows["injury:sell-guy"]["trade_ids"] == ["trade:star"]
-    assert rows["injury:back-guy"]["label"] == "Activate" and rows["injury:back-guy"]["text"].startswith("move Back Guy (RB) off IR")
+    # An activation takes the spot the IR move above frees before naming a drop; the IR row then names no add.
+    lg["injuries"].append(injury("Back Guy", "activate", weeks_out=1, return_week=4))
+    rows = by_id(lg)
+    assert rows["injury:back-guy"]["label"] == "Activate" and rows["injury:back-guy"]["text"] == "move Back Guy (RB) off IR"
+    assert "into the spot Knee Guy's IR move frees" in report.detail_line(rows["injury:back-guy"])
+    assert rows["injury:knee-guy"]["text"] == "move Knee Guy (RB) to IR" and rows["injury:done-guy"]["text"] == "drop Done Guy (RB); add Pickup (RB)"
 
 
 def test_the_checklist_runs_in_espn_click_order_with_holds_last():
@@ -331,9 +335,11 @@ def test_a_one_game_hold_is_not_a_row():
     assert ids(lg) == ["injury:knee-guy", "lineup"]
 
 
-def test_ir_swap_names_the_occupant():
-    lg = league(injuries=[injury("Knee Guy", "ir", occupant="Old Stash")])
-    assert "in place of Old Stash" in by_id(lg)["injury:knee-guy"]["text"]
+def test_ir_swap_names_the_occupant_and_frees_nothing():
+    lg = league(injuries=[injury("Knee Guy", "ir", occupant="Old Stash")],
+                waivers=[waiver("Depth Guy", pos="RB", slot="RB", delta_week=0.0, delta_over_starter=0.5)])
+    row = by_id(lg)["injury:knee-guy"]
+    assert row["text"].endswith("in place of Old Stash") and "Depth Guy" not in full(row)
 
 
 def test_the_ir_occupant_is_never_the_drop_candidate():
@@ -720,3 +726,80 @@ def test_every_row_is_one_short_click_with_the_reasons_underneath():
             if x["kind"] != "lineup":
                 assert report.words(x["text"]) <= report.MAX_ROW_WORDS, (x["id"], x["text"])
                 assert isinstance(x.get("detail", []), list)
+
+
+# ---------- B12: a freed spot goes to the row that needs one, depth comes last ----------
+
+def grupe_league(**kw):
+    """The Oct 20 card: the only K is on IR with a Drop verdict, a healthy RB4 sits on the bench, Boswell is on the
+    wire, no open spot. The cover row used to cut the RB4 while the Drop row dropped the kicker for a depth body."""
+    grupe = {**player("Blake Grupe", pos="K", slot="K", p0=1.0, ros=0.0), "sources": {"espn_status": "INJURY_RESERVE"}}
+    lg = league(roster=[player("Starter WR", slot="WR"), player("TreVeyon Henderson", pos="RB", ros=6.4), grupe],
+                lineup_win={"slots": {"K": ["Blake Grupe"], "WR": ["Starter WR"]}, "p_win": 0.5, "mu": 90.0, "sd": 20.0, "bench": []},
+                injuries=[{**injury("Blake Grupe", "drop", pos="K", weeks_out=4.0, return_week=11, fa=None), "hold_value": 0.0,
+                           "espn_status": "INJURY_RESERVE"}],
+                waivers=[{**waiver("Chris Boswell", pos="K", slot="K", week_slot="K", team="PIT", streamer=True, delta_week=8.4,
+                                   delta_over_starter=5.2, score=1.0)}])
+    lg.update(kw)
+    return lg
+
+
+def test_a_drop_verdict_player_is_the_free_drop_for_the_row_that_needs_a_spot():
+    rows = by_id(grupe_league())
+    cover = rows["cover:k"]
+    assert "Chris Boswell" in cover["text"] and cover["text"].endswith("; drop Blake Grupe")
+    assert "Blake Grupe: on IR, out ~4 wks, worth ~0 pts the rest of the way" in report.detail_line(cover)
+    assert "injury:blake-grupe" not in rows  # the Drop row folded into the row that took him
+    assert not any("Henderson" in full(x) for x in rows.values())  # the healthy RB4 was never the cut
+
+
+def test_a_drop_row_nobody_took_prints_alone_with_a_depth_add_chosen_after_the_other_rows():
+    lg = grupe_league()
+    lg["roster"].append(player("Spare K", pos="K", p0=0.02, ros=7.0))  # a healthy K on the bench: no cover row
+    lg["waivers"].append({**waiver("Wire RB", pos="RB", slot="RB", week_slot="RB", delta_week=0.0, delta_over_starter=-2.0, score=3.0), "vorp": -1.0})
+    rows = by_id(lg)
+    assert "cover:k" not in rows
+    assert rows["injury:blake-grupe"]["text"] == "drop Blake Grupe (K); add Wire RB (RB)"
+    assert rows["injury:blake-grupe"]["detail"] == ["out ~4 wks, back wk 11, worth ~0 pts the rest of the way", "Wire RB: best body on the wire, depth only"]
+
+
+def test_the_waiver_row_claims_the_top_body_and_the_depth_add_never_names_a_third_qb():
+    """The Rodgers inversion: the model named the trending QB as the Drop row's depth add, so the waiver row claimed
+    the second QB. The waiver row runs first and names the top body; depth never adds a QB when two are held."""
+    lg = grupe_league()
+    lg["roster"] += [player("Trevor Lawrence", pos="QB", slot="QB", bye=True, mu=0.0), player("Justin Herbert", pos="QB", bye=True, mu=0.0)]
+    lg["lineup_win"]["slots"]["QB"] = ["Trevor Lawrence"]
+    # the packet lists the wire by score: Rodgers (START NOW +18.4, trending) ahead of Nix
+    lg["waivers"] += [waiver("Aaron Rodgers", pos="QB", slot="QB", week_slot="QB", delta_week=18.4, delta_over_starter=0.0, score=5.0, on_waivers=True),
+                      waiver("Bo Nix", pos="QB", slot="QB", week_slot="QB", delta_week=15.0, delta_over_starter=0.0, score=2.0, on_waivers=True)]
+    rows = by_id(lg)
+    assert "waiver:aaron-rodgers" in rows and "waiver:bo-nix" not in rows
+    assert rows["waiver:aaron-rodgers"]["text"].endswith("; drop Blake Grupe")
+    assert "injury:blake-grupe" not in rows
+    cover = rows["cover:k"]
+    assert "Chris Boswell" in cover["text"] and "drop" in cover["text"] and "Grupe" not in cover["text"].split("drop")[1]
+    assert not any("Bo Nix" in x["text"] for x in rows.values())
+
+
+def test_a_start_now_waiver_takes_the_spot_the_ir_move_frees_and_the_ir_row_names_no_add():
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Hurt RB", pos="RB", ros=0.0)],
+                injuries=[injury("Hurt RB", "ir", weeks_out=15, return_week=None, avail=0.0)],
+                waivers=[waiver("Now Guy"), {**waiver("Depth Guy", delta_week=0.0, delta_over_starter=-1.0, score=2.0), "vorp": -1.0}])
+    rows = by_id(lg)
+    assert rows["injury:hurt-rb"]["text"] == "move Hurt RB (RB) to IR"
+    wv = rows["waiver:now-guy"]
+    assert "drop" not in wv["text"] and "into the spot Hurt RB's IR move frees" in report.detail_line(wv)
+    assert "Bench WR" not in full(wv)
+    assert not any("Depth Guy" in full(x) for x in rows.values())  # the freed spot went to the pickup; nothing is left for depth
+
+
+def test_depth_fills_only_a_spot_nobody_above_wanted():
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench WR", ros=3.0), player("Hurt RB", pos="RB", ros=0.0),
+                        player("QB One", pos="QB", slot="QB"), player("QB Two", pos="QB")],
+                injuries=[injury("Hurt RB", "ir", weeks_out=15, return_week=None, avail=0.0)],
+                waivers=[{**waiver("Third QB", pos="QB", slot="QB", week_slot="QB", delta_week=0.0, delta_over_starter=-3.0, score=9.0), "vorp": -1.0},
+                         {**waiver("Depth RB", pos="RB", slot="RB", week_slot="RB", delta_week=0.0, delta_over_starter=-3.0, score=2.0), "vorp": -1.0}])
+    row = by_id(lg)["injury:hurt-rb"]
+    assert row["text"] == "move Hurt RB (RB) to IR, then add Depth RB (RB)"
+    assert row["detail"] == ["out the season", "Depth RB: best body on the wire, depth only"]
+    assert ids(lg) == ["injury:hurt-rb", "lineup"]

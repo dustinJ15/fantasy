@@ -118,17 +118,23 @@ def _best_fa(p: PlayerProj, waivers: list[dict]) -> dict | None:
     return max(pool, key=fa_ppw) if pool else None
 
 
-def fill_spot(p: PlayerProj | None, waivers: list[dict], handcuffs: list[dict], used: set[str]) -> dict | None:
-    """Who takes the bench spot an IR move or a drop frees (`p` is the player leaving), or an already open one
-    (`p` is None). Being below the wire is the right bar for cutting him and the wrong one for filling the spot: an
-    empty slot is worth less than any body. Order: a pickup who would start or beats replacement, else a free-agent
-    handcuff for one of my RB1s, else the best body at his position by the waiver score, else the best body on the
-    wire. `used` keeps two spots from naming the same player."""
+def fill_spot(pos: str | None, eligible: list[str] | None, waivers: list[dict], handcuffs: list[dict], used: set[str],
+              held: dict[str, int] | None = None) -> dict | None:
+    """Who takes a bench spot nobody on the card wanted: the one an IR move or a drop frees (`pos` and `eligible`
+    are the player leaving) or an already open one (`pos` is None). Being below the wire is the right bar for
+    cutting him and the wrong one for filling the spot: an empty slot is worth less than any body. Order: a pickup
+    who would start or beats replacement, else a free-agent handcuff for one of my RB1s, else the best body at his
+    position by the waiver score, else the best body on the wire. `used` keeps two spots from naming the same
+    player (the rows above already add those). `held` is bodies per position as the rows above leave the roster: a
+    depth body at a one-starter position (QB, K, D/ST) is never named when two are already held (B12: the card
+    added a fourth QB as "depth only"). Report time calls this (`report.todos`), after every row that needs a spot
+    has taken one, so a freed spot goes to need before depth."""
+    held = held or {}
     skill = [w for w in waivers if not w.get("streamer") and w["name"] not in used]
     # Like for like only at the flex positions. A backup at a one-starter position (QB, K, D/ST) is near-worthless
     # in a bench spot, so losing one is no reason to add another; the best skill body on the wire is.
-    fit = [w for w in skill if p is not None and p.pos not in ONE_STARTER
-           and (w.get("slot") in p.eligible or w.get("pos") == p.pos)]
+    fit = [w for w in skill if pos is not None and pos not in ONE_STARTER
+           and (w.get("slot") in (eligible or []) or w.get("pos") == pos)]
     best = max(fit or skill, key=fa_ppw) if (fit or skill) else None
     if best and fa_ppw(best) > 0:
         return {"name": best["name"], "pos": best["pos"], "kind": "upgrade", "why": f"+{fa_ppw(best):.1f}/wk"}
@@ -137,7 +143,8 @@ def fill_spot(p: PlayerProj | None, waivers: list[dict], handcuffs: list[dict], 
     if cuff:
         return {"name": cuff["handcuff"], "pos": "RB", "kind": "handcuff", "why": f"handcuff for {cuff['starter']}"}
     by_score = lambda w: (w.get("score", 0), w.get("mu_ros", 0))  # the waiver score ties at the trend cap; per-game breaks it
-    body = max(fit, key=by_score, default=None) or max(skill, key=by_score, default=None)
+    depth = lambda ws: [w for w in ws if not (w["pos"] in ONE_STARTER and held.get(w["pos"], 0) >= 2)]  # noqa: E731
+    body = max(depth(fit), key=by_score, default=None) or max(depth(skill), key=by_score, default=None)
     if body:
         return {"name": body["name"], "pos": body["pos"], "kind": "depth", "why": "best body on the wire, depth only"}
     return None
@@ -150,7 +157,7 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
     """One entry per hurt player (weeks_out >= 1, or already in the IR slot), most valuable first.
 
     `repl` is the league's replacement level per position (`vbd.replacement_levels`), the floor for depth value.
-    `handcuffs` is `waivers.handcuffs` output; a free-agent one is the first choice for a freed bench spot.
+    `handcuffs` is `waivers.handcuffs` output, for the handcuff value in `player_drop_cost`.
     `ir_memory` is `rulings.ir_memory` for this league: when he last left the IR slot and who came in when he was
     stashed, so a bouncing tag does not re-stash him and the activate row can name the body the stash added."""
     repl = repl or {}
@@ -283,12 +290,7 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
                 else:
                     why.append(f"worth {c['hold_value']:.0f} pts on return vs {c['drop_value']:.0f} from {c['fa']['name']}")
         out.append(row)
-    # Every freed spot gets a name. An IR swap frees nothing (the occupant comes back to the bench).
-    used: set[str] = set()
-    for row in out:
-        row["add"] = None
-        if row["verdict"] in ("ir", "drop") and not row.get("ir_occupant"):
-            row["add"] = fill_spot(next(p for p in hurt if p.espn_id == row["espn_id"]), waivers, handcuffs, used)
-            if row["add"]:
-                used.add(row["add"]["name"])
+    # Who takes the spot an IR move or a drop frees is the checklist's call (`report.todos`, via `fill_spot`), once
+    # every row that needs a spot has taken one: named here, the depth body spent the spot before the cover row and
+    # the waiver row could (B12).
     return out

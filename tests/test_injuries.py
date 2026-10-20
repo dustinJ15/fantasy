@@ -1,7 +1,7 @@
 """IR / trade / drop / hold for a hurt player: the worked examples from docs/plans/injured-player-decision.md."""
 import pytest
 
-from ff.model.injuries import decide, week_weights
+from ff.model.injuries import decide, fill_spot, week_weights
 from ff.model.season import TITLE_RUN_MULT
 from tests.conftest import P
 
@@ -250,51 +250,58 @@ def depth_fa(name, pos="RB", score=1.0):
 
 
 def test_a_freed_spot_names_a_pickup_even_when_nobody_on_the_wire_beats_replacement():
-    mine = roster(); hurt(mine[1], 15, 15, 3)  # RB1 done for the year, no IR slot: a drop
+    mine = roster(); hurt(mine[1], 15, 15, 3)  # RB1 done for the year, no IR slot: a drop, with no add on the row
     (row,) = run(mine, 3, 60, waivers=[depth_fa("Body A", score=2.0), depth_fa("Body B", score=5.0)])
-    assert row["verdict"] == "drop" and row["add"] == {"name": "Body B", "pos": "RB", "kind": "depth", "why": "best body on the wire, depth only"}
+    assert row["verdict"] == "drop" and "add" not in row  # who takes the spot is the checklist's call (B12)
+    assert fill_spot("RB", ["RB", "RB/WR/TE"], [depth_fa("Body A", score=2.0), depth_fa("Body B", score=5.0)], [], set()) == \
+        {"name": "Body B", "pos": "RB", "kind": "depth", "why": "best body on the wire, depth only"}
 
 
 def test_a_free_agent_handcuff_beats_a_depth_body_for_the_freed_spot():
-    mine = roster(); hurt(mine[1], 15, 15, 3)
     cuffs = [{"starter": "RB2", "handcuff": "Backup", "owner_team_id": None, "est_value": 1.1},
              {"starter": "RB1", "handcuff": "Owned Guy", "owner_team_id": 4, "est_value": 3.0}]
-    (row,) = run(mine, 3, 60, waivers=[depth_fa("Body B", score=5.0)], handcuffs=cuffs)
-    assert row["add"]["name"] == "Backup" and row["add"]["why"] == "handcuff for RB2"
+    add = fill_spot("RB", ["RB", "RB/WR/TE"], [depth_fa("Body B", score=5.0)], cuffs, set())
+    assert add["name"] == "Backup" and add["why"] == "handcuff for RB2"
 
 
 def test_a_real_upgrade_still_comes_first_and_two_spots_get_two_names():
-    mine = roster(); hurt(mine[1], 15, 15, 3); hurt(mine[2], 15, 15, 3)  # RB1 and RB2 done; one IR slot, one drop
     cuffs = [{"starter": "RB3", "handcuff": "Backup", "owner_team_id": None, "est_value": 1.1}]
-    rows = {r["name"]: r for r in run(mine, 3, 60, ir_slots=1, waivers=fa(1.5, name="Starter FA") + [depth_fa("Body B")], handcuffs=cuffs)}
-    assert rows["RB1"]["verdict"] == "ir" and rows["RB1"]["add"]["name"] == "Starter FA" and rows["RB1"]["add"]["kind"] == "upgrade"
-    assert rows["RB2"]["verdict"] == "drop" and rows["RB2"]["add"]["name"] == "Backup"
+    wire = fa(1.5, name="Starter FA") + [depth_fa("Body B")]
+    first = fill_spot("RB", ["RB", "RB/WR/TE"], wire, cuffs, set())
+    assert first["name"] == "Starter FA" and first["kind"] == "upgrade"
+    assert fill_spot("RB", ["RB", "RB/WR/TE"], wire, cuffs, {first["name"]})["name"] == "Backup"
 
 
-def test_an_ir_swap_frees_nothing_so_names_nobody():
+def test_an_ir_swap_frees_nothing():
     mine = roster(); hurt(mine[1], 6, 15, 3)
     hurt(mine[9], 15, 15, 3); mine[9].slot = "IR"
     row = next(r for r in run(mine, 3, 60, ir_slots=1, waivers=[depth_fa("Body B")]) if r["name"] == "RB1")
-    assert row["verdict"] == "ir" and row["ir_occupant"] == "TE2" and row["add"] is None
+    assert row["verdict"] == "ir" and row["ir_occupant"] == "TE2"
 
 
 def test_an_open_spot_with_no_player_leaving_still_gets_a_name():
-    from ff.model.injuries import fill_spot
     cuffs = [{"starter": "RB1", "handcuff": "Backup", "owner_team_id": None, "est_value": 1.1}]
-    assert fill_spot(None, [depth_fa("Body B")], cuffs, set())["name"] == "Backup"
-    assert fill_spot(None, [depth_fa("Body B")], cuffs, {"Backup"})["name"] == "Body B"
-    assert fill_spot(None, [], [], set()) is None
+    assert fill_spot(None, None, [depth_fa("Body B")], cuffs, set())["name"] == "Backup"
+    assert fill_spot(None, None, [depth_fa("Body B")], cuffs, {"Backup"})["name"] == "Body B"
+    assert fill_spot(None, None, [], [], set()) is None
 
 
 def test_a_dropped_backup_qb_is_replaced_by_the_best_skill_body_not_another_qb():
-    from ff.model.injuries import fill_spot
-    qb2 = P(99, "QB2", "QB", 12)
     pool = [dict(depth_fa("Some QB", pos="QB", score=1.5), mu_ros=8.0), dict(depth_fa("Better QB", pos="QB", score=1.5), mu_ros=16.0),
             dict(depth_fa("Skill WR", pos="WR", score=5.0), mu_ros=10.0)]
-    assert fill_spot(qb2, pool, [], set())["name"] == "Skill WR"
-    rb = P(98, "RB4", "RB", 6)
+    assert fill_spot("QB", ["QB"], pool, [], set())["name"] == "Skill WR"
     tied = [dict(depth_fa("Low RB", score=1.5), mu_ros=5.0), dict(depth_fa("High RB", score=1.5), mu_ros=9.0)]
-    assert fill_spot(rb, tied, [], set())["name"] == "High RB"
+    assert fill_spot("RB", ["RB", "RB/WR/TE"], tied, [], set())["name"] == "High RB"
+
+
+def test_depth_never_names_a_third_qb_kicker_or_dst():
+    """Oct 20: two QBs on bye and the Drop row added a third as "depth only". A one-starter position holds two at most
+    from depth; an upgrade (he would start) still goes through."""
+    wire = [dict(depth_fa("Some QB", pos="QB", score=9.0), mu_ros=16.0), dict(depth_fa("Body RB", score=1.0), mu_ros=5.0)]
+    assert fill_spot(None, None, wire, [], set(), {"QB": 2})["name"] == "Body RB"
+    assert fill_spot(None, None, wire, [], set(), {"QB": 1})["name"] == "Some QB"
+    assert fill_spot(None, None, [wire[0]], [], set(), {"QB": 2}) is None
+    assert fill_spot(None, None, fa(1.5, name="Starting QB", pos="QB", slot="QB"), [], set(), {"QB": 2})["kind"] == "upgrade"
 
 
 # ---------- a bouncing ESPN tag: just off IR, tagged Out again ----------
