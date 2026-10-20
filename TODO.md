@@ -10,6 +10,7 @@ Sizes: XS under an hour, S a morning, M a day or two, L a week with a plan in `d
 ## Working an item in a fresh session
 
 Dustin's prompt is one line: "Read CLAUDE.md and TODO.md, take the top unchecked item (or item <id>), fix it, and open a PR."
+Run as a loop, one fresh session per item: `docs/ralph-loop.md`.
 The session then:
 
 1. Reads CLAUDE.md (the boundary rule, the layout, the failure table) and this file. Reads the files the item names
@@ -96,4 +97,8 @@ causes and the fixtures. Take them in order.
 
 ## Docs
 
-(none open)
+- [ ] **Docs-1 (S). One shape for the markdown, and a CLAUDE.md under 90 lines.** Take this before any tier: every
+  session loads CLAUDE.md, so every line cut here is paid back each run. Spec and done-when in
+  `docs/ralph-loop.md` under "Docs-1": a `docs/README.md` index, the fixed rows of the failure table to
+  `docs/failures.md`, Operations to `docs/operations.md`, ROADMAP marks items 4 and 7 done, the plans' open questions
+  become TODO lines or are closed, one status header on every plan.
