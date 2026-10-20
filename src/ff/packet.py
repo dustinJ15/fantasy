@@ -41,11 +41,13 @@ def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
 
 def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining: int, overrides: dict | None,
            sl_proj: dict | None = None, lines: dict | None = None, week: int | None = None,
-           weekday: int | None = None, wx: dict | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
-    """`wx` is team -> kickoff forecast (`weather.by_team`); None or a missing team reads as calm."""
+           weekday: int | None = None, wx: dict | None = None,
+           usage_sig: dict | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
+    """`wx` is team -> kickoff forecast (`weather.by_team`); None or a missing team reads as calm. `usage_sig` is
+    gsis_id -> season-to-date opportunity (`usage.signals`); None or an unmatched player leaves his level alone."""
     ppr = snap["settings"].get("ppr", 1.0)
     key = "pts_ppr" if ppr >= 0.75 else ("pts_half_ppr" if ppr > 0 else "pts_std")
-    sl_proj, lines, wx = sl_proj or {}, lines or {}, wx or {}
+    sl_proj, lines, wx, usage_sig = sl_proj or {}, lines or {}, wx or {}, usage_sig or {}
 
     def mk(rows):
         out = []
@@ -58,9 +60,10 @@ def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining
                 sp = sl_proj.get(sid) if sid else None
             spts = float(sp[key]) if sp and sp.get(key) is not None else None
             ln = lines.get(r["team"]) or {}
+            gsis = (xw.lookup(r["espn_id"], r["name"], r["pos"]) or {}).get("gsis_id") if usage_sig else None
             out.append(blend(r, fp, inj.get(str(r["espn_id"])), weeks_remaining, overrides,
                              sleeper_pts=spts, implied_total=ln.get("implied"), week=week, weekday=weekday,
-                             weather=wx.get(r["team"])))
+                             weather=wx.get(r["team"]), usage=usage_sig.get(gsis) if gsis else None))
         return out
     return mk(snap["roster"]), mk(snap["free_agents"])
 
@@ -142,7 +145,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     # projections use the Friday sit-risk numbers, so fixtures and the demo do not change with the calendar.
     now_dt = now if (now is not None and getattr(now, "tzinfo", None) is not None) else datetime.now(UTC)
     rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines, week=week,
-                           weekday=now_dt.weekday() if now is not None else None, wx=wx)
+                           weekday=now_dt.weekday() if now is not None else None, wx=wx, usage_sig=usage_sig)
     apply_clock(rostered, snap["roster"], lines or {}, now)
     apply_clock(fas, snap["free_agents"], lines or {}, now, free_agents=True)
     pool = rostered + fas

@@ -284,3 +284,21 @@ def test_the_packet_carries_the_leagues_clocks_and_a_claim_says_when_it_lands(mo
     snap["waiver_run_ts"] = int(datetime(2026, 9, 16, 7, 0, tzinfo=UTC).timestamp() * 1000)
     blk2 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=100, now=now)
     assert blk2["deadlines"]["waiver_run_source"] == "espn" and blk2["deadlines"]["waiver_run_word"] == "Wed 1:00 AM"
+
+
+def test_usage_reaches_the_rest_of_season_level_through_the_crosswalk(monkeypatch):
+    """D1: `usage.signals` (gsis_id -> season opportunity) is matched through the crosswalk in `_projs` and moves
+    `mu_ros` on the matched receiver and nobody else; the demo's FakeCrosswalk maps espn_id N to gsis `gN`."""
+    snap = make_snapshot()
+    star = next(p for p in snap["roster"] if p["fantasy_team_id"] == snap["my_team_id"] and p["pos"] == "WR")
+    star["actual_season"], star["games_played"] = 80.0, 4
+    base = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=50)
+    usage = {f"g{star['espn_id']}": {"flags": [], "games": 4, "ppg": 20.0, "xfp_pg": 16.0, "tgt_share": 0.26, "tgt_pg": 8.0, "carry_pg": 0.0}}
+    blk = analyze_league(snap, FakeXW(), {}, {}, {}, usage, overrides=None, sims=50)
+    mine = {p["espn_id"]: p for p in base["roster"]}
+    moved = {p["espn_id"]: p for p in blk["roster"]}
+    assert moved[star["espn_id"]]["mu_ros"] < mine[star["espn_id"]]["mu_ros"]
+    assert moved[star["espn_id"]]["sources"]["opp_mult"] == pytest.approx(0.9)
+    assert moved[star["espn_id"]]["usage"]["tgt_share"] == 0.26   # the usage cell still renders from the same dict
+    others = [eid for eid in mine if eid != star["espn_id"]]
+    assert all(moved[e]["mu_ros"] == mine[e]["mu_ros"] for e in others)

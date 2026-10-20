@@ -60,7 +60,8 @@ def season_summary(season: int, through_week: int | None = None) -> pl.DataFrame
 
 
 def signals(summary: pl.DataFrame) -> dict[str, dict]:
-    """gsis_id -> buy_low / sell_high / usage flags."""
+    """gsis_id -> buy_low / sell_high / usage flags, and the per-game numbers `projections.opportunity_mult` reads
+    (`games`, `ppg`, `xfp_pg`, both PPR; their ratio is what moves a rest-of-season level)."""
     out = {}
     for r in summary.iter_rows(named=True):
         flags = []
@@ -73,6 +74,7 @@ def signals(summary: pl.DataFrame) -> dict[str, dict]:
                 flags.append(f"target_share {r['tgt_share']:.0%}")
             if r["carry_pg"] and r["carry_pg"] >= 15:
                 flags.append(f"bellcow {r['carry_pg']:.0f} carries/g")
-        out[r["gsis_id"]] = {"flags": flags, "ppg": round(r["ppg"] or 0, 1), "xfp_pg": round((r["xfp_lite"] or 0) / max(r["games"], 1), 1),
+        out[r["gsis_id"]] = {"flags": flags, "games": int(r["games"] or 0),
+                             "ppg": round(r["ppg"] or 0, 1), "xfp_pg": round((r["xfp_lite"] or 0) / max(r["games"], 1), 1),
                              "tgt_share": r["tgt_share"], "tgt_pg": round(r["tgt_pg"] or 0, 1), "carry_pg": round(r["carry_pg"] or 0, 1)}
     return out
