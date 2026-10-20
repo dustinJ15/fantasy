@@ -22,6 +22,11 @@ What the archive keeps and what it lost, so the replay is honest about which hal
   table is a test of that prior: over-confident P(win) (an 80% bin that wins 65%) says the sigma is too small.
 - A matchup spread over two scoring periods (a two-week final) is skipped: ESPN's per-period box score carries the
   period's roster but the matchup's running total. `skipped_weeks` names them.
+- Version 2 adds `players`, the universe (TODO D12, `docs/plans/scanner-replay.md`): every player in ESPN's
+  ownership-sorted list, with the preseason season total and his projection and actual for every period, so the
+  scanner replay can build the week-w wire (the universe minus the week-w rosters: ESPN keeps no past pool, the
+  probe found) and the rest-of-season prior the live scan has. `universe_missing` counts the rostered players the
+  list does not reach (or carries without a `stats` block); each is priced from his box-score rows alone.
 """
 from __future__ import annotations
 
@@ -37,7 +42,7 @@ from .model.projections import PlayerProj, blend
 from .sources import espn
 
 REPLAY_DIR = DATA_DIR / "replay"
-REPLAY_VERSION = 1
+REPLAY_VERSION = 2
 # Reliability bins over P(win): ten of 10 points each. A season of one league is ~80 matchups, three leagues ~250,
 # so the middle bins hold 30-50 each and the tails a handful; the table prints n so a thin bin is read as thin.
 BINS = 10
@@ -81,12 +86,47 @@ def _first_kickoff(lineup: list) -> str | None:
     return min(dates).date().isoformat() if dates else None
 
 
+def _universe_row(p) -> dict:
+    """One player of the universe pull, as the replay keeps him. `p` is an espn-api Player from `espn.player_universe`
+    (or anything with the same attributes): `stats[period]` carries `projected_points` (ESPN's number before that
+    period's kickoff, the box score's) and `points` (the final) for every period the season has played; period 0 is
+    the season row, whose `projected_points` is the static preseason total the live scan fades (`proj_season`)."""
+    weeks = {}
+    for per, st in (p.stats or {}).items():
+        if int(per) < 1:
+            continue
+        row = {}
+        if "projected_points" in st:
+            row["proj"] = round(float(st["projected_points"] or 0.0), 2)
+        if "points" in st:
+            row["actual"] = round(float(st["points"] or 0.0), 2)
+        if row:
+            weeks[int(per)] = row
+    return {"espn_id": int(p.playerId), "name": p.name, "pos": p.position, "team": getattr(p, "proTeam", None),
+            "eligible": [s for s in p.eligibleSlots if s not in espn.NON_STARTER],
+            "proj_season": round(float(getattr(p, "projected_total_points", 0) or 0.0), 2),
+            "bye_weeks": espn.bye_weeks(p), "weeks": weeks}
+
+
+def universe(players: list, rostered: set[int]) -> tuple[dict[int, dict], int, int]:
+    """The universe as the replay keeps it: espn_id -> `_universe_row` for every pulled player with a `stats` block,
+    the size of the pull, and how many of `rostered` (everyone on any replayed week's roster) it does not hold. A
+    player with no `stats` block at all (the probe found one, a season-long 0.0 on a bench) has neither the season
+    total nor a period, so he is left out and counted: the scan prices him from his box-score rows alone."""
+    out = {int(p.playerId): _universe_row(p) for p in players if p.stats}
+    return out, len(players), sum(pid not in out for pid in rostered)
+
+
 def pull_replay(ref: LeagueRef, league, season: int, weeks: list[int] | None = None, today: date | None = None) -> dict:
     """One league's season from ESPN's box scores (read-only). `league` is a connected espn-api League for `season`.
 
     Only the scoring periods that are a whole matchup period are pulled (the regular season everywhere, and a
     playoff round that is one week); a week that is one half of a two-week matchup goes to `skipped_weeks`. A week
-    nobody has played yet (every score zero) is left out, so the current season replays up to last week."""
+    nobody has played yet (every score zero) is left out, so the current season replays up to last week.
+
+    The universe (`players`) is one `espn.player_universe` pull at the current period: the probe found that one
+    pull carries every period's projection and actual, and that the pull's own period changes nothing else the
+    replay reads (the ownership, designation and team it carries are today's and are not kept)."""
     s = espn.settings(ref, league)
     single = {per[0]: m for m, per in s.matchup_periods.items() if len(per) == 1}
     multi = sorted(w for m, per in s.matchup_periods.items() if len(per) > 1 for w in per)
@@ -113,10 +153,13 @@ def pull_replay(ref: LeagueRef, league, season: int, weeks: list[int] | None = N
         if not matchups or all(m["home_score"] == 0 and m["away_score"] == 0 for m in matchups):
             continue   # not played yet
         out_weeks.append({"week": w, "first_kickoff": _first_kickoff(players), "matchups": matchups})
+    rostered = {r["espn_id"] for wk in out_weeks for m in wk["matchups"] for r in m["home_roster"] + m["away_roster"]}
+    uni, size, missing = universe(espn.player_universe(league, league.current_week), rostered)
     return {"version": REPLAY_VERSION, "season": season, "league": ref.name, "pulled": (today or date.today()).isoformat(),
             "settings": {"name": s.name, "team_count": s.team_count, "lineup_slots": s.lineup_slots, "ppr": s.ppr,
                          "reg_season_weeks": s.reg_season_weeks, "playoff_weeks": s.playoff_weeks},
-            "skipped_weeks": [w for w in multi if w <= league.current_week], "weeks": out_weeks}
+            "skipped_weeks": [w for w in multi if w <= league.current_week], "weeks": out_weeks,
+            "universe_size": size, "universe_missing": missing, "players": uni}
 
 
 def save_replay(rep: dict) -> Path:
@@ -127,9 +170,14 @@ def save_replay(rep: dict) -> Path:
 
 
 def load_replay(path: str | Path) -> dict:
+    """The replay file back as `pull_replay` built it: JSON strings the `players` keys and each player's `weeks`
+    keys, so both come back as ints. A version-1 file (no universe) is refused; the box-score half is unchanged, so
+    `ff replay-pull` again is the whole fix."""
     rep = json.loads(Path(path).read_text())
     if rep.get("version") != REPLAY_VERSION:
-        raise SystemExit(f"{path}: replay version {rep.get('version')}, this code reads {REPLAY_VERSION}; re-run `ff replay-pull`")
+        raise SystemExit(f"{path}: replay version {rep.get('version')}, this code reads {REPLAY_VERSION} "
+                         f"(version 2 added the player universe); re-run `ff replay-pull`")
+    rep["players"] = {int(pid): {**row, "weeks": {int(w): v for w, v in row["weeks"].items()}} for pid, row in rep["players"].items()}
     return rep
 
 
