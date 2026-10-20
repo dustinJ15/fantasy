@@ -39,3 +39,25 @@ def test_coverage_finds_the_depth_and_the_misses_per_size():
     assert out["missing_at"] == {300: 2, 600: 1, 1000: 1}
     beyond = probe.coverage(ordered[:200], rostered)
     assert beyond["depth"] is None and beyond["beyond_pull"] == 2
+
+
+def _entry(pid, status="ACTIVE", owned=50.0, team=1):
+    return {"id": pid, "onTeamId": team, "player": {"injuryStatus": status, "ownership": {"percentOwned": owned}}}
+
+
+def test_payload_drift_reads_a_matching_payload_as_todays_and_counts_the_moves():
+    past = {1: _entry(1, team=3), 2: _entry(2, team=0), 3: _entry(3, "OUT", 80.0, 2)}
+    now = {1: _entry(1, team=3), 2: _entry(2, team=0), 3: _entry(3, "OUT", 80.0, 2)}
+    box_team = {1: 1, 2: 2, 3: 2}   # week w held 1 on team 1, 2 on team 2; the past payload says team 3 and the wire
+    out = probe.payload_drift(past, now, box_team)
+    assert out["verdict"].startswith("today's")
+    assert (out["status_diff"], out["owned_diff"], out["team_diff"]) == (0, 0, 0)
+    assert out["moved"] == 2 and out["moved_to_today"] == 2 and out["n_rostered"] == 3
+
+
+def test_payload_drift_counts_each_field_that_differs():
+    past = {1: _entry(1, "QUESTIONABLE", 40.0, 1), 2: _entry(2, owned=10.0, team=1), 3: _entry(3, team=1)}
+    now = {1: _entry(1, "ACTIVE", 40.0, 1), 2: _entry(2, owned=12.0, team=1), 3: _entry(3, team=4)}
+    out = probe.payload_drift(past, now, {1: 1, 2: 1, 3: 1})
+    assert (out["status_diff"], out["owned_diff"], out["team_diff"]) == (1, 1, 1)
+    assert out["moved"] == 0 and out["verdict"].startswith("the past period")

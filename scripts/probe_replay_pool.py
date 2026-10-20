@@ -11,8 +11,10 @@ and prints:
      (`projection_agreement`);
   3. how deep an ownership-sorted pull must go to hold every player on any week-w roster, and how many it misses at
      300, 600 and 1000 (`coverage`);
-  4. whether the past-period payload's `injuryStatus` and `percentOwned` are today's (a few rostered players, side by
-     side with the current period's payload).
+  4. whether the past-period payload's `injuryStatus`, `percentOwned` and `onTeamId` are today's: the count of
+     players on which the two payloads differ, how many rostered-that-week players the past payload puts on a team
+     other than the box score's and whether that is today's team (`payload_drift`), then a few rostered players side
+     by side.
 The answers go under "What the probe found" in the plan. The pure functions have no ESPN in them and are tested in
 `tests/test_probe_replay_pool.py`; `main` is the only thing that talks to ESPN.
 """
@@ -75,6 +77,31 @@ def coverage(ordered_ids: list[int], rostered_ids: set[int], sizes: tuple[int, .
             "missing_at": {s: sum(r is None or r > s for r in ranks) for s in sizes}}
 
 
+def payload_drift(past: dict[int, dict], now: dict[int, dict], box_team: dict[int, int]) -> dict[str, Any]:
+    """Question 4. `past` and `now` are espn_id -> the `kona_player_info` entry for the past period and the current
+    one; `box_team` is espn_id -> the team that held the player in the week-w box scores. Over the players both
+    payloads carry: how many `injuryStatus`, `percentOwned` and `onTeamId` differ between the two payloads (zero says
+    the past-period payload is today's), and over the rostered ones how many the past payload puts on a team other
+    than the box score's (`moved`) and how many of those it puts on today's team (`moved_to_today`: today's, not the
+    week's)."""
+    both = [pid for pid in past if pid in now]
+
+    def field(e: dict, key: str):
+        pl = e.get("player") or {}
+        return (pl.get("ownership") or {}).get("percentOwned") if key == "percentOwned" else pl.get(key)
+
+    status_diff = sum(field(past[pid], "injuryStatus") != field(now[pid], "injuryStatus") for pid in both)
+    owned_diff = sum(abs(float(field(past[pid], "percentOwned") or 0) - float(field(now[pid], "percentOwned") or 0)) > 0.05
+                     for pid in both)
+    team_diff = sum(past[pid].get("onTeamId") != now[pid].get("onTeamId") for pid in both)
+    moved = [pid for pid, t in box_team.items() if pid in past and int(past[pid].get("onTeamId") or 0) != int(t)]
+    moved_to_today = sum(pid in now and past[pid].get("onTeamId") == now[pid].get("onTeamId") for pid in moved)
+    return {"n_both": len(both), "status_diff": status_diff, "owned_diff": owned_diff, "team_diff": team_diff,
+            "n_rostered": sum(pid in past for pid in box_team), "moved": len(moved), "moved_to_today": moved_to_today,
+            "verdict": "today's payload (designation, ownership and team all match the current period's)"
+            if not (status_diff or owned_diff or team_diff) else "the past period's payload differs from today's"}
+
+
 # ---------- the ESPN half ----------
 
 def _players(league, week: int, size: int, statuses: list[str] | None) -> list[dict]:
@@ -103,9 +130,14 @@ def main(argv: list[str]) -> None:
         lg = espn.connect(ref, season)
         print(f"\n== {ref.name}: {lg.settings.name}, season {season}, probing week {week} (current week {lg.current_week})")
         rostered: dict[int, float] = {}
+        box_team: dict[int, int] = {}
         for b in lg.box_scores(week):
-            for p in list(b.home_lineup) + list(b.away_lineup):
-                rostered[int(p.playerId)] = float(p.projected_points or 0.0)
+            for side, lineup in (("home", b.home_lineup), ("away", b.away_lineup)):
+                team = getattr(b, f"{side}_team")
+                tid = int(getattr(team, "team_id", team) or 0)
+                for p in lineup:
+                    rostered[int(p.playerId)] = float(p.projected_points or 0.0)
+                    box_team[int(p.playerId)] = tid
         past = _players(lg, week, size, None)
         past_pool = _players(lg, week, size, ["FREEAGENT", "WAIVERS"])
         now = {int(e["id"]): e for e in _players(lg, lg.current_week, size, None)}
@@ -113,7 +145,8 @@ def main(argv: list[str]) -> None:
         print("1. pool:", pool_verdict({int(e["id"]) for e in past_pool}, set(rostered)))
         print("2. projections:", projection_agreement(universe, rostered, week))
         print("3. coverage:", coverage([int(e["id"]) for e in past], set(rostered)))
-        print("4. designation and ownership, past-period payload against the current one (rostered players):")
+        print("4. designation and ownership, past-period payload against the current one:",
+              payload_drift({int(e["id"]): e for e in past}, now, box_team))
         shown = 0
         for e in past:
             pid = int(e["id"])
