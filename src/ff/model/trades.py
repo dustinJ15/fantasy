@@ -440,6 +440,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             sendable = not why_not
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
+                "give_ids": [p.espn_id for p in give], "get_ids": [p.espn_id for p in get],
                 "my_delta_ppw": round(float(d_me), 2), "their_delta_ppw": round(float(d_them), 2),
                 # Cuts ESPN demands in the trade screen (position cap), priced into the deltas above.
                 "drops": _drop_rows(drops, limits), "their_drops": [p.name for p in their_drops],
