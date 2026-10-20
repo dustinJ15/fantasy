@@ -933,7 +933,27 @@ def why_parts(lg: dict) -> list[str]:
     # something: that is exactly when the P(win) lineup differs from the plain highest-points one.
     if lg.get("lineup_diff") and lw.get("p_win") is not None and ph != "final":
         why.append(game_script(lw["p_win"]) + ", so this is not the highest-points lineup" + win_gain_note(lw))
+    if ph != "final":
+        why += [hold_note(h) for h in lw.get("held") or []]
     return why
+
+
+def hold_note(h: dict) -> str:
+    """"+0.8 at QB is noise, leave Caleb Williams in": a healthy starter the exact search would bench for under
+    `lineup.MIN_SWAP_GAIN` points keeps his seat (`Lineup.held`, B18); the why line says so, so the lineup row's
+    silence about him is a ruling, not a miss. The body who would have come in is in the packet (`for`) for the
+    detail; the line stays short."""
+    return f"+{h['gain']:.1f} at {h['slot']} is noise, leave {h['name']} in"
+
+
+def held_line(lw: dict) -> str:
+    """The detail's one line on the holds: "Held under the swap floor: Caleb Williams at QB over Kyler Murray
+    (+0.8)"; empty when nothing was held (or an older packet has no `held`)."""
+    held = lw.get("held") or []
+    if not held:
+        return ""
+    return "Held under the swap floor: " + "; ".join(
+        f"{h['name']} at {h['slot']}" + (f" over {h['for']}" if h.get("for") else "") + f" (+{h['gain']:.1f})" for h in held)
 
 
 def game_script(p_win: float) -> str:
@@ -1291,6 +1311,8 @@ def _detail_matchup(lg: dict) -> list[str]:
         L.append(f"- {slot}: " + ", ".join(n + (f" ({game_note(by_name[n])})" if n in by_name and game_note(by_name[n]) else "") for n in names))
     if lg["lineup_diff"]:
         L.append(f"Differs from the pure-points lineup ({le['mu']}){win_gain_note(lw)}: " + "; ".join(f"{d['name']} in {d['in']} lineup ({d['ev']} ± {d['sd']})" for d in lg["lineup_diff"]))
+    if held_line(lw):
+        L.append(held_line(lw))
     L.append("")
     L.append(f"Bench: {', '.join(lw['bench'])}")
     return L

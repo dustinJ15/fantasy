@@ -1076,3 +1076,20 @@ def test_a_drop_note_on_an_out_body_says_out_not_a_percentage():
     lg = league(week=14, weeks_remaining=4,
                 roster=[player("Starter WR", slot="WR"), {**player("Out Guy", ros=3.2, p0=1.0), "sources": {"espn_status": "OUT"}}, player("Plays", ros=3.0)])
     assert report._drop_note(lg, "Out Guy").endswith(", out this week)")
+
+
+# ---------- B18: a held swap is on the why line ----------
+
+def test_why_names_a_held_swap_and_the_detail_says_who_he_kept_out():
+    """Oct 20 Denver: "Caleb Williams: QB -> bench, set by Thu · Kyler Murray: bench -> QB" for +0.8. With the hold
+    the lineup row is silent about the QB slot, so the why line has to say it was a ruling."""
+    lg = league(roster=[player("Caleb Williams", pos="QB", mu=18.7, slot="QB"), player("Kyler Murray", pos="QB", mu=19.5)],
+                lineup_win={"slots": {"QB": ["Caleb Williams"]}, "p_win": 0.55, "mu": 100.0, "sd": 20.0, "bench": ["Kyler Murray"],
+                            "held": [{"name": "Caleb Williams", "slot": "QB", "for": "Kyler Murray", "gain": 0.8}]})
+    why = report.why_parts(lg)
+    assert "+0.8 at QB is noise, leave Caleb Williams in" in why
+    assert "Kyler Murray" not in report._lineup_item(lg)["text"]
+    assert report.held_line(lg["lineup_win"]) == "Held under the swap floor: Caleb Williams at QB over Kyler Murray (+0.8)"
+    lg["week_state"]["phase"] = "final"
+    assert not any("noise" in w for w in report.why_parts(lg))
+    assert report.held_line({"slots": {}, "bench": []}) == ""  # an older packet without the field

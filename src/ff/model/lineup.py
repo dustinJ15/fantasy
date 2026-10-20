@@ -13,6 +13,13 @@ from .projections import PlayerProj
 # comes down once variance is fitted from the projlog residuals (TODO D2).
 MIN_WIN_GAIN = 0.015
 
+# A swap between two healthy starters is a click, a deadline (a Thursday player) and a lost option; under this many
+# points of EV it is noise and the current starter keeps his seat (B18: "Caleb Williams: QB -> bench · Kyler Murray:
+# bench -> QB" for +0.8). Same shape as MIN_WIN_GAIN: the exact search still runs, the hold is the last pass, and only
+# `optimize(hold=True)` applies it (this week's lineup on the card). Rest-of-season pricing wants the exact answer. A
+# body on bye, out or a zero, or an empty seat, is never a hold: there is nobody to leave in.
+MIN_SWAP_GAIN = 1.0
+
 # What an empty starter slot prints as (the packet, the card and the email all read it by this string).
 EMPTY_SLOT = "(EMPTY — no eligible player)"
 # A player this likely to sit scores zero for lineup purposes: on bye, out, on IR, or a researched scratch. He never
@@ -47,6 +54,9 @@ class Lineup:
     # Seats per slot nobody startable could fill (a two-RB slot with one healthy RB has one): `to_dict` prints one
     # EMPTY marker per seat, so the card sees every hole, not only a slot with nobody in it.
     holes: dict[str, int] = field(default_factory=dict)
+    # Current starters kept in their seat under MIN_SWAP_GAIN (`optimize(hold=True)`): name, the slot he sits in, who
+    # would have replaced him (`for`) and the EV the hold forgoes (`gain`). The why line prints each one.
+    held: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -55,6 +65,7 @@ class Lineup:
             "p_win": round(self.p_win, 3) if self.p_win is not None else None,
             "win_gain": round(self.win_gain, 3) if self.win_gain is not None else None,
             "bench": [p.name for p in self.bench],
+            "held": list(self.held),
         }
 
 
@@ -68,13 +79,17 @@ def _expand_slots(lineup_slots: dict[str, int]) -> list[str]:
 
 
 def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: float | None = None, opp_var: float | None = None,
-             objective: str = "auto") -> Lineup:
+             objective: str = "auto", hold: bool = False) -> Lineup:
     """
     objective: 'ev' maximizes expected points; 'win' maximizes P(win) vs opponent; 'auto' = win if opponent known.
     Exact search over candidates: for each slot we consider the top-K eligible players by EV, then brute force.
 
     A P(win) search is held to MIN_WIN_GAIN: when the best P(win) lineup beats the highest-points lineup by less than
     that, the highest-points lineup is returned (with its P(win)) and `win_gain` reads 0.0.
+
+    `hold`: a healthy starter the search benches for under MIN_SWAP_GAIN points keeps his seat (`_hold_current`), and
+    `Lineup.held` says so. The choice between the highest-points and the P(win) lineup is made on the exact lineups
+    first; the hold is a last pass over whichever won, so a sub-point hold never reads as a P(win) deviation.
     """
     use_win = objective == "win" or (objective == "auto" and opp_mu is not None)
     if use_win and opp_mu is None:
@@ -120,7 +135,8 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
             el = el + [None]
         cands.append(el)
 
-    def search(cands: list[list[PlayerProj | None]]):
+    def search(cands: list[list[PlayerProj | None]], by_win: bool = use_win, must: frozenset = frozenset()):
+        """The best combo in the pool: by P(win) or by points (`by_win`), among the combos seating every id in `must`."""
         best = None
         seen = set()
         for combo in itertools.product(*cands):
@@ -128,12 +144,12 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
             if len(set(ids)) != len(ids):
                 continue
             key = tuple(sorted(ids))
-            if key in seen:
+            if key in seen or not must <= set(ids):
                 continue
             seen.add(key)
             mu = pin_mu + sum(p.ev for p in combo if p is not None)
             var = pin_var + sum(p.var for p in combo if p is not None)
-            score = win_prob(mu, var, opp_mu, opp_var or 0.0) if use_win else mu
+            score = win_prob(mu, var, opp_mu, opp_var or 0.0) if by_win else mu
             if best is None or score > best[0] + 1e-12 or (abs(score - best[0]) < 1e-12 and mu > best[1]):
                 best = (score, mu, var, combo)
         return best
@@ -145,12 +161,20 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
         best = search([el if None in el else el + [None] for el in cands])
     if best is None:
         return Lineup({s_: list(ps) for s_, ps in pinned.items()}, pin_mu, pin_var, None, [p for p in players_all if p not in pin_list])
-    score, mu, var, combo = best
+    by_win, win_gain = use_win, None
     if ev_lineup is not None:
-        gain = score - ev_lineup.p_win
-        if gain < MIN_WIN_GAIN:
-            ev_lineup.win_gain = 0.0
-            return ev_lineup
+        win_gain = best[0] - ev_lineup.p_win
+        if win_gain < MIN_WIN_GAIN:
+            if not hold:
+                ev_lineup.win_gain = 0.0
+                return ev_lineup
+            # The highest-points lineup, re-searched in this (wider) pool so the hold pass has a combo to work from.
+            best, by_win, win_gain = search(cands, by_win=False), False, 0.0
+    held: list[dict] = []
+    if hold:
+        starting = [p for p in avail if p.slot in lineup_slots]
+        best, held = _hold_current(best, cands, slots, search, by_win, starting)
+    score, mu, var, combo = best
     assignment: dict[str, list[PlayerProj]] = {s_: list(ps) for s_, ps in pinned.items()}
     holes: dict[str, int] = {}
     for s, p in _settle(slots, combo):
@@ -162,7 +186,42 @@ def optimize(players: list[PlayerProj], lineup_slots: dict[str, int], opp_mu: fl
     chosen = {p.espn_id for p in combo if p is not None} | {p.espn_id for p in pin_list}
     bench = [p for p in players_all if p.espn_id not in chosen]
     pw = win_prob(mu, var, opp_mu, opp_var or 0.0) if opp_mu is not None else None
-    return Lineup(assignment, mu, var, pw, bench, win_gain=pw - ev_lineup.p_win if ev_lineup is not None else None, holes=holes)
+    if ev_lineup is not None and win_gain:
+        win_gain = pw - ev_lineup.p_win  # the P(win) this lineup buys, holds included
+    return Lineup(assignment, mu, var, pw, bench, win_gain=win_gain, holes=holes, held=held)
+
+
+def _hold_current(best: tuple, cands: list[list], slots: list[str], search, by_win: bool,
+                  starting: list[PlayerProj]) -> tuple[tuple, list[dict]]:
+    """The MIN_SWAP_GAIN pass: `starting` are the healthy, unlocked players seated in a starter slot today. One at a
+    time, best first, a starter the search benches is forced back in (added to every pool he is eligible for, and
+    `must` in the search) and the best lineup with him is compared to the best without: under MIN_SWAP_GAIN points
+    (and, on a P(win) search, under MIN_WIN_GAIN of P(win)) the swap is noise and he stays. Each hold is recorded as
+    `{"name", "slot", "for", "gain"}`; `for` names the body who would have come in. A player on bye, out or a zero is
+    not in `starting` (he is not startable) and an empty seat has no current starter, so neither is ever held."""
+    held: list[dict] = []
+    must: set[int] = set()
+    while True:
+        score, mu, var, combo = best
+        chosen = {p.espn_id for p in combo if p is not None}
+        pick = None
+        for o in sorted((p for p in starting if p.espn_id not in chosen), key=lambda p: -p.ev):
+            cands_o = [el if s not in o.eligible or any(q is o for q in el) else el + [o] for s, el in zip(slots, cands)]
+            alt = search(cands_o, by_win=by_win, must=frozenset(must | {o.espn_id}))
+            if alt is None:
+                continue  # he fits nowhere once the holds above are seated
+            d_mu, d_score = mu - alt[1], score - alt[0]
+            if d_mu < MIN_SWAP_GAIN and (not by_win or d_score < MIN_WIN_GAIN):
+                pick = (o, alt, cands_o, d_mu)
+                break
+        if pick is None:
+            return best, held
+        o, alt, cands, d_mu = pick
+        new_ids = {p.espn_id for p in alt[3] if p is not None}
+        out = [p.name for p in combo if p is not None and p.espn_id not in new_ids]
+        held.append({"name": o.name, "slot": o.slot, "for": ", ".join(out) or None, "gain": round(d_mu, 1)})
+        must.add(o.espn_id)
+        best = alt
 
 
 def as_set(players: list[PlayerProj], lineup_slots: dict[str, int],

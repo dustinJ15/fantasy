@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: B12 (§1), B14 (§2), B15 (§3), B16 (§4) and B17 (§5) implemented 2026-10-20; the rest plan only.
+Status: B12 (§1), B14 (§2), B15 (§3), B16 (§4), B17 (§5) and B18 (§6) implemented 2026-10-20; the lint plan only.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B18, B19, in that order.
+Still open: B19.
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
@@ -190,6 +190,16 @@ lost option. A `MIN_SWAP_GAIN` (1.0) in `optimize`: when the recommended and cur
 player at a slot and the EV gap is under the floor, keep the current one; the why line says "+0.8 at QB is noise,
 leave Caleb in". Bye, Out and empty-slot replacements are never held. Same shape as `MIN_WIN_GAIN`. Lower priority
 than the rest: it is one click, not a wrong click.
+
+Implemented (B18): `lineup.MIN_SWAP_GAIN` (1.0) and `optimize(hold=True)`. The exact search still runs and the
+highest-points vs P(win) choice is made on the exact lineups; `_hold_current` is the last pass over whichever won: each
+healthy, unlocked current starter the search benched is forced back in (best first, `must` in the search) and stays
+when the best lineup with him is under `MIN_SWAP_GAIN` points behind, and on a P(win) search also under `MIN_WIN_GAIN`.
+A body on bye, out or a zero is not `startable`, and an empty seat has no current starter, so neither is held.
+`Lineup.held` carries `{name, slot, for, gain}` into the packet; `report.hold_note` puts each one on the why line and
+`report.held_line` on the detail in both renderers. Only this week's lineup on the card (`packet`: `ev_lu`, `win_lu`,
+`_lineup_after`) passes `hold=True`; the season pricing in `trades`, `injuries` and the wire runs exact. Tests under
+"B18" in `tests/test_lineup.py` and `tests/test_card.py`.
 
 ## A check on the card as a whole
 

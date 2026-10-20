@@ -38,11 +38,9 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-The Oct 20 card is the evidence for B17-B18: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the
-causes and the fixtures. Take them in order.
+The Oct 20 card is the evidence for B19: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the causes
+and the fixtures.
 
-- [ ] **B18 (S). Noise-level lineup swaps**: `MIN_SWAP_GAIN` for a swap between two healthy starters (Caleb for
-  Kyler at +0.8, with a Thursday deadline). Plan §6. After B12-B17.
 - [ ] **B19 (S). A lint on the card as a whole** (`report.card_lint`, run by `ff render-email`): one add per body,
   no healthy cut while a Drop-verdict player stays, no zero-EV starter over a live bench body, Stream and Cover never
   the same position, every detail trade candidate says whether it is a row. Plan "A check on the card as a whole".
