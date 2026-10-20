@@ -1,9 +1,9 @@
 # Plan: the Oct 20 card's mixed messages
 
-Status: B12 (§1), B14 (§2), B15 (§3), B16 (§4), B17 (§5) and B18 (§6) implemented 2026-10-20; the lint plan only.
+Status: B12 (§1), B14 (§2), B15 (§3), B16 (§4), B17 (§5), B18 (§6) and the lint (B19) implemented 2026-10-20.
 Written: 2026-10-20 against `main` at 705ac88 (391 tests passing).
 TODO ids: B12, B14, B15, B16, B17, B18, B19.
-Still open: B19.
+Still open: none.
 
 For the agent working one of those items. The packet behind the email is not in the repo (`data/packets/` is
 untracked), so every finding below is read off the email itself and traced to the function that wrote the line; each
@@ -215,6 +215,17 @@ league and the fixtures above:
 
 And one line in `briefing/SKILL.md`: when two rows add the same body, `skip` one; a note under the other is not a
 ruling (the Stream row went unruled this morning while the Cover row's note said it covered both).
+
+Implemented (B19): `report.card_lint(lg, rows)` runs the five checks over the rows after `apply_reads` (a skipped row
+is off the card), and `ff render-email` prints each warning as a `card: <league>: ...` line next to `read_lint`'s.
+The lint reads fields, not words: every builder that spends a spot stamps the row with `drop` (the body it cuts; a
+Drop row's own, an activation's, the stream's swap) and `add` / `adds` (`report.row_adds`: the wire body a waiver,
+cover or stream row carries, the depth and open-spot adds), and the cover row carries `pos`. Check 2 is the order
+the ledger prints in: a healthy cut is wrong on any row at or above the one that finally spends a free drop
+(`ledger.free_drops`). Check 3 skips a locked starter and a final week, and counts a wire body by `week_slot` and
+`delta_week`. Check 5 fires only on a bare "not a row" (a packet from before B16). The Oct 20 `grupe_league` fixture,
+which seats Grupe at K, is the test that the lint warns; the same league with the K slot EMPTY is clean. Tests under
+"B19" in `tests/test_card.py` and `tests/test_demo.py`.
 
 ## Order
 

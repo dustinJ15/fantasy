@@ -94,7 +94,8 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
    `weeks_out`. The checklist runs in the order Dustin clicks through ESPN (IR, pickups with their drop, then the
    lineup once the roster is set, with a free-agent pickup's start folded in, then trades); hurt players he is keeping print under **Holding:** below the list, and their `injury:` ids still take
    a ruling if you want a note on one. `ff render-email` warns about a typo'd id, a missing reason and an unruled trade or drop; fix
-   reads.json and re-run before sending.
+   reads.json and re-run before sending. It also lints the card as a whole (`card:` lines): when two rows add the same
+   body, `skip` one of them; a note under the other row is not a ruling, and the email would still say it twice.
    Leave `read` for what is genuinely new: the news, the practice report, the thing the model has no column for.
    If it only repeats a row's verdict, drop it.
    Do NOT edit briefing.md or the HTML by hand. If research changes a player's availability (ruled out, a role change),

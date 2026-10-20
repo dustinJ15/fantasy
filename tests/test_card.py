@@ -1093,3 +1093,97 @@ def test_why_names_a_held_swap_and_the_detail_says_who_he_kept_out():
     lg["week_state"]["phase"] = "final"
     assert not any("noise" in w for w in report.why_parts(lg))
     assert report.held_line({"slots": {}, "bench": []}) == ""  # an older packet without the field
+
+
+# ---------- B19: a lint on the card as a whole ----------
+
+def lint(lg, reads=None):
+    return report.card_lint(lg, report.apply_reads(report.todos(lg), reads))
+
+
+def fixed_grupe_league(**kw):
+    """`grupe_league` as the optimizer leaves it since B15: the IR kicker is not seated, the K slot reads EMPTY."""
+    lg = grupe_league(**kw)
+    lg["roster"][2]["slot"] = "IR"
+    lg["lineup_win"]["slots"]["K"] = [EMPTY]
+    return lg
+
+
+def test_the_card_lint_is_quiet_on_a_card_the_ledger_built():
+    """The B12 to B18 fixtures, as the builders leave them: one add per body, the free drop spent first, the kicker on
+    one row, every candidate in the detail with its reason."""
+    assert lint(healthy_k_league()) == []
+    assert lint(two_bye_qbs()) == []
+    assert lint(fixed_grupe_league()) == []
+    assert lint(league(trades=[trade(["Kai"], ["Maye"]), trade(["Odunze"], ["Maye"], sendable=False, why_not="costs him 0.6/wk")])) == []
+
+
+def test_the_lint_flags_the_oct_20_lineup_that_seated_a_zero():
+    """The detail lineup started Grupe at K (0 this week, on IR) with Boswell on the wire: the optimizer never seats
+    a zero since B15, so a seated one means a stale packet, and the lint says so."""
+    warns = lint(grupe_league())
+    assert len(warns) == 1 and "seats Blake Grupe at K" in warns[0] and "Chris Boswell" in warns[0]
+    lg = league(roster=[player("Bye WR", slot="WR", bye=True, mu=0.0), player("Live WR", ros=5.0)],
+                lineup_win={"slots": {"WR": ["Bye WR"]}, "p_win": 0.5, "mu": 90.0, "sd": 20.0, "bench": ["Live WR"]})
+    assert any("seats Bye WR at WR" in w and "Live WR" in w for w in lint(lg))
+    lg["roster"][0]["locked"] = True  # his game has kicked off: nothing to do about it
+    assert lint(lg) == []
+    lg["roster"][0]["locked"] = False
+    lg["week_state"]["phase"] = "final"
+    assert lint(lg) == []
+
+
+def test_the_lint_flags_a_body_two_rows_add_and_a_skip_on_one_clears_it():
+    """The Oct 20 Stream row and Cover row both named Boswell; the Cover row's note said it covered both and the
+    Stream row went unruled. Two rows adding one body is a lint warning until one of them is skipped."""
+    lg = healthy_k_league()
+    w = lg["waivers"][0]
+    rows = [{"id": "cover:k", "kind": "cover", "pos": "K", "text": "...", "detail": [], "add": w},
+            {"id": "stream:chris-boswell", "kind": "stream", "text": "...", "detail": [], "add": w}]
+    warns = report.card_lint(lg, rows)
+    assert any("Chris Boswell is added by two rows (cover:k and stream:chris-boswell)" in w and "skip one" in w for w in warns)
+    assert any("Stream and Cover both bring a K in" in w for w in warns)
+    rows[1]["ruling"] = "skip"
+    assert report.card_lint(lg, rows) == []
+    # a depth add and an open-spot add count as adds too
+    rows = [{"id": "injury:x", "kind": "injury", "verdict": "ir", "name": "X", "text": "...", "detail": [], "adds": ["Depth Guy"]},
+            {"id": "open:depth-guy", "kind": "waiver", "text": "...", "detail": [], "adds": ["Depth Guy"]}]
+    assert any("Depth Guy is added by two rows" in w for w in report.card_lint(lg, rows))
+
+
+def test_the_lint_flags_a_healthy_cut_while_a_drop_verdict_player_stays():
+    """The Oct 20 Cover row cut Henderson (a healthy RB4) and the Drop row two lines down dropped Grupe, the free
+    drop, for a depth body. A healthy cut is wrong on any row above the one that finally spends the free drop."""
+    lg = fixed_grupe_league()
+    cover = {"id": "cover:k", "kind": "cover", "pos": "K", "text": "...", "detail": [], "drop": "TreVeyon Henderson"}
+    drop_row = {"id": "injury:blake-grupe", "kind": "injury", "verdict": "drop", "name": "Blake Grupe", "text": "...", "detail": [], "drop": "Blake Grupe"}
+    warns = report.card_lint(lg, [cover, drop_row])
+    assert any("cover:k cuts TreVeyon Henderson while Blake Grupe (Drop verdict, a free drop) still stands" in w for w in warns)
+    assert any("cuts TreVeyon Henderson" in w for w in report.card_lint(lg, [cover]))  # nobody ever drops him: same thing
+    assert report.card_lint(lg, [drop_row, {**cover, "id": "waiver:now-guy", "kind": "waiver"}]) == []  # the free drop went first
+
+
+def test_the_lint_wants_a_reason_on_every_candidate_off_the_card():
+    lg = league(trades=[trade(["Kai"], ["Maye"], sendable=False, why_not=None)])
+    warns = lint(lg)
+    assert len(warns) == 1 and "Kai for Maye" in warns[0] and "not a row" in warns[0] and "why" in warns[0]
+
+
+def test_every_row_that_moves_a_body_says_so_in_its_fields():
+    """The lint reads `add`/`adds` and `drop` off the rows, not the words: every builder that spends a spot has to
+    set them, or the lint goes blind to that row."""
+    lg = grupe_league()
+    lg["roster"].append(player("Spare K", pos="K", p0=0.02, ros=7.0))
+    lg["waivers"].append(waiver("Now Guy"))
+    rows = by_id(lg)
+    assert rows["waiver:now-guy"]["drop"] == "Blake Grupe" and report.row_adds(rows["waiver:now-guy"]) == ["Now Guy"]
+    assert rows["stream:chris-boswell"]["drop"] == "Spare K" and report.row_adds(rows["stream:chris-boswell"]) == ["Chris Boswell"]
+    assert rows["cover:k"]["pos"] == "K" if "cover:k" in rows else True
+    lg = grupe_league()
+    lg["roster"].append(player("Spare K", pos="K", p0=0.02, ros=7.0))
+    lg["waivers"][0].update(delta_week=1.0)
+    lg["waivers"].append({**waiver("Wire RB", pos="RB", slot="RB", week_slot="RB", delta_week=0.0, delta_over_starter=-2.0, score=3.0), "vorp": -1.0})
+    row = by_id(lg)["injury:blake-grupe"]
+    assert row["drop"] == "Blake Grupe" and report.row_adds(row) == ["Wire RB"]
+    lg = league(roster=[player("Starter WR", slot="WR")], open_spots=1, open_spot_adds=[{"name": "Depth Guy", "pos": "WR", "why": "depth"}])
+    assert report.row_adds(by_id(lg)["open:depth-guy"]) == ["Depth Guy"]

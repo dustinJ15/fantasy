@@ -126,6 +126,9 @@ def render_email_cmd(packet: str = typer.Option(..., "--packet", help="packet JS
             rprint(f"[dim]remembered: {line}[/]")
     for warn in report.read_lint(p, r):
         rprint(f"[yellow]reads: {warn}[/]")
+    for lg in p["leagues"]:  # the card as a whole, with the rulings in: a skipped row is off it (B19)
+        for warn in report.card_lint(lg, report.apply_reads(report.todos(lg), (r or {}).get(lg["name"]))):
+            rprint(f"[yellow]card: {lg['name']}: {warn}[/]")
     open(out, "w").write(render_email(p, r, only_incoming=only_incoming, full=full))
     if md:
         open(md, "w").write(report.render(p, reads=r, only_incoming=only_incoming))

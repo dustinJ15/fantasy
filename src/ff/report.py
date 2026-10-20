@@ -6,7 +6,7 @@ from collections import Counter
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, drop_verdict_note, handcuff_for, market_value, sit_note, weeks_left, weeks_word
+from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, drop_verdict_note, free_drops, handcuff_for, market_value, sit_note, weeks_left, weeks_word
 from .model import waivers as waivers_model
 from .model.injuries import fill_spot
 from .model.lineup import EMPTY_SLOT, NEVER_STARTS_AT
@@ -343,8 +343,8 @@ def _cover_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
             plan = f"add {fa['name']} ({fa['team']}) before kickoff"
         if fa is not None:
             added.add(fa["name"])
-        out.append({"kind": "cover", "id": f"cover:{slug(pos)}", "label": f"Cover {pos}",
-                    "text": f"{who['name']} is {risk} and your only {pos}: {plan}{click}", "detail": detail, "add": fa})
+        out.append({"kind": "cover", "id": f"cover:{slug(pos)}", "label": f"Cover {pos}", "pos": pos,
+                    "text": f"{who['name']} is {risk} and your only {pos}: {plan}{click}", "detail": detail, "add": fa, "drop": drop})
     return out
 
 
@@ -413,7 +413,7 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
             continue  # out one game and worth keeping: the lineup row already handles him, this would be the injury report
         back = f", back wk {r['return_week']}" if r.get("return_week") else ""
         horizon = f"out {weeks_word(r)}{back}"
-        kind = "injury"
+        kind, cut = "injury", None  # `cut`: the body this row drops, for `card_lint`
         detail = [horizon]
         if v == "ir":
             text = f"move {who} to IR"
@@ -424,6 +424,7 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
             text = f"move {who} off IR"
             detail = [f"ESPN lists him {st}, so the slot has to be cleared"]
             drop, suffix = taken[r["name"]]
+            cut = drop
             # The drop is the body the stash brought in: say so, so a round trip reads as one (Daniels, Oct 3 to 7).
             came_in = _stash_note(r, drop)
             if drop in folded:
@@ -438,7 +439,7 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
                 else:
                     detail += more
         elif v == "drop":
-            text = f"drop {who}"
+            text, cut = f"drop {who}", r["name"]
             cuff = handcuff_for(lg, r["name"])
             # The Handcuffs line lists him and the Drop row cuts him: say both (the handcuff value is already in
             # `drop_cost`; the words were missing, B17).
@@ -455,7 +456,7 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
             if r.get("why"):
                 detail.append(r["why"][0])
         out.append({"kind": kind, "id": f"injury:{slug(r['name'])}", "label": INJURY_LABEL[v], "verdict": v, "name": r["name"], "pos": r["pos"],
-                    "text": text, "detail": detail, "trade_ids": [f"trade:{slug('-'.join(t['get']))}" for t in r.get("trades") or []]})
+                    "text": text, "detail": detail, "drop": cut, "trade_ids": [f"trade:{slug('-'.join(t['get']))}" for t in r.get("trades") or []]})
     return out
 
 
@@ -481,6 +482,7 @@ def _depth_adds(lg: dict, rows: list[dict], spots: Spots, added: set[str]) -> No
             continue
         added.add(a["name"])
         spots.note(add_pos=a["pos"])
+        row.setdefault("adds", []).append(a["name"])
         row["text"] += f"{lead}{a['name']} ({a['pos']})"
         row["detail"].append(f"{a['name']}: {a['why']}")
 
@@ -552,7 +554,7 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_week']:.0f} this week)")
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']}{click}",
-                    "detail": detail, "add": w})
+                    "detail": detail, "add": w, "drop": drop})
     for w in ups[:1]:
         drop, suffix = spots.take(adding=w["pos"], lands_ts=w.get("lands_ts"))
         click, spot = _spot_words(drop, suffix)
@@ -562,7 +564,7 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         if nxt:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_over_starter']:.1f}/wk)")
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
-                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}){click}", "detail": detail, "add": w})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}){click}", "detail": detail, "add": w, "drop": drop})
     return out
 
 
@@ -616,7 +618,7 @@ def _stream_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         if cur is not None:
             spots.swap(adding=pos, drop=cur)
             _, detail = _spot_words(cur, f"; drop {cur}{drop_note(lg, cur)}")
-            text = f"swap in {w['name']} for {cur} at {pos}"
+            text, drop = f"swap in {w['name']} for {cur} at {pos}", cur
         else:
             drop, suffix = spots.take(adding=pos, lands_ts=w.get("lands_ts"))
             click, detail = _spot_words(drop, suffix)
@@ -624,7 +626,7 @@ def _stream_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         added.add(w["name"])
         pos_added.add(pos)
         out.append({"kind": "stream", "id": f"stream:{slug(w['name'])}", "label": "Stream", "text": text,
-                    "detail": [f"+{w['delta_week']:.1f} this week{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w), *detail], "add": w})
+                    "detail": [f"+{w['delta_week']:.1f} this week{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w), *detail], "add": w, "drop": drop})
     return out
 
 
@@ -641,7 +643,7 @@ def _open_spot_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         w = next((w for w in lg["waivers"] if w["name"] == a["name"]), None)
         out.append({"kind": "waiver", "id": f"open:{slug(a['name'])}", "label": "Open spot",
                     "text": f"{_add_verb(lg, w) if w else 'add'} {a['name']} ({a['pos']}) to the open bench spot",
-                    "detail": [a["why"], *(_claim_detail(lg, w) if w else [])]})
+                    "detail": [a["why"], *(_claim_detail(lg, w) if w else [])], "adds": [a["name"]]})
     return out
 
 
@@ -1140,6 +1142,77 @@ def read_lint(packet: dict, reads: dict | None) -> list[str]:
                 out.append(f"{name}.items['{key}']: trade row has no ruling (do / skip / amend)")
             if x["kind"] == "injury" and x.get("verdict") in INJURY_NEEDS_RULING and key not in ruled:
                 out.append(f"{name}.items['{key}']: {x['verdict']} verdict on a hurt player has no ruling (do / skip / amend)")
+    return out
+
+
+def row_adds(x: dict) -> list[str]:
+    """The bodies a row brings in: the wire body it carries as `add` (a waiver, cover or stream row) and the depth or
+    open-spot adds it names (`adds`). Every builder that spends a spot sets one of them, so `card_lint` reads the
+    rows' fields and never their words."""
+    out = [x["add"]["name"]] if x.get("add") else []
+    return out + [n for n in x.get("adds") or [] if n not in out]
+
+
+def card_lint(lg: dict, rows: list[dict] | None = None) -> list[str]:
+    """Check the card as a whole, after the rows are built and Claude's rulings are in (a skipped row is off the
+    card). Every row on the Oct 20 card was right about its own numbers; the mess was five builders spending the same
+    spots in the wrong order, which no row test sees. These are the five contradictions that card carried (B19):
+
+    1. a body is added by at most one row (Boswell: the Stream row and the Cover row);
+    2. no row cuts a healthy body while a Drop-verdict player, a free drop, is still unspent on it or any row above
+       (Henderson for a kicker, with Grupe's Drop row two lines down);
+    3. no recommended starter scores 0 this week while a bench or wire body eligible for the slot would score (Grupe
+       seated at K: the optimizer never seats a zero since B15, so a seated one is a stale packet);
+    4. the Stream and Cover rows never bring a body in at the same position;
+    5. every trade candidate in the detail says whether it is a row and, when not, why (`row_word`).
+
+    `ff render-email` prints each warning next to `read_lint`'s. The fix for a warning is a `skip` on the extra row in
+    reads.json today, and a TODO line for the builder that let it through; a note under the other row is not a ruling.
+    """
+    rows = [x for x in (todos(lg) if rows is None else rows) if x.get("ruling") != "skip"]
+    out: list[str] = []
+    seen: dict[str, str] = {}
+    for x in rows:
+        for n in row_adds(x):
+            if n in seen:
+                out.append(f"{n} is added by two rows ({seen[n]} and {x['id']}): skip one")
+            else:
+                seen[n] = x["id"]
+    free, spent = free_drops(lg), set()
+    for x in rows:
+        d = x.get("drop")
+        if not d:
+            continue
+        left = [n for n in free if n not in spent and n != d]
+        if d not in free and left:
+            out.append(f"{x['id']} cuts {d} while {', '.join(left)} (Drop verdict, a free drop) still "
+                       f"{'stands' if len(left) == 1 else 'stand'}: the free drop goes first")
+        spent.add(d)
+    if (lg.get("week_state") or {}).get("phase", "pre") != "final":
+        rec = lg["lineup_win"]["slots"]
+        by_name = {p["name"]: p for p in lg["roster"]}
+        starters = {n for ns in rec.values() for n in ns}
+        for slot, names in rec.items():
+            pos = _slot_positions(slot)
+            for n in names:
+                p = by_name.get(n)
+                if p is None or p.get("locked") or week_ev(p) > 0:
+                    continue
+                live = [q["name"] for q in lg["roster"] if q["name"] not in starters and q["pos"] in pos and q.get("slot") != "IR"
+                        and not q.get("locked") and week_ev(q) > 0]
+                live += [w["name"] for w in lg.get("waivers") or [] if w["pos"] in pos and (w.get("week_slot") or w["pos"]) == slot
+                         and (w.get("delta_week") or 0.0) > 0 and w["name"] not in live]
+                if live:
+                    out.append(f"the lineup seats {n} at {slot} for 0 this week while {', '.join(live)} would score: the optimizer "
+                               f"never seats a zero, so the packet is stale (re-run ff packet)")
+    covered = {x["pos"] for x in rows if x["kind"] == "cover" and x.get("pos")}
+    for x in rows:
+        if x["kind"] == "stream" and x.get("add") and x["add"]["pos"] in covered:
+            out.append(f"Stream and Cover both bring a {x['add']['pos']} in ({x['id']} and cover:{slug(x['add']['pos'])}): skip one")
+    for t, word, _ in trade_candidates(lg):
+        if word == "not a row":
+            out.append(f"the detail lists {', '.join(t['get'])} for {', '.join(t['give'])} as not a row and does not say why: "
+                       f"the scan set no why_not (an old packet; re-run ff packet)")
     return out
 
 

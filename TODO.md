@@ -38,12 +38,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-The Oct 20 card is the evidence for B19: `docs/plans/card-mixed-messages-2026-10-20.md` has the rows, the causes
-and the fixtures.
-
-- [ ] **B19 (S). A lint on the card as a whole** (`report.card_lint`, run by `ff render-email`): one add per body,
-  no healthy cut while a Drop-verdict player stays, no zero-EV starter over a live bench body, Stream and Cover never
-  the same position, every detail trade candidate says whether it is a row. Plan "A check on the card as a whole".
+(none open)
 
 ## Tier C — operations
 
