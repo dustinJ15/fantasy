@@ -1,6 +1,6 @@
 import pytest
 
-from ff.model.trades import evaluate, scan
+from ff.model.trades import apply_title_delta, evaluate, scan, why_not_sendable
 from tests.conftest import P
 
 
@@ -499,3 +499,44 @@ def test_evaluate_taxes_an_uneven_offer_from_my_side(slots):
     values = {"2": {"redraft_value": 6000}, "12": {"redraft_value": 3000}, "15": {"redraft_value": 3000}}
     out = evaluate(1, 2, [by_id[2]], [by_id[12], by_id[15]], {1: mine, 2: theirs}, slots, repl, values)
     assert out["market_ratio"] is not None and out["market_ratio"] < 1.0
+
+
+# ---------- B16: why a candidate is not a row ----------
+
+def test_why_not_names_every_floor_the_package_misses():
+    """The detail prints "not a row: <why_not>"; one line per floor, in the scan's first person."""
+    assert why_not_sendable(0.5, 1.5, 0.3, [], 1.0) == []
+    assert why_not_sendable(0.5, 1.5, -0.6, [], 1.0) == ["costs him 0.6/wk"]
+    assert why_not_sendable(0.25, 0.4, -0.3, ["QB"], 0.7) == [
+        "costs him 0.3/wk", "coin flip at best", "under +1.0/wk for me", "he'd have to stream QB this week", "I give more at market"]
+
+
+def test_scan_says_why_an_overpay_is_not_a_row(slots):
+    mine = [P(1, "QB", "QB", 20, tid=1), P(2, "RB1", "RB", 16, tid=1), P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1),
+            P(5, "WR1", "WR", 14, tid=1), P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1),
+            P(7, "TE", "TE", 3, tid=1), P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "QB", "QB", 20, tid=2), P(12, "RB1", "RB", 8, tid=2), P(13, "RB2", "RB", 6, tid=2),
+              P(15, "WR1", "WR", 14, tid=2), P(16, "WR2", "WR", 12, tid=2), P(17, "WR3", "WR", 11, tid=2),
+              P(18, "TEgood", "TE", 12, tid=2), P(22, "TE2", "TE", 6, tid=2), P(19, "K", "K", 8, tid=2), P(20, "D", "D/ST", 7, tid=2)]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    values = {str(i): {"redraft_value": 6000} for i in (2, 3, 4)} | {"18": {"redraft_value": 3000}}
+    out = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values)
+    overpays = [c for c in out if "TEgood" in c["get"] and c["market_ratio"] is not None and c["market_ratio"] < 0.8]
+    assert overpays
+    for c in overpays:
+        assert not c["sendable"] and "I give more at market" in c["why_not"]
+    assert all(c["why_not"] is None for c in out if c["sendable"])
+
+
+def test_a_package_that_lowers_my_title_odds_is_not_a_row():
+    """"me +1.1 ppw" led the Oct 20 detail on a package that cost me 0.8 title points and handed the favorite 4.9."""
+    c = {"sendable": True, "must_try": True, "why_not": None}
+    apply_title_delta(c, -0.8, 4.9)
+    assert c["my_title_delta"] == -0.8 and c["their_title_delta"] == 4.9
+    assert not c["sendable"] and not c["must_try"] and c["why_not"] == "lowers my title odds"
+    ok = {"sendable": True, "must_try": True, "why_not": None}
+    apply_title_delta(ok, 0.0, -1.2)
+    assert ok["sendable"] and ok["must_try"] and ok["why_not"] is None
+    both = {"sendable": False, "must_try": False, "why_not": "costs him 0.6/wk"}
+    apply_title_delta(both, -0.3, 2.0)
+    assert both["why_not"] == "costs him 0.6/wk; lowers my title odds"

@@ -270,10 +270,11 @@ def incoming_line(t: dict) -> str:
 COVER_POS = ("QB", "TE", "K", "D/ST")
 # The model's why-vocabulary is first person ("leaves me no backup QB"); the checklist is addressed to Dustin.
 TO_DUSTIN = (("leaves me ", "leaves you "), ("market says I give", "market says you give"), ("for me", "for you"),
-             ("I get the best player", "you get the best player"))
+             ("I get the best player", "you get the best player"), ("lowers my title odds", "lowers your title odds"),
+             ("I give more at market", "you give more at market"))
 
 
-def _to_dustin(s: str) -> str:
+def to_dustin(s: str) -> str:
     for a, b in TO_DUSTIN:
         s = s.replace(a, b)
     return s
@@ -707,11 +708,27 @@ def accept_note(t: dict) -> str:
     return word + (f" ({t['p_accept']:.0%})" if t.get("p_accept") is not None else "")
 
 
+def opponent_warn(t: dict, lg: dict) -> str | None:
+    """"he is your opponent this week; accepted today it executes before kickoff": a package to the man I play Sunday
+    changes both lineups in the matchup it is meant to win, and the row should say so before the paste goes out.
+    "after the kickoff" when the league's review period runs past it (`deadlines.offer_after_kickoff`); None for
+    anyone else, or an older packet with no opponent."""
+    opp = (lg.get("opponent") or {}).get("team_id")
+    if not opp or t.get("rival_team_id") != opp:
+        return None
+    dl = lg.get("deadlines") or {}
+    if dl.get("offer_after_kickoff"):
+        return f"he is your opponent this week; accepted today it executes after the {dl.get('next_kickoff_word') or 'next'} kickoff"
+    return "he is your opponent this week; accepted today it executes before kickoff"
+
+
 def _trade_item(t: dict, spots: Spots, push: bool, lg: dict | None = None) -> dict:
     """One package to go send: the offer, what it does for each side, the cut ESPN's position cap forces in the trade
     screen (without it the paste goes out and the screen answers "Too many players with default position WR"), what
     he is left with where I ask (so the paste cannot tell a one-QB team it is set at QB), the fallback, the push."""
-    warn = [_to_dustin(w) for w in t["why"] if w.startswith(TRADE_WARN_PREFIXES)]
+    warn = [to_dustin(w) for w in t["why"] if w.startswith(TRADE_WARN_PREFIXES)]
+    if lg and opponent_warn(t, lg):
+        warn.append(opponent_warn(t, lg))
     them = "neutral for them" if abs(t["their_delta_ppw"]) < 0.05 else f"{t['their_delta_ppw']:+.1f} for them"
     drops, cut = spots.cut(t)
     text = (f"offer {t['rival'] or 'them'} your {', '.join(t['give'])} for {', '.join(t['get'])}: "
@@ -738,8 +755,36 @@ def _trade_items(lg: dict, spots: Spots, pushed: list[dict]) -> list[dict]:
     """The pushed package first, then the packages that help both sides, `TRADE_ROWS` rows in all unless the push
     needs more. No "reach" row: an offer only he would decline is not a thing to do today, and printing one anyway
     taught the card to nag about packages nobody takes."""
-    worth = pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(TRADE_ROWS - len(pushed), 0)]
-    return [_trade_item(t, spots, bool(t.get("pushed") or t.get("must_try")), lg) for t in worth]
+    return [_trade_item(t, spots, bool(t.get("pushed") or t.get("must_try")), lg) for t in trade_rows(lg, pushed)]
+
+
+def trade_rows(lg: dict, pushed: list[dict]) -> list[dict]:
+    """The packages that get a row: the push, then the sendable ones in scan order, `TRADE_ROWS` in all."""
+    return pushed + [t for t in lg["trades"] if sendable(t) and t not in pushed][:max(TRADE_ROWS - len(pushed), 0)]
+
+
+# Candidates the detail tables list under the rows, so a package the card left off is seen with its reason.
+DETAIL_TRADES = 3
+
+
+def row_word(t: dict, rows: list[dict]) -> str:
+    """"row" / "not a row: costs him 0.6/wk": whether a candidate in the detail is on the card and, when not, the floor
+    it missed (`trades.why_not_sendable`, the title-odds gate in `trades.apply_title_delta`). Oct 20: the detail led
+    with a package that cost the rival 0.7/wk and lowered my title odds, and nothing said why it was not a row."""
+    if any(t is r for r in rows):
+        return "row"
+    if sendable(t):
+        return f"not a row: behind the {TRADE_ROWS} on the card"
+    return "not a row" + (f": {t['why_not']}" if t.get("why_not") else "")
+
+
+def trade_candidates(lg: dict) -> list[tuple[dict, str, str | None]]:
+    """The detail's candidates, rows first, then the sendable, then the rest in scan order, `DETAIL_TRADES` in all:
+    (package, its row word, the opponent warning or None). Shared by both renderers."""
+    rows = trade_rows(lg, _pushed(lg))
+    on_card = {id(r) for r in rows}
+    cands = sorted(lg["trades"], key=lambda t: (id(t) not in on_card, not sendable(t)))[:DETAIL_TRADES]
+    return [(t, row_word(t, rows), opponent_warn(t, lg)) for t in cands]
 
 
 def _ledger(lg: dict) -> Spots:
@@ -1263,11 +1308,12 @@ def _detail_trades(lg: dict) -> list[str]:
 
     L.append("\n## Trade candidates")
     if lg["trades"]:
-        for t in lg["trades"][:3]:
+        for t, word, opp in trade_candidates(lg):
             td = f" · title odds me {t.get('my_title_delta', '?'):+} / them {t.get('their_title_delta', '?'):+}" if "my_title_delta" in t else ""
-            pa = f" · p(accept) {t['p_accept']:.2f} ({t.get('accept_word') or 'not a row'}: {'; '.join(t.get('accept_why') or [])})" if t.get("p_accept") is not None else ""
+            pa = f" · p(accept) {t['p_accept']:.2f} ({t.get('accept_word') or 'he would decline'}: {'; '.join(t.get('accept_why') or [])})" if t.get("p_accept") is not None else ""
             after = f" · {t['after_line']}" if t.get("after_line") else ""
-            L.append(f"- **Give {', '.join(t['give'])} → get {', '.join(t['get'])}** from {t['rival']}: me {t['my_delta_ppw']:+.1f} ppw, them {t['their_delta_ppw']:+.1f} ppw{td}{pa}{after}. {'; '.join(t['why'])}")
+            why = "; ".join([*t["why"], *([opp] if opp else [])])
+            L.append(f"- **{word}** — **Give {', '.join(t['give'])} → get {', '.join(t['get'])}** from {t['rival']}: me {t['my_delta_ppw']:+.1f} ppw, them {t['their_delta_ppw']:+.1f} ppw{td}{pa}{after}. {why}")
     else:
         L.append("No mutually beneficial package found this week.")
     return L

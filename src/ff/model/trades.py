@@ -60,9 +60,13 @@ MARKET_FLOOR = 0.8
 # handing over a season-ender as if he were healthy. The raw figure still rides on the row as a caveat.
 MARKET_INJURY_FLOOR = 0.25
 # A package this good is worth nagging about: the card keeps it at the top every morning until Dustin sends it or
-# says no (rulings.record_pushes). Points per week over the rest-of-season lineup; the title-odds delta is not used
-# because at 1500 sims it is noise of the same size as any threshold.
+# says no (rulings.record_pushes). Points per week over the rest-of-season lineup; the title-odds delta is not a
+# push threshold because at 1500 sims its size is noise, only its sign gates the row (`apply_title_delta`).
 MUST_TRY_PPW = 2.0
+# A package is a row (`sendable`) when it clears every floor here; `why_not_sendable` names the ones it misses so the
+# detail can say why a candidate it lists is not on the card.
+SEND_MIN_PPW = 1.0        # my gain per week, a lost backup charged against it
+THEIR_FLOOR_PPW = -0.25   # what it may cost him per week before it reads as a loss on his side
 # A rival reads an offer by what the pieces are worth to him, not by my lineup math. A piece worth under this share of
 # what he gives up, that would also ride his bench, is a throw-in: it carries no weight in the market check, and a
 # 2-for-1 built on one is the 1-for-1 it really is, which the scan proposes on its own anyway. The lesson of the Purdy
@@ -432,8 +436,8 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             # My gain, with a backup lost on my side charged against it; ranking is p_accept times that.
             my_gain = d_me - 0.75 * len(new_thin)
             after = rival_after(new_theirs, list(get), slots, their_ctx)
-            sendable = bool(p_accept >= acc.SENDABLE and my_gain >= 1.0 and d_them >= -0.25 and not streams
-                            and (ratio is None or ratio >= MARKET_FLOOR))
+            why_not = why_not_sendable(p_accept, my_gain, d_them, streams, ratio)
+            sendable = not why_not
             rival_cands.append({
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "my_delta_ppw": round(float(d_me), 2), "their_delta_ppw": round(float(d_them), 2),
@@ -444,7 +448,7 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "fair_his": fair_his, "best_side": best_side,
                 "p_accept": p_accept, "accept_word": acc.bucket(p_accept), "accept_why": reasons,
                 "rival_after": after, "after_line": _after_line(after),
-                "sendable": sendable,
+                "sendable": sendable, "why_not": "; ".join(why_not) or None,
                 "must_try": bool(sendable and p_accept >= acc.PUSH and my_gain >= MUST_TRY_PPW),
                 "why": why,
                 "score": round(p_accept * my_gain, 3),
@@ -468,6 +472,34 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
         cands += kept
     cands.sort(key=lambda c: -c["score"])
     return cands[:top]
+
+
+def why_not_sendable(p_accept: float, my_gain: float, d_them: float, streams: list[str], ratio: float | None) -> list[str]:
+    """Why a package is not a row, in the scan's first person; empty when it is one. Each floor it misses is a line,
+    so the detail can say "not a row: costs him 0.6/wk; coin flip at best" next to a candidate the card left off."""
+    out: list[str] = []
+    if d_them < THEIR_FLOOR_PPW:
+        out.append(f"costs him {-d_them:.1f}/wk")
+    if p_accept < acc.SENDABLE:
+        out.append("coin flip at best")
+    if my_gain < SEND_MIN_PPW:
+        out.append(f"under +{SEND_MIN_PPW:.1f}/wk for me")
+    if streams:
+        out.append(f"he'd have to stream {', '.join(streams)} this week")
+    if ratio is not None and ratio < MARKET_FLOOR:
+        out.append("I give more at market")
+    return out
+
+
+def apply_title_delta(c: dict, mine: float, theirs: float) -> None:
+    """The packet's re-sim folded into the verdict: a package that lowers my title odds is not a row however the
+    points per week read (Oct 20: "me +1.1 ppw" led a package that cost me 0.8 title points and handed the favorite
+    4.9). The re-sim shares the baseline's draws, so a null trade reads exactly 0.0 and the sign is the trade's."""
+    c["my_title_delta"], c["their_title_delta"] = mine, theirs
+    if mine < 0:
+        c["sendable"] = False
+        c["must_try"] = False
+        c["why_not"] = "; ".join(w for w in (c.get("why_not"), "lowers my title odds") if w)
 
 
 def evaluate(my_id: int, rival_id: int, give: list[PlayerProj], get: list[PlayerProj], rosters: dict[int, list[PlayerProj]],
