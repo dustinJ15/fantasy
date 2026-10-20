@@ -1,10 +1,11 @@
 # Plan: the backtest harness
 
-Status: harness built 2026-10-20 in one PR (TODO D8): `src/ff/backtest.py`, `ff replay-pull`, `ff backtest`; no real
-season has been replayed yet (the container had no cookies), so every number below is from the synthetic check.
-Written: 2026-10-20 against `main` at 5d705c1.
-TODO ids: D8 (the harness); D11 (the live replay of 2025 and 2026, the first real numbers); D12 (the scanner replay).
-Still open: D11, D12.
+Status: harness built 2026-10-20 in one PR (TODO D8): `src/ff/backtest.py`, `ff replay-pull`, `ff backtest`; first real
+run 2026-10-20 (D11) on 2026 weeks 1-6, the tables in `docs/accuracy.md`; 2025 cannot be replayed (ESPN keeps a completed
+season's scores, not its lineups: "What the first run found"). The numbers in the synthetic-check section are synthetic.
+Written: 2026-10-20 against `main` at 5d705c1; D11 findings added the same day.
+TODO ids: D8 (the harness); D11 (the live replay, the first real numbers); D12 (the scanner replay).
+Still open: D12.
 
 For an agent running or extending the backtest, or reading its tables before changing a constant in `model/lineup.py`
 or `model/projections.py`. ROADMAP item 8 in one line: replay a season with the same code and measure, so a model
@@ -34,6 +35,9 @@ earliest game date among its players) so a trade's close date can be placed on i
 Each matchup: `home`, `away` (team ids), both recorded scores, `playoff`, and both rosters, one row per entry:
 `espn_id`, `name`, `pos`, `team`, `eligible` (starter slots only), `slot` (as set, `BE`/`IR` for the bench), `proj`,
 `actual`, `bye`. `version` is `REPLAY_VERSION`; `load_replay` refuses an older file.
+
+A completed season is not in the archive at all: every week of 2025 came back with scores and no roster on either side
+(`pull_replay` says so, `NO_LINEUPS`, instead of espn-api's KeyError). Only the current season replays.
 
 What the archive lost, so the replay is read for what it scores and not more:
 
@@ -99,18 +103,26 @@ who set the highest-points lineup leave 0.0 a week; one who benches his best RB 
 - The replay is never written by the briefing run and never committed (`data/replay/` is ignored); it is pulled by
   hand, once per season per league, and re-pulled when `REPLAY_VERSION` moves.
 
+## What the first run found (D11, 2026-10-20)
+
+The tables and the two rulings (the sigma prior: no direction, stays; `MIN_WIN_GAIN`: stays, `differs` is 0, 15 and 0)
+are in `docs/accuracy.md`. The three things this plan could not know:
+
+- `box_scores` on a past season returns no week: 2025 came back with both scores and no roster on either side under
+  `mMatchupScore`, `mScoreboard`, `mBoxscore`, `mMatchup` and the `leagueHistory` endpoint, and `mRoster` with a past
+  `scoringPeriodId` is the final roster (same players, same slots in periods 1, 8 and 17) with that period's stats.
+  espn-api's "most recent season" is literal. The replay is the live season, re-pulled when the tables are refreshed;
+  a season's sample ends when the season does, about 250 matchups across the three leagues.
+- The archived `projected_points` is the number as of kickoff: identical to the projlog's last pre-kickoff `espn_pts`
+  for 32 of 42 week-6 players, the rest revised before kickoff (up to 2.4 points), and a late scratch zeroed (Judkins,
+  13.53 in the Sunday log). That zero is the one bit of hindsight in the replay (`row_proj` reads it as a certain
+  zero): 19 of 322 zero-projection game-week rows were seated by their managers, 3 scored.
+- `score_mismatch` fired 0 times in 192 team-weeks.
+
 ## Still to do
 
-- **D11**, the live replay: pull 2025 and 2026 for the three leagues (cookies; the 2025 box scores are still served
-  for the same league ids), run `ff backtest` and `ff backtest --trades`, put the tables in `docs/accuracy.md` next
-  to the projlog's, and decide two constants from them: the sigma prior if the 0.7+ bins are off by more than the
-  bin's sampling noise in the same direction in all three leagues (take the direction, not a fitted value: the fitter
-  in `projlog.sigma_fit` owns the value), and `MIN_WIN_GAIN` only if `differs` reaches `DIFFERS_MIN_N` and
-  `gain_realized` reads at least half of `gain_promised`. Things the first run will find out and this plan could not:
-  whether `box_scores` on a past season returns every week (espn-api says "most recent season" in its docstring but
-  gates only on year 2019), whether the archived `projected_points` is the pre-kickoff number or a later revision
-  (compare one week against a projlog `espn_pts` row: 2026 week 6, any player), and how often `score_mismatch` fires.
-- **D12**, the scanner replay: each week of a replayed season, build the rosters and the wire from the replay, price
+- **D12**, the scanner replay (on the live season: a completed season has no lineups, above): each week of a
+  replayed season, build the rosters and the wire from the replay, price
   every rival package with `model/trades.py` and every claim with `model/waivers.py`, and score each against the
   weeks that followed. Needs what the replay does not yet carry: the free-agent pool per week (`kona_player_info`
   with a past `scoringPeriodId`, to probe), a season prior per player at the time (ESPN's preseason total is

@@ -229,3 +229,18 @@ def test_save_and_load_round_trip_and_version_check(tmp_path):
     (tmp_path / "old.json").write_text('{"version": 0}')
     with pytest.raises(SystemExit):
         bt.load_replay(tmp_path / "old.json")
+
+
+def test_a_season_espn_serves_without_lineups_fails_with_the_finding_not_a_key_error():
+    """2025 came back with scores and no roster on any week (2026-10-20); espn-api raises KeyError from inside its box
+    score, and the pull names the season instead of a traceback. Any other KeyError is still a bug and still raises."""
+    def no_rosters(w, player_team_cache=None):
+        raise KeyError("rosterForCurrentScoringPeriod")
+    settings = LeagueSettings(name="L", team_count=4, scoring={}, lineup_slots={"QB": 1}, bench_slots=5, ir_slots=1, reg_season_weeks=2,
+                              playoff_team_count=2, playoff_weeks=[3], matchup_periods={1: [1], 2: [2]}, faab=False, faab_budget=0,
+                              trade_deadline_ms=0, ppr=0.5)
+    with patch.object(bt.espn, "settings", lambda ref, lg: settings):
+        with pytest.raises(SystemExit, match=r"L1: ESPN serves no lineups for 2025 \(week 1 came back without a roster\)"):
+            bt.pull_replay(LeagueRef(name="L1", espn_id=7), _P(current_week=17, box_scores=no_rosters), 2025)
+        with pytest.raises(KeyError, match="somethingElse"):
+            bt.pull_replay(LeagueRef(name="L1", espn_id=7), _P(current_week=17, box_scores=lambda w, player_team_cache=None: (_ for _ in ()).throw(KeyError("somethingElse"))), 2025)
