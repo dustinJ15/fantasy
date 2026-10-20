@@ -121,10 +121,6 @@ are in `docs/accuracy.md`. The three things this plan could not know:
 
 ## Still to do
 
-- **D12**, the scanner replay (on the live season: a completed season has no lineups, above): each week of a
-  replayed season, build the rosters and the wire from the replay, price
-  every rival package with `model/trades.py` and every claim with `model/waivers.py`, and score each against the
-  weeks that followed. Needs what the replay does not yet carry: the free-agent pool per week (`kona_player_info`
-  with a past `scoringPeriodId`, to probe), a season prior per player at the time (ESPN's preseason total is
-  static, so that one is fine) and the market values (FantasyCalc has no archive; price without them and say so).
-  Plan it first; it is the sample the trade and waiver hit rates need before the outcome log has one.
+- **D12**, the scanner replay (on the live season: a completed season has no lineups, above): planned 2026-10-20 in
+  `docs/plans/scanner-replay.md` (the player universe as the pool, the chart off, `scan_hits` and `claim_hits`, five steps);
+  the first step is the probe of ESPN's past-period player list, `scripts/probe_replay_pool.py`.

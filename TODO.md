@@ -57,11 +57,16 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D12 (L). The scanner replay.** `docs/plans/backtest.md` "Still to do": price every rival package
-  and every claim each replayed week with `model/trades.py` and `model/waivers.py` and score them against the weeks
-  that followed; the trade and waiver hit rates need this sample, the outcome log has one executed trade. On the live
-  season only: D11 (2026-10-20) found ESPN serves no lineups for a completed season. Needs the
-  free-agent pool per past week (probe `kona_player_info` with a past `scoringPeriodId`). Plan in `docs/plans/` first.
+- [ ] **D12 (L, planned). The scanner replay.** Plan: `docs/plans/scanner-replay.md` (2026-10-20): every team-week of a
+  replayed season, every package `model/trades.py` `scan` proposes and every claim `model/waivers.py` `rank_free_agents`
+  ranks, graded against the weeks that followed; the sample the trade and waiver hit rates need while the outcome log
+  has one executed trade. Live season only (D11: a completed season has no lineups). Five steps, one PR each, in order:
+  1. the probe, `uv run python scripts/probe_replay_pool.py --league L1 --week <past week>` (needs the cookies and
+  `leagues.toml`; the 2026-10-20 session had no league ids), its four answers written under "What the probe found" in
+  the plan; 2. the player universe in the replay (`REPLAY_VERSION` 2, `players`, `universe_missing`); 3. `scan_hits`
+  (`ff backtest --scan`: `replay_proj`, `standings_at`, the pool, the two realized scores, the tables, the three
+  synthetic properties); 4. `claim_hits` (`--claims`, plus the managers' actual adds); 5. the first real tables in
+  `docs/accuracy.md`. Market values have no archive: the chart is off in the replay and the tables say so.
 - [ ] **D10 (L, after D12). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
   play-by-play 2016-2025, per-player weekly points ~ f(opportunity share, team implied total, opponent
   schedule-adjusted points allowed, recent usage trend), blended with consensus by out-of-sample error. Its first
