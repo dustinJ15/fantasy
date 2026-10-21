@@ -540,3 +540,40 @@ def test_a_package_that_lowers_my_title_odds_is_not_a_row():
     both = {"sendable": False, "must_try": False, "why_not": "costs him 0.6/wk"}
     apply_title_delta(both, -0.3, 2.0)
     assert both["why_not"] == "costs him 0.6/wk; lowers my title odds"
+
+
+# ---------- D9: the variance sign on a consolidation's my_gain (docs/plans/trade-acceptance.md question 4) ----------
+
+def test_variance_mult_signs_a_consolidation_by_my_playoff_odds():
+    from ff.model.trades import variance_mult
+    assert variance_mult(2, 1, 30.0) == pytest.approx(1.10)   # underdog buys the bigger, swingier starter
+    assert variance_mult(2, 1, 80.0) == pytest.approx(0.90)   # favorite pays for giving up the floor
+    assert variance_mult(2, 1, 55.0) == 1.0                   # the middle is points per week as is
+    assert variance_mult(2, 1, 40.0) == 1.0 and variance_mult(2, 1, 70.0) == 1.0  # the bands are strict
+    assert variance_mult(2, 1, None) == 1.0                   # no sim, no sign
+    assert variance_mult(1, 1, 30.0) == 1.0 and variance_mult(2, 2, 80.0) == 1.0  # same bodies both ways
+    assert variance_mult(1, 2, 30.0) == 1.0                   # de-consolidating is not the question the research answers
+
+
+def test_scan_scales_a_consolidations_gain_by_my_odds(slots):
+    """RB3 + my bad TE for their good TE gains me what RB3 alone does (+5.0/wk), so the scan keeps the 1-for-1 as
+    the one row for that ask. As an underdog the consolidation reads +5.5 and leads; as a favorite it reads +4.5.
+    No `reg_season_weeks`, so my odds weight no playoff week: the multiplier is the only thing they move."""
+    mine, theirs = _rosters()
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    meta = {2: {"name": "Rival", "wins": 3, "losses": 3}}
+
+    def ask(my_pct, get=("TEgood",)):
+        out = scan(1, {1: mine, 2: theirs}, slots, repl, meta, {}, top=50, max_per_rival=50, playoff_pct={1: my_pct, 2: 50.0})
+        return next(c for c in out if tuple(c["get"]) == get)
+
+    under, mid, fav = ask(30.0), ask(55.0), ask(80.0)
+    assert under["give"] == ["RB3", "TE"] and under["variance_mult"] == pytest.approx(1.1)
+    assert under["my_gain"] == pytest.approx(1.1 * under["my_delta_ppw"], abs=0.01)
+    assert under["score"] == pytest.approx(under["p_accept"] * under["my_gain"], abs=0.01)
+    assert any("underdog" in w and "30%" in w for w in under["why"])
+    for c in (mid, fav):  # the 1-for-1 leads again; its own gain is never scaled
+        assert c["give"] == ["RB3"] and c["variance_mult"] == 1.0 and c["my_gain"] == under["my_delta_ppw"]
+    # a de-consolidation (1-for-2) is not scaled whatever my odds
+    assert ask(30.0, ("TEgood", "RB1"))["variance_mult"] == 1.0
+

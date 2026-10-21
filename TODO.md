@@ -87,10 +87,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   in every league (hit 0.47-0.57, realized -0.3 to +2.0) and the 1-2 bin realized +0.78 in L2 at a coin flip; 1.5 is the
   case if the 1-2 bin realizes under a point in two leagues over the season, and a ruling on it is one line here, not a
   constant change without the table.
-- [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
-  (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
-  the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only
-  once the sim runs 10k for the top three, which the `MUST_TRY_PPW` comment says it cannot today. After B16.
 
 ## Tier E — tests that would catch model errors
 
