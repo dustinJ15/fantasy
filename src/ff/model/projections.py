@@ -52,7 +52,12 @@ NFL_GAMES = 17
 # a one-game kicker and a fill-in QB at the top of the claim ranking. The 2026 replay (weeks 1-5, the wire bodies within
 # three points of a starter): this week's number as the prior reads the no-prior body at +0.5 to +0.9 a game over what he
 # scored after, 3.3 mean absolute, against +0.6 to +1.0 and 3.35-3.5 with no prior; the position's replacement level as
-# the prior read worse than no prior on every row set and needs a second pricing pass.
+# the prior read worse than no prior on every row set and needs a second pricing pass. The prior itself was re-read on
+# everyone (D17, 2026-10-21, `ff backtest --prior`, docs/accuracy.md "The rest-of-season prior"): the in-range wire body
+# *with* a total reads 1.3 to 1.8 a game under what he scores after (his total is a backup's), and the larger of the total
+# and this week's number is the one prior that fixes him, but it reads every rostered body +1.2 to +1.3 over (this week's
+# number carries ESPN's weekly optimism, which the fading total damps) and a faster fade is worse on every sample; so it
+# stays, re-read on the full season (D18).
 PRIOR_FADE_GAMES = 6
 
 # What his opportunity says he should have scored, against what he did (D1). `model/usage.py` prices a season's
@@ -199,14 +204,15 @@ def opponent_mult(pos: str, opponent: dict | None) -> float:
     return float(np.clip(1.0 + k * (f - 1.0), 1.0 - OPPONENT_MULT_CAP, 1.0 + OPPONENT_MULT_CAP))
 
 
-def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None) -> float | None:
+def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None, fade: int = PRIOR_FADE_GAMES) -> float | None:
     """A player's healthy per-game level from the season so far: his own points per game played, with ESPN's
-    preseason total (per game) as a prior that fades out over his first PRIOR_FADE_GAMES games. None without either."""
+    preseason total (per game) as a prior that fades out over his first `fade` (PRIOR_FADE_GAMES) games. None without
+    either."""
     if ytd_pg is None or games <= 0:
         return prior_pg
     if not prior_pg:
         return ytd_pg
-    w_prior = max(0.0, 1.0 - games / PRIOR_FADE_GAMES)
+    w_prior = max(0.0, 1.0 - games / fade)
     return w_prior * prior_pg + (1 - w_prior) * ytd_pg
 
 
@@ -379,6 +385,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
+                 # this week's blend before the matchup (the opponent, the wind): the rest of the season's input
+                 "mu_neutral": round(mu_neutral, 2),
                  # ESPN's preseason total per NFL game; None when ESPN gave him no total. `prior_src` says what
                  # `season_pg` faded: that total (`season`), this week's number in its place (`week`, D13), or nothing
                  "prior_pg": round(prior_pg, 2) if prior_pg else None,
