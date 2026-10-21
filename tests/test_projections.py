@@ -238,18 +238,22 @@ def _usage(ppg: float, xfp_pg: float, games: int = 4) -> dict:
     return {"flags": [], "games": games, "ppg": ppg, "xfp_pg": xfp_pg, "tgt_share": 0.2, "tgt_pg": 6.0, "carry_pg": 0.0}
 
 
-def test_opportunity_mult_moves_halfway_toward_what_the_targets_say_and_is_clipped():
-    from ff.model.projections import OPPORTUNITY_RATIO_CLIP, opportunity_mult
-    assert opportunity_mult("WR", _usage(ppg=20.0, xfp_pg=16.0)) == pytest.approx(0.9)   # 20% over his usage: -10%
-    assert opportunity_mult("RB", _usage(ppg=10.0, xfp_pg=12.0)) == pytest.approx(1.1)   # under it: +10%
+def test_opportunity_mult_moves_toward_what_the_targets_say_by_the_fitted_weight_and_is_clipped():
+    """The weight per position is the fitted one (D10 step 1): over half, under one, and a running QB's attempts count."""
+    from ff.model.projections import OPPORTUNITY_RATIO_CLIP, OPPORTUNITY_WEIGHT, opportunity_mult
+    w_wr, w_rb, w_te, w_qb = (OPPORTUNITY_WEIGHT[p] for p in ("WR", "RB", "TE", "QB"))
+    assert all(0.5 < w < 1.0 for w in (w_wr, w_rb, w_te, w_qb))
+    assert opportunity_mult("WR", _usage(ppg=20.0, xfp_pg=16.0)) == pytest.approx(1 - w_wr + w_wr * 0.8)   # 20% over his usage
+    assert opportunity_mult("RB", _usage(ppg=10.0, xfp_pg=12.0)) == pytest.approx(1 - w_rb + w_rb * 1.2)   # under it
+    assert opportunity_mult("QB", _usage(ppg=20.0, xfp_pg=15.0)) == pytest.approx(1 - w_qb + w_qb * 0.75)
     lo, hi = OPPORTUNITY_RATIO_CLIP
-    assert opportunity_mult("TE", _usage(ppg=4.0, xfp_pg=12.0)) == pytest.approx(0.5 + 0.5 * hi)
-    assert opportunity_mult("WR", _usage(ppg=20.0, xfp_pg=5.0)) == pytest.approx(0.5 + 0.5 * lo)
+    assert lo < 0.5 and hi >= 1.8   # inside the data the clip is off; it guards a bad row
+    assert opportunity_mult("TE", _usage(ppg=4.0, xfp_pg=12.0)) == pytest.approx(1 - w_te + w_te * hi)
+    assert opportunity_mult("WR", _usage(ppg=20.0, xfp_pg=2.0)) == pytest.approx(1 - w_wr + w_wr * lo)
 
 
-def test_opportunity_has_no_say_on_a_qb_a_kicker_a_one_game_sample_or_a_blank():
+def test_opportunity_has_no_say_on_a_kicker_a_one_game_sample_or_a_blank():
     from ff.model.projections import opportunity_mult
-    assert opportunity_mult("QB", _usage(ppg=20.0, xfp_pg=5.0)) == 1.0
     assert opportunity_mult("K", _usage(ppg=8.0, xfp_pg=0.0)) == 1.0 and opportunity_mult("D/ST", None) == 1.0
     assert opportunity_mult("WR", _usage(ppg=20.0, xfp_pg=16.0, games=1)) == 1.0
     assert opportunity_mult("WR", None) == 1.0 and opportunity_mult("WR", {}) == 1.0
@@ -257,25 +261,28 @@ def test_opportunity_has_no_say_on_a_qb_a_kicker_a_one_game_sample_or_a_blank():
 
 
 def test_a_td_heavy_start_is_regressed_toward_the_targets_and_the_rival_still_sees_espn():
-    """A receiver with 91.3 in 4 games on usage worth 73 (five touchdowns on 24 targets): his level reads 10% under
-    his average, the preseason prior and the weekly blend as before; his rival's app (`espn_pg`) never sees it."""
+    """A receiver with 91.3 in 4 games on usage worth 73 (five touchdowns on 24 targets): his level reads under his
+    average by the fitted weight (11% at 0.58; 10% at the 0.5 prior of the plan's worked example), the preseason
+    prior and the weekly blend as before; his rival's app (`espn_pg`) never sees it."""
+    from ff.model.projections import OPPORTUNITY_WEIGHT
     r = row(name="TD WR", pos="WR", proj_week=18.0, proj_season=246.2, actual_season=91.3, games_played=4)
     plain = blend(r, None, None, 13, None, week=5)
     hot = blend(r, None, None, 13, None, week=5, usage=_usage(ppg=22.8, xfp_pg=18.3))
-    ytd, prior = 91.3 / 4, 246.2 / 17
-    mult = 0.5 + 0.5 * 18.3 / 22.8
+    ytd, prior, w = 91.3 / 4, 246.2 / 17, OPPORTUNITY_WEIGHT["WR"]
+    mult = 1 - w + w * 18.3 / 22.8
     assert hot.mu_ros_active == pytest.approx(0.5 * (ytd * mult * 4 / 6 + prior * 2 / 6) + 0.5 * 18.0, abs=0.05)
     assert hot.mu_ros_active < plain.mu_ros_active and hot.mu_ros < plain.mu_ros
     assert hot.sources["espn_pg"] == plain.sources["espn_pg"] and hot.sources["ytd_pg"] == plain.sources["ytd_pg"]
-    assert hot.sources["opp_mult"] == pytest.approx(mult, abs=0.001) and "opp:x0.90" in hot.flags
+    assert hot.sources["opp_mult"] == pytest.approx(mult, abs=0.001) and f"opp:x{mult:.2f}" in hot.flags
     assert hot.mu == plain.mu and hot.sigma == plain.sigma   # this week's number is the matchup's, not the season's
 
 
 def test_a_back_whose_carries_outrun_his_points_reads_up_and_a_blank_usage_changes_nothing():
     r = row(name="Volume RB", pos="RB", proj_week=12.0, proj_season=180.0, actual_season=40.0, games_played=4)
     plain = blend(r, None, None, 13, None, week=5)
+    from ff.model.projections import OPPORTUNITY_WEIGHT
     cold = blend(r, None, None, 13, None, week=5, usage=_usage(ppg=10.0, xfp_pg=13.0))
-    assert cold.mu_ros_active > plain.mu_ros_active and cold.sources["opp_mult"] == pytest.approx(1.15)
+    assert cold.mu_ros_active > plain.mu_ros_active and cold.sources["opp_mult"] == pytest.approx(1 + 0.3 * OPPORTUNITY_WEIGHT["RB"], abs=0.001)
     same = blend(r, None, None, 13, None, week=5, usage={"flags": [], "games": 0, "ppg": 0.0, "xfp_pg": 0.0})
     assert same.mu_ros_active == plain.mu_ros_active and same.sources["opp_mult"] == 1.0 and "opp:x1.00" not in same.flags
     # no games on ESPN's side: nothing to scale, the prior is the level

@@ -84,12 +84,19 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   in every league (hit 0.47-0.57, realized -0.3 to +2.0) and the 1-2 bin realized +0.78 in L2 at a coin flip; 1.5 is the
   case if the 1-2 bin realizes under a point in two leagues over the season, and a ruling on it is one line here, not a
   constant change without the table.
-- [ ] **D10 (L). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
-  play-by-play 2016-2025, per-player weekly points ~ f(opportunity share, team implied total, opponent
-  schedule-adjusted points allowed, recent usage trend), blended with consensus by out-of-sample error. Its first
-  deliverable is the fitted weight that replaces `OPPORTUNITY_WEIGHT` (0.5) and the clip in `model/projections.py`
-  (`docs/plans/in-season-projection.md`), and a pass-attempt term so QB stops reading 1.0; the backtest harness
-  (`docs/plans/backtest.md`) is how it is scored. Plan in `docs/plans/` first.
+- [ ] **D10 (L, planned). The fitted projection model.** Plan: `docs/plans/fitted-projection.md` (2026-10-21). ROADMAP
+  item 1's historical half, on nflverse weekly stats 2016-2025 (`opfit.py`, `ff fit-opportunity`; the network, no
+  cookies), each term fitted leave-one-season-out in the live arithmetic's own shape and adopted only when it beats the
+  prior out of sample; the backtest harness (`docs/plans/backtest.md`) and the projlog score what the fit cannot. Step 1
+  done 2026-10-21: `OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP` fitted (QB 0.57, RB 0.64, WR 0.58, TE 0.67; the
+  clip off inside the data) and `XFP_PER_ATTEMPT` (0.415), so QB reads his attempts. Left, one PR each, in order:
+  2. the opponent factor (`opfit.fit_opponent`: points allowed per position by each defense over the season so far,
+  adjusted for the offenses faced, as a capped multiplier on this week's number; ROADMAP item 5's open piece); 3. the
+  implied-total term (`VEGAS_K` fitted on nflverse `schedules` `spread_line` / `total_line`, ROADMAP item 4's open
+  calibration); 4. the recent-usage trend (the last three games' share against the season's, a second term on the
+  rest-of-season level, the same closed form as step 1); 5. the blend with consensus by out-of-sample error (the
+  historical model's weekly number against ESPN's in the 2026 replay and the projlog; needs the replay files and the
+  cookies). Each step's done-when and what it must not read are in the plan.
 - [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
   (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
   the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only

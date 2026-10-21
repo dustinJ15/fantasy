@@ -4,7 +4,8 @@ Status: implemented 2026-10-20 in one PR (TODO D1): the opportunity read in `mod
 wired from `model/usage.py` `signals` through `packet._projs`. The two earlier pieces of the same number are A1
 (2026-10-08, the season-to-date level with the fading prior) and D7 (the usage cell on the card).
 Written: 2026-10-20 against `main` at 9f3c08a (462 tests passing).
-TODO ids: D1; the fitted model that would replace the prior weight is D10.
+TODO ids: D1; the fitted model that replaces the prior weight is D10 (step 1 done 2026-10-21: `OPPORTUNITY_WEIGHT` is
+fitted per position, QB included, and the clip is off inside the data; `docs/plans/fitted-projection.md`).
 Still open: D10.
 
 For an agent touching the rest-of-season level (`season_pg`, `per_game`, `opportunity_mult`) or the usage proxy
@@ -33,8 +34,10 @@ but no number moved. `opportunity_mult(pos, usage)` moves one:
     mult  = 1 - w + w * ratio                                # w = OPPORTUNITY_WEIGHT[pos], 0.5 for RB, WR, TE
 
 and `ytd_pg` is multiplied by it before the prior fades in. A receiver who has scored 20% over what his targets are
-worth reads 10% under his season average; a back whose carries outrun his points reads up. QB, K and D/ST read 1.0:
-the proxy prices no pass attempt and nflverse has no kicks. A sample under `OPPORTUNITY_MIN_GAMES` (2) reads 1.0.
+worth reads 10% under his season average at the 0.5 prior; a back whose carries outrun his points reads up. QB, K and
+D/ST read 1.0: the proxy prices no pass attempt and nflverse has no kicks. A sample under `OPPORTUNITY_MIN_GAMES` (2)
+reads 1.0. (Since 2026-10-21, D10 step 1, the weight is fitted per position, QB included at a fitted pass-attempt
+value, and the clip is (0.3, 2.0): `docs/plans/fitted-projection.md`. The arithmetic below is at the 0.5 prior.)
 
 Why a ratio and not xFP itself: `xfp_lite` and `ppg` are PPR points from nflverse; `ytd_pg` is league scoring from
 ESPN. Their ratio needs no scoring table and survives a half-PPR league, at the cost of mis-weighting a reception
@@ -83,7 +86,9 @@ is this table.
 3. **QB?** No, until the proxy prices a pass attempt. A QB's TD rate regresses too, but `xfp_lite` has no term for
    him and a 1.0 is honest.
 4. **Fade the weight with games like the prior?** No; the clip does that job at small samples, and the half weight is
-   the number a fit would replace. One constant is easier to fit than a schedule.
+   the number a fit would replace. One constant is easier to fit than a schedule. (Measured 2026-10-21, D10 step 1:
+   the fitted weight does fall with games played, 0.7-0.8 at two or three games to 0.35-0.5 past ten, and a schedule
+   buys 0.01-0.02 of out-of-sample rmse; one constant stays.)
 
 ## Deviations
 

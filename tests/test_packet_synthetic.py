@@ -298,7 +298,8 @@ def test_usage_reaches_the_rest_of_season_level_through_the_crosswalk(monkeypatc
     mine = {p["espn_id"]: p for p in base["roster"]}
     moved = {p["espn_id"]: p for p in blk["roster"]}
     assert moved[star["espn_id"]]["mu_ros"] < mine[star["espn_id"]]["mu_ros"]
-    assert moved[star["espn_id"]]["sources"]["opp_mult"] == pytest.approx(0.9)
+    from ff.model.projections import OPPORTUNITY_WEIGHT
+    assert moved[star["espn_id"]]["sources"]["opp_mult"] == pytest.approx(1 - 0.2 * OPPORTUNITY_WEIGHT["WR"], abs=0.001)
     assert moved[star["espn_id"]]["usage"]["tgt_share"] == 0.26   # the usage cell still renders from the same dict
     others = [eid for eid in mine if eid != star["espn_id"]]
     assert all(moved[e]["mu_ros"] == mine[e]["mu_ros"] for e in others)
