@@ -44,10 +44,11 @@ from typing import Any
 
 from .config import DATA_DIR, LeagueRef
 from .model.lineup import Lineup, as_set, optimize, win_prob
-from .model.projections import PRIOR_FADE_GAMES, PlayerProj, blend, per_game, season_pg
+from .model.projections import NFL_GAMES, PRIOR_FADE_GAMES, PlayerProj, blend, opponent_mult, opportunity_mult, per_game, season_pg, vegas_mult
 from .model.season import SeasonCtx, greedy_lineup
 from .model.sim import simulate
 from .model.trades import lineup_strength, scan
+from .model.usage import nfl_team
 from .model.vbd import own_starter_value, replacement_levels
 from .model.waivers import CLAIM_WORTHY_PPW, rank_free_agents
 from .sources import espn
@@ -984,3 +985,174 @@ def prior_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
             "zeroed_known": any("total_zeroed" in u for u in rep["players"].values()),
             "rostered": split([r for r in rows if r["kind"] == "rostered"]), "wire": split([r for r in rows if r["kind"] == "wire"]),
             "near": split([r for r in rows if r["near"]])}
+
+
+# ---------- the blend question (D10 step 5) ----------
+# The fitted weekly number is the historical model on its own: his level so far (`season_pg` over his league-scoring
+# points a game through last week, moved by `opportunity_mult` and its trend, ESPN's preseason total per game as the
+# fading prior), times this week's implied total (`vegas_mult`) and opponent (`opponent_mult`). ESPN's weekly number
+# never enters it, so its error and ESPN's are two reads of the same player-week, and the inverse-error weight between
+# them says what the fitted number is worth as a source of `blend` (`docs/plans/fitted-projection.md`, step 5).
+
+FIT_POSITIONS = ("QB", "RB", "WR", "TE")
+# The replay's sources: ESPN's number, the same with the implied total on it, with the opponent on that too (`blend`'s
+# arithmetic on ESPN alone: the card's number for a player Sleeper does not reach), and the fitted number.
+FIT_SOURCES = ("espn", "espn_vegas", "espn_matchup", "fitted")
+# A row is scored when ESPN projected him for at least this: the universe holds every body ESPN lists, and a 0.3
+# projection on a third-string back is a row neither source is asked about by the card.
+FIT_MIN_PROJ = 3.0
+
+
+class FitInputs:
+    """What the fitted number reads beside the replay, each through the week before the one priced: `usage` week ->
+    gsis_id -> `usage.signals` over weeks 1..week-1 (empty for week 1); `defense` week -> (nflverse team, pos) ->
+    `usage.opponent_factor_index` through week-1; `games` (week, nflverse team) -> {opp, implied} off nflverse's
+    closing lines; `gsis` espn_id -> gsis_id (the crosswalk)."""
+
+    def __init__(self, usage: dict[int, dict[str, dict]], defense: dict[int, dict], games: dict[tuple[int, str], dict], gsis: dict[int, str]):
+        self.usage, self.defense, self.games, self.gsis = usage, defense, games, gsis
+
+
+def week_games(sched) -> dict[tuple[int, str], dict]:
+    """(week, team) -> {opp, implied} for every regular-season game in an nflverse `schedules` frame; `implied` is None
+    without a closing line (`opfit.implied_lines`'s arithmetic: the home side's total is `total / 2 + spread / 2`)."""
+    out: dict[tuple[int, str], dict] = {}
+    for g in sched.iter_rows(named=True):
+        if g.get("game_type") != "REG":
+            continue
+        tot, spr = g.get("total_line"), g.get("spread_line")
+        has = tot is not None and spr is not None
+        wk, home, away = int(g["week"]), g["home_team"], g["away_team"]
+        out[(wk, home)] = {"opp": away, "implied": tot / 2 + spr / 2 if has else None}
+        out[(wk, away)] = {"opp": home, "implied": tot / 2 - spr / 2 if has else None}
+    return out
+
+
+def fit_inputs(season: int, weeks: list[int], espn_ids: set[int]) -> FitInputs:
+    """`FitInputs` off nflverse (the network; no cookies) and the crosswalk."""
+    from .ids import Crosswalk
+    from .model import usage as usage_mod
+    from .sources import nflverse
+    usage = {w: (usage_mod.signals(usage_mod.season_summary(season, w - 1)) if w > 1 else {}) for w in weeks}
+    defense = {w: usage_mod.opponent_factor_index(season, w - 1) for w in weeks}
+    xw = Crosswalk()
+    gsis = {pid: g for pid in espn_ids if (g := (xw.by_espn.get(str(pid)) or {}).get("gsis_id"))}
+    return FitInputs(usage, defense, week_games(nflverse.schedules(season)), gsis)
+
+
+def fitted_week(u: dict, week: int, inp: FitInputs) -> dict | None:
+    """The fitted weekly number for universe row `u` in week `week` and the multipliers behind it, or None when he has
+    neither a game so far nor a preseason total (no level). Reads his actuals over weeks 1..week-1 only."""
+    pos = u["pos"]
+    pts, games = season_to_date(u, week)
+    ytd = pts / games if games else None
+    usage = inp.usage.get(week, {}).get(inp.gsis.get(u["espn_id"], ""))
+    opp_mult = opportunity_mult(pos, usage) if ytd is not None else 1.0
+    prior = (u.get("proj_season") or 0.0) / NFL_GAMES or None
+    level = season_pg(ytd * opp_mult if ytd is not None else None, games, prior)
+    if level is None:
+        return None
+    team = nfl_team(u.get("team"))
+    g = inp.games.get((week, team)) or {}
+    v = vegas_mult(pos, g.get("implied"))
+    d = opponent_mult(pos, inp.defense.get(week, {}).get((g.get("opp"), pos))) if g.get("opp") else 1.0
+    return {"fitted": level * v * d, "level": level, "vegas_mult": v, "def_mult": d, "opp_mult": opp_mult}
+
+
+def fit_rows(rep: dict, inp: FitInputs) -> list[dict]:
+    """Every player-week of one replay the scorer grades: a position in FIT_POSITIONS, a week with ESPN's number of at
+    least FIT_MIN_PROJ and an actual, not his bye; `rostered` when he was on a roster that week. Each row carries every
+    FIT_SOURCES number and the actual."""
+    played = [w["week"] for w in rep["weeks"]]
+    rostered = {wk["week"]: {r["espn_id"] for m in wk["matchups"] for r in m["home_roster"] + m["away_roster"]} for wk in rep["weeks"]}
+    out = []
+    for pid, u in rep["players"].items():
+        if u["pos"] not in FIT_POSITIONS:
+            continue
+        byes = set(u.get("bye_weeks") or [])
+        for w in played:
+            v = u["weeks"].get(w) or {}
+            if w in byes or "actual" not in v or "proj" not in v or float(v["proj"]) < FIT_MIN_PROJ:
+                continue
+            f = fitted_week(u, w, inp)
+            if f is None:
+                continue
+            espn_pts = float(v["proj"])
+            out.append({"league": rep.get("league"), "week": w, "espn_id": pid, "pos": u["pos"], "rostered": pid in rostered.get(w, set()),
+                        "espn": espn_pts, "espn_vegas": espn_pts * f["vegas_mult"], "espn_matchup": espn_pts * f["vegas_mult"] * f["def_mult"],
+                        "fitted": f["fitted"], "actual": float(v["actual"])})
+    return out
+
+
+def inverse_error_weights(rows: list[dict], sources: tuple[str, ...]) -> dict[str, float] | None:
+    """Each source's weight in the mix, proportional to one over its mean squared error over `rows`; None with no row."""
+    if not rows:
+        return None
+    inv = {s: 1.0 / max(sum((r[s] - r["actual"]) ** 2 for r in rows) / len(rows), 1e-9) for s in sources}
+    tot = sum(inv.values())
+    return {s: x / tot for s, x in inv.items()}
+
+
+def mix_oos(rows: list[dict], sources: tuple[str, ...]) -> tuple[float | None, float | None]:
+    """(mean absolute error, bias) of the inverse-error mix scored leave-one-week-out: each week's rows mixed at the
+    weights fitted on the other weeks. None with fewer than two weeks."""
+    weeks = sorted({r["week"] for r in rows})
+    if len(weeks) < 2:
+        return None, None
+    errs = []
+    for w in weeks:
+        wt = inverse_error_weights([r for r in rows if r["week"] != w], sources)
+        errs += [sum(wt[s] * r[s] for s in sources) - r["actual"] for r in rows if r["week"] == w]
+    return _mean([abs(e) for e in errs]), _mean(errs)
+
+
+def fit_table(rows: list[dict], sources: tuple[str, ...], mix: tuple[str, ...], min_n: int) -> list[dict]:
+    """One row per position: n, each source's mean absolute error and bias (forecast minus actual), the inverse-error
+    weights of `mix` over every row, and the mix scored out of sample (`mix_oos`). `counts` is False under `min_n`:
+    the weights print but nothing is adopted (D2's rule, `projlog.FIT_MIN_N`)."""
+    out = []
+    for pos in FIT_POSITIONS:
+        rs = [r for r in rows if r["pos"] == pos]
+        row: dict[str, Any] = {"pos": pos, "n": len(rs), "counts": len(rs) >= min_n, "min_n": min_n}
+        for s in sources:
+            row[s] = {"mae": _mean([abs(r[s] - r["actual"]) for r in rs]), "bias": _mean([r[s] - r["actual"] for r in rs])}
+        row["weights"] = inverse_error_weights(rs, mix)
+        row["mix"] = dict(zip(("mae", "bias"), mix_oos(rs, mix)))
+        out.append(row)
+    return out
+
+
+def projlog_sources(season: int, through_week: int) -> dict[tuple[str, int, int], dict[str, float]]:
+    """(league, espn_id, week) -> {espn_pts, sleeper_pts, blend}: the morning forecast the projlog scored for that
+    player-week (`projlog.scored_rows`, his last one before kickoff)."""
+    from . import projlog
+    out: dict[tuple[str, int, int], dict[str, float]] = {}
+    for r in projlog.scored_rows(projlog._logs(season), through_week):
+        out.setdefault((r["league"], int(r["espn_id"]), r["week"]), {})[r["source"]] = r["mu"]
+    return out
+
+
+def fit_hits(reps: list[dict], inp_by_season: dict[int, FitInputs], logged: dict | None = None, min_n: int | None = None) -> dict[str, Any]:
+    """The blend question over every replay, pooled: `replay` (every graded player-week, FIT_SOURCES, ESPN and the
+    fitted number mixed), `both` (the rows where the fitted number is at FIT_MIN_PROJ too: selecting on ESPN's number
+    alone leans the sample toward ESPN, since a body it rates high and the fitted number does not is kept and the
+    reverse is not), `rostered` (the rostered rows) and `projlog` (the rows the projlog also scored,
+    with Sleeper and the live blend beside them; the mix is ESPN, Sleeper and the fitted number, `blend`'s two stat
+    sources and the candidate third). `logged` is `projlog_sources`' map; None skips that table. A projlog row written
+    before 2026-10-08 has no `league` and so no league's scoring to match: it does not join."""
+    from .projlog import FIT_MIN_N
+    n_min = FIT_MIN_N if min_n is None else min_n
+    rows = [r for rep in reps for r in fit_rows(rep, inp_by_season[rep["season"]])]
+    out: dict[str, Any] = {"seasons": sorted({rep["season"] for rep in reps}), "leagues": [rep.get("league") for rep in reps],
+                           "weeks": sorted({r["week"] for r in rows}), "min_proj": FIT_MIN_PROJ,
+                           "replay": fit_table(rows, FIT_SOURCES, ("espn", "fitted"), n_min),
+                           "both": fit_table([r for r in rows if r["fitted"] >= FIT_MIN_PROJ], FIT_SOURCES, ("espn", "fitted"), n_min),
+                           "rostered": fit_table([r for r in rows if r["rostered"]], FIT_SOURCES, ("espn", "fitted"), n_min)}
+    if logged is not None:
+        both = []
+        for r in rows:
+            lg = logged.get((r["league"], r["espn_id"], r["week"])) or {}
+            if lg.get("sleeper_pts") is not None and lg.get("blend") is not None:
+                both.append({**r, "sleeper": lg["sleeper_pts"], "blend": lg["blend"]})
+        out["projlog"] = fit_table(both, ("espn", "sleeper", "blend", "fitted"), ("espn", "sleeper", "fitted"), n_min)
+    return out

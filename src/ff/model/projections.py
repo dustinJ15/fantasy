@@ -173,6 +173,15 @@ def _sigma(pos: str, mu: float, fp_sd: float | None) -> float:
 VEGAS_K = {"QB": 0.41, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}   # QB was 0.35; fitted 2026-10-21
 LEAGUE_AVG_IMPLIED = 23.0
 
+
+def vegas_mult(pos: str, implied_total: float | None) -> float:
+    """This week's multiplier for his team's implied total: `1 + k * (implied / LEAGUE_AVG_IMPLIED - 1)` with VEGAS_K's
+    `k`; 1.0 with no line or a position the line does not move."""
+    k = VEGAS_K.get(pos, 0.0)
+    if not implied_total or not k:
+        return 1.0
+    return 1.0 + k * (implied_total / LEAGUE_AVG_IMPLIED - 1.0)
+
 # This week's opponent (D10 step 2, ROADMAP item 5's open piece). `model/usage.py` `opponent_factors` reads each
 # defense's PPR points allowed a game to a position over the season through last week, over what those offenses scored
 # at the position in their other games (one pass of schedule adjustment): 1.2 is a defense giving up a fifth more than
@@ -332,8 +341,7 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     else:
         mu = 0.0
     mu_neutral = mu   # the blend before this week's matchup (Vegas, the opponent) is applied: the rest of the season's input
-    if implied_total and mu and VEGAS_K.get(pos, 0):
-        mu *= 1 + VEGAS_K[pos] * (implied_total / LEAGUE_AVG_IMPLIED - 1)
+    mu *= vegas_mult(pos, implied_total)
     def_mult = opponent_mult(pos, opponent)
     mu *= def_mult
     wx_mult = wind_mult(pos, weather)

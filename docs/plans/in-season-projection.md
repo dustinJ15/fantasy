@@ -4,9 +4,9 @@ Status: implemented 2026-10-20 in one PR (TODO D1): the opportunity read in `mod
 wired from `model/usage.py` `signals` through `packet._projs`. The two earlier pieces of the same number are A1
 (2026-10-08, the season-to-date level with the fading prior) and D7 (the usage cell on the card).
 Written: 2026-10-20 against `main` at 9f3c08a (462 tests passing).
-TODO ids: D1; the fitted model that replaces the prior weight is D10 (step 1 done 2026-10-21: `OPPORTUNITY_WEIGHT` is
-fitted per position, QB included, and the clip is off inside the data; `docs/plans/fitted-projection.md`).
-Still open: D10.
+TODO ids: D1; the fitted model that replaces the prior weight is D10 (done 2026-10-21: `OPPORTUNITY_WEIGHT` is fitted
+per position, QB included, and the clip is off inside the data; `docs/plans/fitted-projection.md`).
+Still open: none.
 
 For an agent touching the rest-of-season level (`season_pg`, `per_game`, `opportunity_mult`) or the usage proxy
 (`usage.season_summary`). The container had no ESPN cookies and no nflverse cache, so the worked example below is the

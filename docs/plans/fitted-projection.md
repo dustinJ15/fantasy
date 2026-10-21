@@ -1,11 +1,11 @@
 # Plan: the fitted projection model (TODO D10)
 
-Status: planned 2026-10-21; steps 1-4 done 2026-10-21 (1: the opportunity weight, clip and pass attempt, `opfit.py`, `ff fit-opportunity`;
-2: the opponent factor, `OPPONENT_K`; 3: the implied total, `VEGAS_K` QB 0.41; 4: the recent-usage trend, `TREND_K`, read by `trend_mult`
-inside `opportunity_mult`). Step 5 is in TODO.md under D10; each step's section below says what was fitted and adopted.
-Written: 2026-10-21 against `main` at 3db45b8 (a session with the network and no cookies: nflverse reachable, ESPN not).
-TODO ids: D10 (step 5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
-Still open: D10.
+Status: steps 1-5 done 2026-10-21 (1: the opportunity weight, clip and pass attempt, `opfit.py`, `ff fit-opportunity`; 2: the opponent
+factor, `OPPONENT_K`; 3: the implied total, `VEGAS_K` QB 0.41; 4: the recent-usage trend, `TREND_K`; 5: the blend question, `ff backtest
+--fit`: the fitted number stays a rest-of-season read, not a third source of `blend`). Each step's section below says what was adopted.
+Written: 2026-10-21 against `main` at 3db45b8 (steps 1-4: the network, no cookies); step 5 at 5ed8078 with the cookies and the replay.
+TODO ids: D10 (done); D21 the season-end re-read of step 5; D2 is the variance fit the same way, on the projlog; D13 the floor prior.
+Still open: D21.
 
 For an agent fitting a projection constant to past seasons, or taking a D10 step. ROADMAP item 1's historical half in one
 line: the in-season model (`docs/plans/in-season-projection.md`) reads a player's rest of season from his season so far,
@@ -307,15 +307,85 @@ adopted numbers in place under the fit out of sample and says `keep prior` in ev
   targets; the research step (`overrides.json`, `ros_mult`) is where a known role change is priced.
 - **Survivorship**, as step 1: a row needs three games after it.
 
-## Step 5 (one PR; the done-when)
+## Step 5: the blend with consensus by out-of-sample error (done 2026-10-21)
 
-5. **The blend with consensus by out-of-sample error.** The point of the item: the fitted weekly number (steps 2-3 on
-   the level so far) against ESPN's weekly number for the same player-week, on the 2026 replay (`players[].weeks[].proj`
-   and `actual`, three leagues, every rostered and universe player) and the projlog (`espn_pts`, `sleeper_pts`, the
-   blend, the actual). The mixing weight is the inverse-error one over the scored weeks, per position, refused under
-   `projlog.FIT_MIN_N` as D2. Done when `ff backtest --fit` (or `ff accuracy --fit-blend`) prints the fitted number's
-   MAE beside each source's and the mixing weight, and the plan says whether the fitted model enters `blend` as a third
-   source at that weight or stays a rest-of-season read only. Needs the replay files and the cookies.
+The point of the item: is the fitted weekly number a source of `blend`, beside ESPN's and Sleeper's, or only the
+rest-of-season read it already is? `ff backtest --fit` (`backtest.fit_hits`) answers it on the 2026 replay.
+
+### The fitted weekly number
+
+The historical model on its own, ESPN's weekly number never entering it (`backtest.fitted_week`): his level so far
+(`season_pg` over his league-scoring points a game through last week, moved by `opportunity_mult` with its trend,
+ESPN's preseason total per NFL game as the fading prior), times this week's `vegas_mult` (his team's implied total off
+nflverse's closing line) and `opponent_mult` (the defense's factor through last week). The usage, the factor and the
+line are read through week w-1 (`backtest.fit_inputs`; week 1 has no usage, never the whole season). It is `blend`'s
+own arithmetic with the stat sources left out, so it drops in as a third source with no new shape. `vegas_mult` is
+`blend`'s implied-total term as a function now, so both read one definition.
+
+### The rows
+
+Every player-week of the three replays (L1, L2, L3, weeks 1-6) at QB, RB, WR and TE with ESPN's pre-kickoff number at
+3+ (`FIT_MIN_PROJ`: the universe holds every body ESPN lists, and a 0.3 on a third-string back is no row the card asks
+about), an actual, and a level (a game so far or a preseason total). Pooled over the leagues, so a player-week counts
+once per league's scoring. Three samples: every row; the rows where the fitted number is at 3+ too (selecting on
+ESPN's number alone keeps the body ESPN rates high and the fitted number does not, never the reverse, which leans
+the sample toward ESPN); the rows rostered that week. The mixing weight is inverse mean squared error over the rows,
+per position; the mix is scored leave-one-week-out (each week mixed at the weights the other five fit). The projlog
+table joins its morning rows (Sleeper, the live blend) on league, player and week; a log from before 2026-10-08
+carries no league, so weeks 1-4 cannot be matched to one league's scoring and do not join.
+
+### What it printed (2026 weeks 1-6, 2026-10-21)
+
+Mean absolute error / bias (forecast minus actual), points a week. `espn+line` is ESPN's number times `vegas_mult`,
+`espn+line+def` times `opponent_mult` too: `blend` on ESPN alone, the card's number for a body Sleeper does not reach.
+
+| sample | pos | n | espn | espn+line | espn+line+def | fitted | w fitted | mix, held out |
+|---|---|---|---|---|---|---|---|---|
+| every | QB | 549 | 6.12 / +0.13 | 6.09 / +0.12 | 6.09 / +0.15 | 7.24 / -4.13 | 0.40 | 6.18 / -1.57 |
+| every | RB | 1108 | 5.24 / +0.80 | 5.17 / +0.77 | 5.24 / +0.79 | 5.00 / -2.32 | 0.47 | 4.94 / -0.68 |
+| every | WR | 1832 | 5.21 / +0.28 | 5.21 / +0.25 | 5.22 / +0.26 | 5.10 / -2.10 | 0.47 | 4.98 / -0.83 |
+| every | TE | 796 | 5.13 / -0.30 | 5.09 / -0.33 | 5.05 / -0.32 | 5.18 / -2.20 | 0.46 | 5.09 / -1.18 |
+| both 3+ | QB | 531 | 6.09 / +0.14 | 6.07 / +0.15 | 6.06 / +0.18 | 7.01 / -3.80 | 0.41 | 6.16 / -1.49 |
+| both 3+ | RB | 933 | 5.49 / +0.58 | 5.41 / +0.56 | 5.50 / +0.59 | 5.37 / -2.32 | 0.47 | 5.29 / -0.79 |
+| both 3+ | WR | 1503 | 5.56 / +0.03 | 5.56 / -0.00 | 5.57 / +0.01 | 5.52 / -2.09 | 0.47 | 5.40 / -0.96 |
+| both 3+ | TE | 636 | 5.51 / -0.34 | 5.47 / -0.37 | 5.42 / -0.36 | 5.58 / -2.15 | 0.47 | 5.48 / -1.19 |
+| rostered | QB | 322 | 6.51 / +0.06 | 6.51 / +0.51 | 6.49 / +0.55 | 7.15 / -3.52 | 0.43 | 6.46 / -1.47 |
+| rostered | RB | 759 | 5.93 / +0.76 | 5.82 / +0.75 | 5.92 / +0.78 | 5.82 / -2.60 | 0.47 | 5.69 / -0.82 |
+| rostered | WR | 904 | 6.39 / +0.16 | 6.42 / +0.19 | 6.42 / +0.21 | 6.32 / -2.63 | 0.46 | 6.17 / -1.13 |
+| rostered | TE | 337 | 6.12 / -0.18 | 6.09 / -0.18 | 6.02 / -0.14 | 6.38 / -2.58 | 0.46 | 6.16 / -1.29 |
+
+The projlog's joinable rows (weeks 5-6): QB 13, RB 21, WR 21, TE 10, every position under `projlog.FIT_MIN_N` (150),
+so the three-source weights (ESPN, Sleeper, fitted) print and count for nothing.
+
+### What the score found
+
+- **The fitted number is a second opinion, not a better one.** Alone it ties ESPN at RB, WR and TE (within 0.25) and
+  loses a point at QB. Mixed with ESPN at about 0.47, held out, it beats ESPN alone by 0.2-0.3 at RB and 0.15-0.23 at
+  WR in all three samples, ties at TE and loses at QB (+0.06 every row, -0.05 rostered). The weight is near a half
+  because its errors are its own (ESPN's analysts and a points-so-far level miss different weeks), not because it is
+  accurate.
+- **It reads 1.2 to 4 points low in every position and every week.** Most of that is the prior: ESPN's preseason total
+  over 17 games bakes in the games it expects him to miss, so as the per-game level of a body who plays it reads low,
+  and it fades over six games. With no prior the bias is -0.0 (RB) to -1.5 (QB) and the error 0.6-0.7 worse; the
+  total over 15 games or zero-point weeks left out of the level each take a third of a point off. Mixed in as it
+  stands, at a third of the weight among three sources, it would pull every this-week `mu` down about a point.
+- **The verdict: it stays a rest-of-season read only.** The question a blend source has to answer is whether it beats
+  the live two-source blend held out, and the only table that holds Sleeper and the blend is under the minimum sample
+  in every position. The replay says the candidate is worth re-reading (RB and WR gain held out against ESPN, even
+  carrying its bias), so D21 re-reads it at the season's end, with the bias taken out on the training weeks.
+- **The matchup terms on ESPN's number (the double-count question).** The line on top of ESPN helps at RB (5.24 to
+  5.17 every row, 5.93 to 5.82 rostered) and is flat elsewhere; it stays. The opponent on top of the line hurts at RB
+  in every sample (+0.07 to +0.10: ESPN's analysts already priced the run defense) and helps at TE (-0.04 to -0.07);
+  QB and WR are flat. Six weeks of one season against the ten seasons `OPPONENT_K` was fitted on is no reason to move
+  a constant; D21 re-reads RB's `k` on the blend with the full season.
+
+### What the score could not see
+
+- **Sleeper.** The replay archives ESPN's number only; the live blend averages ESPN and Sleeper, so the replay scores
+  the candidate against half the blend. The projlog holds the other half, but only from 2026-10-08.
+- **The team on the pull day.** The universe carries today's team, so a body traded or released mid-season reads his
+  new team's line and opponent in the weeks before; a handful of rows.
+- **The sit risk.** The replay keeps no designation; a body ESPN projected at 3+ who sat is a zero for both numbers.
 
 ## Leakage rules (the fitter keeps them; a step must too)
 
