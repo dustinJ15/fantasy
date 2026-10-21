@@ -1,7 +1,7 @@
 """The projection-constant fitter (TODO D10): step 1 fits `projections.OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP`
 per position, and `usage.XFP_PER_ATTEMPT`; step 2 fits `projections.OPPONENT_K`, this week's opponent factor; step 3
-fits `projections.VEGAS_K`, this week's implied team total (nflverse `schedules`); all to nflverse weekly stats of past
-seasons. Prints, never writes: the constants are copied by hand with the sample and the
+fits `projections.VEGAS_K`, this week's implied team total (nflverse `schedules`); step 4 fits `projections.TREND_K`, the
+last three games' usage against the season's on the rest-of-season level; all to nflverse weekly stats of past seasons. Prints, never writes: the constants are copied by hand with the sample and the
 date in the comment (`docs/plans/fitted-projection.md`).
 
 The question it answers is the one `opportunity_mult` makes a prior on: a player's season so far reads `ppg` points a
@@ -44,6 +44,10 @@ GAMES_BUCKETS = ((2, 3), (4, 6), (7, 10), (11, 17))
 K_BOUNDS = (0.0, 1.0)
 # ...and `k` by the defense's games played when the factor was read, for the reader (a young factor is mostly noise).
 DEF_GAMES_BUCKETS = ((3, 5), (6, 9), (10, 17))
+# Step 4: `t` is how much of the recent-usage ratio's deviation the level takes; held to [0, 1] (a negative `t` would
+# move a player away from his newer role), and `t` by games played for the reader (under RECENT_GAMES + 1 the ratio is 1).
+T_BOUNDS = (0.0, 1.0)
+TREND_GAMES_BUCKETS = ((4, 6), (7, 10), (11, 17))
 
 
 def weekly(seasons: Iterable[int] = FIT_SEASONS) -> pl.DataFrame:
@@ -75,8 +79,10 @@ def season_rows(w: pl.DataFrame) -> pl.DataFrame:
     if "xfp" not in g.columns:
         g = g.with_columns(pl.lit(0.0).alias("xfp"))
     over = ["season", "gsis_id"]
+    recent = pl.sum_horizontal([pl.col("xfp").shift(i).over(over).fill_null(0.0) for i in range(1, projections.RECENT_GAMES + 1)])
     return g.with_columns([
         (pl.col("fpts").cum_sum().over(over) - pl.col("fpts")).alias("pts_before"),
+        recent.alias("xfp_recent"),
         (pl.col("xfp").cum_sum().over(over) - pl.col("xfp")).alias("xfp_before"),
         (pl.col("week").rank("ordinal").over(over) - 1).cast(pl.Int64).alias("games"),
         pl.col("fpts").sum().over(over).alias("pts_total"),
@@ -500,6 +506,109 @@ def fit_vegas(w: pl.DataFrame, lines: pl.DataFrame) -> dict:
             "weeks": [fit_vegas_position(VegasSample.of(df, pos), pos) for pos in FIT_POSITIONS]}
 
 
+# ---------- step 4: the recent-usage trend ----------
+
+def trend_frame(w: pl.DataFrame, min_games: int = projections.OPPORTUNITY_MIN_GAMES, min_after: int = FIT_MIN_GAMES_AFTER,
+                min_ppg: float = FIT_MIN_PPG) -> pl.DataFrame:
+    """Step 1's rows (`w` carries `xfp`, `with_xfp`) with the trend on them: `recent_pg`, his xFP-lite a game over the
+    last RECENT_GAMES games before the week (all of them under that many, so the ratio reads 1), `ratio` that over
+    `xfp_pg` held to OPPORTUNITY_RATIO_CLIP as the live `trend_mult` holds it, and `level`, `ppg` moved toward his usage
+    by the live `opportunity_mult` with the trend off (the base the term multiplies). `future_ppg` is the truth."""
+    g = season_rows(w).filter((pl.col("games") >= min_games) & (pl.col("games_after") >= min_after)).with_columns([
+        (pl.col("pts_before") / pl.col("games")).alias("ppg"),
+        (pl.col("xfp_before") / pl.col("games")).alias("xfp_pg"),
+        (pl.col("xfp_recent") / pl.min_horizontal(pl.col("games"), pl.lit(projections.RECENT_GAMES))).alias("recent_pg"),
+        ((pl.col("pts_total") - pl.col("pts_before")) / pl.col("games_after")).alias("future_ppg"),
+    ]).filter((pl.col("ppg") >= min_ppg) & (pl.col("xfp_pg") > 0))
+    lo, hi = projections.OPPORTUNITY_RATIO_CLIP
+    om = [projections.opportunity_mult(r["pos"], {"ppg": r["ppg"], "xfp_pg": r["xfp_pg"], "games": r["games"]})
+          for r in g.select(["pos", "ppg", "xfp_pg", "games"]).iter_rows(named=True)]
+    g = g.with_columns((pl.col("recent_pg") / pl.col("xfp_pg")).clip(lo, hi).alias("ratio"),
+                       (pl.col("ppg") * pl.Series(om, dtype=pl.Float64)).alias("level"))
+    return g.select(["season", "gsis_id", "pos", "week", "games", "ppg", "xfp_pg", "recent_pg", "ratio", "level", "games_after", "future_ppg"])
+
+
+@dataclass
+class TrendSample:
+    """One position's trend rows as arrays: `season` for the folds, `games` so far, `level` the opportunity-moved
+    level, `ratio` the recent-usage ratio, `y` his points a game over the rest of the season."""
+    season: np.ndarray
+    games: np.ndarray
+    level: np.ndarray
+    ratio: np.ndarray
+    y: np.ndarray
+
+    @classmethod
+    def of(cls, df: pl.DataFrame, pos: str) -> TrendSample:
+        d = df.filter(pl.col("pos") == pos)
+        return cls(d["season"].to_numpy(), d["games"].to_numpy().astype(int), d["level"].to_numpy().astype(float),
+                   d["ratio"].to_numpy().astype(float), d["future_ppg"].to_numpy().astype(float))
+
+    @property
+    def n(self) -> int:
+        return int(self.y.size)
+
+
+def fit_t(s: TrendSample, mask: np.ndarray | None = None) -> float:
+    """The least-squares `t`, closed form (`level * (1 + t * (ratio - 1))` is `level + t * x`, `x = level * (ratio - 1)`),
+    held to T_BOUNDS. `mask` picks the training rows."""
+    x = s.level * (s.ratio - 1.0)
+    y = s.y - s.level
+    if mask is not None:
+        x, y = x[mask], y[mask]
+    den = float((x * x).sum())
+    if den <= 0:
+        return 0.0
+    return float(np.clip((x * y).sum() / den, *T_BOUNDS))
+
+
+def _trend_err(s: TrendSample, t: float) -> np.ndarray:
+    return s.level * (1.0 + t * (s.ratio - 1.0)) - s.y
+
+
+def oos_trend(s: TrendSample) -> tuple[float, int, list[float]]:
+    """Leave-one-season-out: `t` fitted on the other seasons, scored on the held-out one; the summed squared error and
+    count over every held-out row, and the per-fold `t`s."""
+    sse, n, ts = 0.0, 0, []
+    for yr in np.unique(s.season):
+        test = s.season == yr
+        if test.all():
+            continue
+        t = fit_t(s, ~test)
+        ts.append(t)
+        err = _trend_err(s, t)[test]
+        sse += float((err**2).sum()); n += int(err.size)
+    return sse, n, ts
+
+
+def fit_trend_position(s: TrendSample, pos: str, min_n: int = FIT_MIN_N) -> dict:
+    """One position's row: the sample, the prior `t` (TREND_K) and its error in place, no trend (t = 0), the `t` fitted
+    on every season and its out-of-sample error, the per-fold `t`s, the share of rows whose ratio is off 1 by 10% or
+    more (how often the term moves anyone), `t` by games played, and the verdict: `fit` when the fitted `t` beats the
+    prior out of sample on `min_n` rows or more, else `keep prior`."""
+    prior_t = projections.TREND_K.get(pos, 0.0)
+    row = {"pos": pos, "n": s.n, "seasons": int(np.unique(s.season).size), "t_prior": prior_t, "rmse_none": None,
+           "rmse_prior": None, "t_fit": None, "rmse_fit": None, "t_folds": [], "moved": None, "t_by_games": {},
+           "fitted": False, "min_n": min_n}
+    if not s.n:
+        return row
+    sse, n, ts = oos_trend(s)
+    row.update(rmse_none=_rmse(float((_trend_err(s, 0.0) ** 2).sum()), s.n), rmse_prior=_rmse(float((_trend_err(s, prior_t) ** 2).sum()), s.n),
+               t_fit=round(fit_t(s), 3), rmse_fit=_rmse(sse, n), t_folds=[round(x, 3) for x in ts],
+               moved=round(float((np.abs(s.ratio - 1.0) >= 0.1).mean()), 3))
+    for lo, hi in TREND_GAMES_BUCKETS:
+        m = (s.games >= lo) & (s.games <= hi)
+        row["t_by_games"][f"{lo}-{hi}"] = (round(fit_t(s, m), 3), int(m.sum())) if m.any() else (None, 0)
+    row["fitted"] = s.n >= min_n and row["rmse_fit"] is not None and row["rmse_fit"] < row["rmse_prior"] - 1e-9
+    return row
+
+
+def fit_trend(w: pl.DataFrame) -> dict:
+    """Step 4 over FIT_POSITIONS: the trend frame and `fit_trend_position` for each. `w` carries `xfp` (`with_xfp`)."""
+    df = trend_frame(w)
+    return {"rows": len(df), "weeks": [fit_trend_position(TrendSample.of(df, pos), pos) for pos in FIT_POSITIONS]}
+
+
 def fit_attempt_value(w: pl.DataFrame, carry: float = usage.XFP_PER_CARRY) -> dict:
     """The PPR points a pass attempt is worth at the league average: QB weeks with an attempt, points less `carry` a
     carry, least squares through the origin on attempts (`per_attempt`, with its per-season range). `joint` is the
@@ -543,9 +652,10 @@ def refit_opportunity_values(w: pl.DataFrame) -> dict[str, dict]:
 def run(seasons: Iterable[int] = FIT_SEASONS) -> dict:
     """Everything `ff fit-opportunity` prints: the attempt value first, then the weight rows on a training frame that
     prices attempts at that value (the pair is adopted together), the per-opportunity refit for information, the
-    opponent factor (step 2) and the implied total (step 3)."""
+    opponent factor (step 2), the implied total (step 3) and the recent-usage trend (step 4, at the adopted weight and clip)."""
     w = weekly(seasons)
     attempt = fit_attempt_value(w)
     df = training_frame(with_xfp(w, attempt["per_attempt"]))
     return {"seasons": [int(s) for s in seasons], "rows": len(df), "attempt": attempt, "values": refit_opportunity_values(w),
-            **fit_weights(df), "opponent": fit_opponent(w), "vegas": fit_vegas(with_xfp(w), implied_lines(schedules(seasons)))}
+            **fit_weights(df), "opponent": fit_opponent(w), "vegas": fit_vegas(with_xfp(w), implied_lines(schedules(seasons))),
+            "trend": fit_trend(with_xfp(w))}

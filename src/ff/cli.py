@@ -310,8 +310,8 @@ def accuracy(week: int | None = typer.Option(None, "--week", help="Score the wee
 def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season of the training sample"),
                     end: int = typer.Option(2025, "--to", help="Last season (the live season is partial; leave it out)")):
     """Fit OPPORTUNITY_WEIGHT and OPPORTUNITY_RATIO_CLIP (model/projections.py) and XFP_PER_ATTEMPT (model/usage.py), then
-    OPPONENT_K (this week's opponent factor) and VEGAS_K (this week's implied total, on nflverse schedules' closing
-    lines), to nflverse weekly stats of past seasons, leave-one-season-out, and print
+    OPPONENT_K (this week's opponent factor), VEGAS_K (this week's implied total, on nflverse schedules' closing
+    lines) and TREND_K (the last three games' usage against the season's), to nflverse weekly stats of past seasons, leave-one-season-out, and print
     them next to the constants (writes nothing; docs/plans/fitted-projection.md says how to adopt a row). Needs the
     network, no cookies."""
     from . import opfit
@@ -370,6 +370,20 @@ def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season
         t.add_row(r["pos"], str(r["n"]), str(r["k_prior"]), "—" if r["k_fit"] is None else str(r["k_fit"]),
                   str(r["rmse_none"]), str(r["rmse_prior"]), str(r["rmse_fit"]), folds, "—" if r["k_ppg"] is None else str(r["k_ppg"]), verdict)
     rprint(t)
+    tr = out["trend"]
+    rprint(f"[dim]{tr['rows']} trend rows: step 1's rows, his level moved toward his usage by `opportunity_mult` (trend off), and his last "
+           f"{opfit.projections.RECENT_GAMES} games' xFP-lite a game over his season's, held to {opfit.projections.OPPORTUNITY_RATIO_CLIP}; the model is "
+           f"`trend_mult`'s, `level * (1 + t * (ratio - 1))`, scored leave-one-season-out[/]")
+    t = Table("pos", "n", "TREND_K now", "fit", "rmse t=0", "rmse now", "rmse fit", "folds", "moved ≥10%", "verdict")
+    for r in tr["weeks"]:
+        folds = f"{min(r['t_folds'])}-{max(r['t_folds'])}" if r["t_folds"] else "—"
+        verdict = "fit" if r["fitted"] else ("keep prior" if r["n"] >= r["min_n"] else f"keep prior (n < {r['min_n']})")
+        t.add_row(r["pos"], str(r["n"]), str(r["t_prior"]), "—" if r["t_fit"] is None else str(r["t_fit"]), str(r["rmse_none"]),
+                  str(r["rmse_prior"]), str(r["rmse_fit"]), folds, "—" if r["moved"] is None else f"{r['moved']:.0%}", verdict)
+    rprint(t)
+    for r in tr["weeks"]:
+        if r["t_by_games"]:
+            rprint(f"[dim]{r['pos']} t by games played: " + ", ".join(f"{k}: {v[0]} (n {v[1]})" for k, v in r["t_by_games"].items() if v[0] is not None) + "[/]")
 
 
 @app.command("replay-pull")

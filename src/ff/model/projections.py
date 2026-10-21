@@ -77,6 +77,16 @@ PRIOR_FADE_GAMES = 6
 OPPORTUNITY_WEIGHT = {"QB": 0.57, "RB": 0.64, "WR": 0.58, "TE": 0.67}   # was 0.5 (RB, WR, TE), QB 0; fitted 2026-10-21
 OPPORTUNITY_RATIO_CLIP = (0.3, 2.0)   # was (0.7, 1.4); fitted 2026-10-21
 OPPORTUNITY_MIN_GAMES = 2
+# The recent-usage trend (D10 step 4): his last RECENT_GAMES games' xFP-lite a game against his season's, a second term
+# on the opportunity-moved level, `1 + t * (recent / season - 1)` with the ratio held to OPPORTUNITY_RATIO_CLIP. Fitted
+# 2026-10-21 (`opfit.fit_trend`, `ff fit-opportunity`) on step 1's 23,096 player-weeks of 2016-2025, leave-one-season-out
+# at the adopted weight and clip; the fold `t`s sit within 0.06 of these, worth 0.1% (WR) to 0.7% (QB) of the
+# rest-of-season error. The prior was zero (a share change persists only when a role changed, which the number cannot
+# tell from a blowout); xFP a game beat target share and carries a game as the measure in every position. Under
+# RECENT_GAMES + 1 games the last three are the season and the term reads 1.0. The plan has the table
+# (`docs/plans/fitted-projection.md`, step 4). K and D/ST read 1.0.
+TREND_K = {"QB": 0.33, "RB": 0.16, "WR": 0.10, "TE": 0.15}   # was 0 (no term); fitted 2026-10-21
+RECENT_GAMES = 3
 
 
 @dataclass
@@ -243,7 +253,22 @@ def opportunity_mult(pos: str, usage: dict | None) -> float:
         return 1.0
     lo, hi = OPPORTUNITY_RATIO_CLIP
     ratio = min(max(xfp / ppg, lo), hi)
-    return 1.0 - w + w * ratio
+    return (1.0 - w + w * ratio) * trend_mult(pos, usage)
+
+
+def trend_mult(pos: str, usage: dict | None) -> float:
+    """The recent-usage term on the rest-of-season level (D10 step 4): `1 + t * (ratio - 1)`, the ratio his last
+    RECENT_GAMES games' xFP-lite a game (`usage.signals` `xfp_recent_pg`) over his season's (`xfp_pg`), held to
+    OPPORTUNITY_RATIO_CLIP, `t` from TREND_K. 1.0 for a position with no `t`, a missing number, or a season of
+    RECENT_GAMES games or fewer (the last three are the season)."""
+    t = TREND_K.get(pos, 0.0)
+    if not t or not usage:
+        return 1.0
+    xfp, recent, games = _num(usage.get("xfp_pg")), _num(usage.get("xfp_recent_pg")), int(usage.get("games") or 0)
+    if xfp is None or xfp <= 0 or recent is None or games <= RECENT_GAMES:
+        return 1.0
+    lo, hi = OPPORTUNITY_RATIO_CLIP
+    return 1.0 + t * (min(max(recent / xfp, lo), hi) - 1.0)
 
 
 def per_game(season: float | None, weekly: float, plays_this_week: bool) -> float:

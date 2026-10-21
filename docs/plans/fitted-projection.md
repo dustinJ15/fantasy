@@ -1,11 +1,10 @@
 # Plan: the fitted projection model (TODO D10)
 
-Status: planned 2026-10-21; step 1 done the same day (the opportunity weight and clip, the pass-attempt term: `src/ff/opfit.py`,
-`ff fit-opportunity`, the constants adopted in `model/projections.py` and `model/usage.py`); step 2 done 2026-10-21 (the opponent
-factor: `usage.opponent_factors`, `opfit.fit_opponent`, `OPPONENT_K` adopted, `blend` reads it this week); step 3 done 2026-10-21 (the
-implied total: `opfit.fit_vegas` on nflverse `schedules`, `VEGAS_K` QB 0.41 adopted, RB, WR and TE kept). Steps 4-5 are in TODO.md under D10.
+Status: planned 2026-10-21; steps 1-4 done 2026-10-21 (1: the opportunity weight, clip and pass attempt, `opfit.py`, `ff fit-opportunity`;
+2: the opponent factor, `OPPONENT_K`; 3: the implied total, `VEGAS_K` QB 0.41; 4: the recent-usage trend, `TREND_K`, read by `trend_mult`
+inside `opportunity_mult`). Step 5 is in TODO.md under D10; each step's section below says what was fitted and adopted.
 Written: 2026-10-21 against `main` at 3db45b8 (a session with the network and no cookies: nflverse reachable, ESPN not).
-TODO ids: D10 (steps 4-5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
+TODO ids: D10 (step 5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
 Still open: D10.
 
 For an agent fitting a projection constant to past seasons, or taking a D10 step. ROADMAP item 1's historical half in one
@@ -250,14 +249,66 @@ place against the fit's 7.8377 out of sample and says `keep prior` in every posi
   runs, days before close on a Tuesday. The term is fitted on the better number.
 - **K and D/ST**: nflverse has no kicks, and a D/ST is the defense; their constants stay hand-set.
 
-## Steps 4-5 (one PR each, in order; the done-when of each)
+## Step 4: the recent-usage trend (done 2026-10-21)
 
-4. **The recent-usage trend.** The last three games' opportunity share against the season's (`tgt_share`, carries a
-   game) as a second term on the rest-of-season level: `level ≈ ppg * (1 - w + w * ratio) * (1 + t * (recent / season - 1))`.
-   Training row as step 1 with the trend added; `t` fitted at the adopted `w`, leave-one-season-out. Done when the
-   fitter prints `t` per position with the verdict and, if `fit`, `opportunity_mult` reads it from `usage.signals`.
-   The prior is zero (the public finding is that a share change persists only when a role changed, which the number
-   cannot tell from a blowout).
+A second term on the rest-of-season level: `level ≈ ppg * (1 - w + w * ratio) * (1 + t * (recent / season - 1))`, `t`
+fitted at the adopted `w` and clip. The prior was zero (the public finding is that a share change persists only when a
+role changed, which the number cannot tell from a blowout). What it must not read: the row's own game in `recent`
+(the last three games *before* the week), and this week's number never sees it (it is on the level only).
+
+### The measure
+
+The plan named the last three games' target share and carries a game. Fitted side by side on the same rows
+(2016-2025, out of sample), xFP-lite a game, the opportunity step 1 already prices (targets, carries, air yards and
+attempts at the adopted values), beat both in every position: target share fits QB -0.02 (a QB has none), RB 0.08,
+WR 0.09, TE 0.13 and scores 0.002-0.006 worse than xFP at RB, WR and TE; carries a game fits only at RB (0.11) and
+scores worse there too. So `recent` is the last three games' xFP-lite a game against the season's `xfp_pg`, one formula
+(`usage.xfp_lite_expr`), and the ratio is held to `OPPORTUNITY_RATIO_CLIP` (the data's 1st-99th percentiles run
+0.46-1.76 at RB, WR and TE and 0.76-1.41 at QB, so the clip is a guard, as in step 1).
+
+### The training row
+
+`opfit.trend_frame`: step 1's rows (2+ games before, 3+ after, 5.0+ PPR a game so far), with `recent_pg` over the
+last `RECENT_GAMES` (3) games before the week (all of them under three, so the ratio reads 1 and the row carries no
+signal: the live term reads 1.0 there too), `ratio` that over `xfp_pg`, and `level`, `ppg` times the live
+`opportunity_mult` with the trend off. `future_ppg` is the truth. 23,096 rows: QB 3,481, RB 6,128, WR 9,883, TE 3,604.
+
+### What it printed (2016-2025, 2026-10-21)
+
+| pos | n | t then | fit | rmse t=0 | rmse fit | folds | ratio off 1 by 10%+ | t by games played (4-6, 7-10, 11-17) | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| QB | 3481 | 0 | 0.334 | 4.3782 | 4.3490 | 0.275-0.367 | 26% | 0.31, 0.32, 0.39 | fit |
+| RB | 6128 | 0 | 0.164 | 4.4327 | 4.4204 | 0.141-0.187 | 48% | 0.00, 0.20, 0.23 | fit |
+| WR | 9883 | 0 | 0.102 | 4.1375 | 4.1333 | 0.084-0.126 | 51% | 0.00, 0.10, 0.22 | fit |
+| TE | 3604 | 0 | 0.150 | 3.4050 | 3.3966 | 0.127-0.182 | 52% | 0.04, 0.10, 0.30 | fit |
+
+Adopted: `TREND_K = {"QB": 0.33, "RB": 0.16, "WR": 0.10, "TE": 0.15}`, `RECENT_GAMES = 3`. The live read:
+`usage.season_summary` carries `xfp_recent` (the last three weeks with a stat row, sorted by week), `signals` hands
+`xfp_recent_pg` to `projections.trend_mult`, and `opportunity_mult` multiplies it onto the step-1 term, so the `opp:x`
+flag and every rest-of-season number (`level`, `mu_ros`) carry it; this week's `mu` does not. A re-run scores the
+adopted numbers in place under the fit out of sample and says `keep prior` in every position.
+
+### What the fit found
+
+- **The trend is real and small.** 0.7% off the rest-of-season error at QB, 0.3% at RB and TE, 0.1% at WR, against the
+  6-10% the step-1 read took: most of what the last three games say, the season's usage already said. The fold `t`s
+  sit within 0.06 of the whole-sample one.
+- **QB reads it most.** A QB's recent attempts (a game script change, a new play caller, a rookie given the offense)
+  carry a third of their deviation into the rest of the season; a receiver's recent targets a tenth.
+- **It needs a season behind it.** At four to six games the last three are half the season and `t` fits zero at RB
+  and WR; past ten games it is 0.22-0.39 in every position. The reverse of step 1's weight and the same direction as
+  step 2's `k`. One constant stays (question 10).
+
+### What the fit could not see
+
+- **ESPN's weekly number.** On the card the level is shrunk halfway toward this week's blend (`per_game`), and
+  ESPN's analysts read a role change too, so the trend may double count it there; step 5 scores that.
+- **Why the role moved.** An injury ahead of him on the depth chart and a blowout look the same in three games'
+  targets; the research step (`overrides.json`, `ros_mult`) is where a known role change is priced.
+- **Survivorship**, as step 1: a row needs three games after it.
+
+## Step 5 (one PR; the done-when)
+
 5. **The blend with consensus by out-of-sample error.** The point of the item: the fitted weekly number (steps 2-3 on
    the level so far) against ESPN's weekly number for the same player-week, on the 2026 replay (`players[].weeks[].proj`
    and `actual`, three leagues, every rostered and universe player) and the projlog (`espn_pts`, `sleeper_pts`, the
@@ -311,3 +362,7 @@ place against the fit's 7.8377 out of sample and says `keep prior` in every posi
    multiplier on at its adopted `k`, so `VEGAS_K` is the term's worth on top of it, as `blend` applies them; the
    reverse (whether the opponent factor still earns its place once the line is on) is the overlap step 5 scores on the
    blend, where both terms meet ESPN's analysts.
+10. **A `t` schedule by games played instead of one constant?** No, as questions 1 and 7. `t` rises with the sample
+   (zero at four to six games for RB and WR, where the last three are half the season), but the whole term is worth
+   0.1-0.7% of the error; a schedule would move a few hundredths of that. Revisit with step 5 if the replay scores the
+   mid-season read as the place the card is wrong.

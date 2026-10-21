@@ -293,3 +293,68 @@ def test_the_adopted_vegas_constants_are_what_the_fitter_prints():
     assert all(opfit.K_BOUNDS[0] <= projections.VEGAS_K[p] <= opfit.K_BOUNDS[1] for p in opfit.FIT_POSITIONS)
     assert projections.VEGAS_K["QB"] == 0.41
     assert (projections.VEGAS_K["RB"], projections.VEGAS_K["WR"], projections.VEGAS_K["TE"]) == (0.3, 0.35, 0.3)
+
+
+# ---------- D10 step 4: the recent-usage trend ----------
+
+def test_trend_frame_reads_the_last_three_games_before_the_week_on_the_level_with_the_trend_off():
+    """Six games at 15 points on 5, 5, 5, 10, 10, 10 targets: at his fifth game (4 before) the last three are games 2-4
+    (5, 5, 10 targets), never game 5's own; at his third game (2 before) the last three are his season and the ratio
+    reads 1. `level` is the live opportunity_mult with the trend off (the base the term multiplies)."""
+    tg = [5, 5, 5, 10, 10, 10]
+    w = _weekly([{"week": wk, "fpts_ppr": 15.0, "targets": t} for wk, t in zip(range(1, 7), tg)])
+    df = opfit.trend_frame(opfit.with_xfp(w), min_after=1)
+    at5 = df.filter(pl.col("week") == 5).row(0, named=True)
+    xt = usage.XFP_PER_TARGET
+    assert at5["games"] == 4 and at5["xfp_pg"] == pytest.approx(25 * xt / 4) and at5["recent_pg"] == pytest.approx(20 * xt / 3)
+    assert at5["ratio"] == pytest.approx((20 / 3) / (25 / 4))
+    base = projections.OPPORTUNITY_WEIGHT["WR"]
+    assert at5["level"] == pytest.approx(15.0 * (1 - base + base * (25 * xt / 4) / 15.0))   # no trend in the base
+    at3 = df.filter(pl.col("week") == 3).row(0, named=True)
+    assert at3["games"] == 2 and at3["ratio"] == pytest.approx(1.0)
+
+
+def _trend_sample(t_true: float, n: int = 6000, seed: int = 0, noise: float = 0.0, seasons: int = 5) -> opfit.TrendSample:
+    rng = np.random.default_rng(seed)
+    level = rng.uniform(6.0, 25.0, n)
+    ratio = rng.uniform(0.6, 1.5, n)
+    y = level * (1 + t_true * (ratio - 1)) + rng.normal(0.0, noise, n)
+    return opfit.TrendSample(np.repeat(np.arange(2020, 2020 + seasons), n // seasons), np.full(n, 8), level, ratio, y)
+
+
+def test_fit_t_recovers_the_truth_stays_in_bounds_and_the_verdict_is_against_the_prior():
+    assert opfit.fit_t(_trend_sample(0.0)) == pytest.approx(0.0)
+    assert opfit.fit_t(_trend_sample(0.3, noise=2.0)) == pytest.approx(0.3, abs=0.03)
+    s = _trend_sample(0.0)
+    s.y = s.level * (1 - 0.3 * (s.ratio - 1))   # a rising role scoring him down: held at 0
+    assert opfit.fit_t(s) == 0.0
+    s = _trend_sample(0.3, noise=2.0)
+    sse, n, ts = opfit.oos_trend(s)
+    assert n == s.n and len(ts) == 5 and all(abs(t - 0.3) < 0.05 for t in ts)
+    row = opfit.fit_trend_position(s, "QB", min_n=100)
+    assert row["t_prior"] == projections.TREND_K["QB"] and row["rmse_fit"] < row["rmse_none"]
+    assert row["fitted"] == (row["rmse_fit"] < row["rmse_prior"]) and row["t_by_games"]["7-10"][1] == s.n
+    thin = opfit.fit_trend_position(_trend_sample(0.3, n=200, noise=2.0), "WR", min_n=1000)
+    assert not thin["fitted"] and thin["t_fit"] is not None
+
+
+def test_the_adopted_trend_constants_are_what_the_fitter_prints():
+    """Fitted 2026-10-21 on 2016-2025 (QB 0.334, RB 0.164, WR 0.102, TE 0.150); the prior was zero."""
+    assert set(projections.TREND_K) == set(opfit.FIT_POSITIONS)
+    assert all(opfit.T_BOUNDS[0] < projections.TREND_K[p] <= opfit.T_BOUNDS[1] for p in opfit.FIT_POSITIONS)
+    assert projections.TREND_K == {"QB": 0.33, "RB": 0.16, "WR": 0.10, "TE": 0.15}
+
+
+def test_the_live_summary_carries_the_last_three_games_by_week_for_trend_mult(monkeypatch):
+    """`usage.season_summary` sorts by week before it takes the last RECENT_GAMES (the frame arrives in any order), and
+    `signals` hands `xfp_recent_pg` to `projections.trend_mult` beside `xfp_pg`."""
+    tg = {1: 4, 2: 4, 3: 6, 5: 8, 6: 10}   # week 4 the bye
+    rows = [{"gsis_id": "p", "name": "P", "team": "A", "pos": "WR", "week": wk, "targets": t, "receptions": 0, "rec_yards": 0,
+             "air_yards": 0, "carries": 0, "rush_yards": 0, "attempts": 0, "tgt_share": 0.2, "ay_share": 0.2,
+             "fpts_ppr": 12.0, "fpts": 12.0, "rec_td": 0, "rush_td": 0, "opp": "B"} for wk, t in reversed(tg.items())]
+    monkeypatch.setattr(usage, "weekly_usage", lambda season, through_week=None: pl.DataFrame(rows))
+    sig = usage.signals(usage.season_summary(2026))["p"]
+    xt = usage.XFP_PER_TARGET
+    assert sig["games"] == 5 and sig["xfp_pg"] == pytest.approx(round(32 * xt / 5, 1))
+    assert sig["xfp_recent_pg"] == pytest.approx(round(24 * xt / 3, 1))   # weeks 3, 5, 6
+    assert projections.trend_mult("WR", sig) > 1.0

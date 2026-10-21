@@ -239,6 +239,24 @@ def _usage(ppg: float, xfp_pg: float, games: int = 4) -> dict:
     return {"flags": [], "games": games, "ppg": ppg, "xfp_pg": xfp_pg, "tgt_share": 0.2, "tgt_pg": 6.0, "carry_pg": 0.0}
 
 
+def test_trend_mult_reads_the_last_three_games_against_the_season_and_opportunity_mult_carries_it():
+    """D10 step 4: a receiver whose last three games are worth 20% more than his season's moves up by TREND_K of it; a
+    season of RECENT_GAMES games or fewer, a missing recent number, K and D/ST read 1.0, and the ratio is clipped."""
+    from ff.model.projections import OPPORTUNITY_RATIO_CLIP, OPPORTUNITY_WEIGHT, RECENT_GAMES, TREND_K, opportunity_mult, trend_mult
+    up = {**_usage(ppg=16.0, xfp_pg=16.0, games=6), "xfp_recent_pg": 19.2}
+    assert trend_mult("WR", up) == pytest.approx(1 + TREND_K["WR"] * 0.2) and trend_mult("WR", up) > 1.0
+    assert opportunity_mult("WR", up) == pytest.approx(trend_mult("WR", up))   # ratio 1 on the season: only the trend moves him
+    down = {**_usage(ppg=20.0, xfp_pg=16.0, games=6), "xfp_recent_pg": 12.0}
+    w = OPPORTUNITY_WEIGHT["RB"]
+    assert opportunity_mult("RB", down) == pytest.approx((1 - w + w * 0.8) * (1 - TREND_K["RB"] * 0.25))
+    assert trend_mult("WR", {**up, "games": RECENT_GAMES}) == 1.0   # the last three are his season
+    assert trend_mult("WR", _usage(ppg=16.0, xfp_pg=16.0, games=6)) == 1.0   # no recent number
+    assert trend_mult("K", {**up}) == 1.0 and trend_mult("WR", None) == 1.0
+    lo, hi = OPPORTUNITY_RATIO_CLIP
+    assert trend_mult("QB", {**up, "xfp_recent_pg": 100.0}) == pytest.approx(1 + TREND_K["QB"] * (hi - 1))
+    assert trend_mult("QB", {**up, "xfp_recent_pg": 0.0}) == pytest.approx(1 + TREND_K["QB"] * (lo - 1))
+
+
 def test_opportunity_mult_moves_toward_what_the_targets_say_by_the_fitted_weight_and_is_clipped():
     """The weight per position is the fitted one (D10 step 1): over half, under one, and a running QB's attempts count."""
     from ff.model.projections import OPPORTUNITY_RATIO_CLIP, OPPORTUNITY_WEIGHT, opportunity_mult
