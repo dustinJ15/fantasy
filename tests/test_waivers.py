@@ -269,6 +269,7 @@ def test_a_priority_league_carries_the_rank_and_no_faab_through_packet_markdown_
     from tests.test_packet_synthetic import FakeXW, make_snapshot
     monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
     snap = make_snapshot()
+    snap.pop("pending_claims")   # the demo's claim in is B20's row; this test is the wire's rows
     snap["settings"]["faab"] = False
     snap["settings"]["waiver_order"] = "rolling"
     snap["teams"][0]["waiver_rank"] = 6

@@ -1187,3 +1187,89 @@ def test_every_row_that_moves_a_body_says_so_in_its_fields():
     assert row["drop"] == "Blake Grupe" and report.row_adds(row) == ["Wire RB"]
     lg = league(roster=[player("Starter WR", slot="WR")], open_spots=1, open_spot_adds=[{"name": "Depth Guy", "pos": "WR", "why": "depth"}])
     assert report.row_adds(by_id(lg)["open:depth-guy"]) == ["Depth Guy"]
+
+
+# ---------- B20: the claims I already placed in the app ----------
+
+def claim_in(w, drop="Bench WR", bid=0, lands="Wed 1:00 AM"):
+    """Mark a waiver row as a claim I have in, the way `packet.pending_claims` does, and return the block entry."""
+    w.update(claimed={"id": "c1", "bid": bid, "drop": drop, "drop_id": 2, "status": "PENDING"}, on_waivers=True, lands=lands, lands_ts=1792566000000)
+    return {"id": "c1", "add": w["name"], "add_id": w.get("espn_id", 9), "add_pos": w["pos"], "drop": drop, "drop_id": 2, "bid": bid,
+            "lands": lands, "lands_ts": 1792566000000, "status": "PENDING"}
+
+
+def test_a_claim_i_have_in_prints_with_no_verb_and_no_new_drop_and_the_lineup_reads_it_as_a_claim():
+    """The 2026-10-20 evening card proposed the claims Dustin had placed that morning. A placed claim is a row with
+    no verb and the drop it already spends; the lineup row reads him like any claim (he fills the empty QB once it
+    lands); no other row names the body or the drop, and the card lint is clean."""
+    lg = two_bye_qbs(open_spots=0)
+    lg["pending_claims"] = [claim_in(lg["waivers"][0])]
+    rows = by_id(lg)
+    row = rows["waiver:bo-nix"]
+    assert row["label"] == "Waiver (claim in)" and row["claimed"] is True
+    assert row["text"] == "claim in: Bo Nix (QB) (drop Bench WR), lands Wed 1:00 AM"
+    assert report.detail_line(row).startswith("placed in the app; nothing to click") and "+15 pts this week at QB" in report.detail_line(row)
+    assert rows["lineup"]["moves"] == ["QB: nobody plays this week (Trevor Lawrence, Justin Herbert on bye); Bo Nix once the claim lands Wed 1:00 AM"]
+    assert [x["id"] for x in report.todos(lg) if x.get("drop") == "Bench WR"] == ["waiver:bo-nix"]
+    assert report.card_lint(lg) == []
+    assert report.words(row["text"]) <= report.MAX_ROW_WORDS
+    # a FAAB bid reads with the dollars; a claim into an open spot says so and spends the spot
+    lg = two_bye_qbs(open_spots=1, faab_remaining=40)
+    lg["pending_claims"] = [claim_in(lg["waivers"][0], drop=None, bid=12)]
+    lg["waivers"].append(waiver("Now Guy", pos="WR", week_slot="WR", delta_week=3.0))
+    rows = by_id(lg)
+    assert rows["waiver:bo-nix"]["text"] == "claim in: Bo Nix (QB) ($12), lands Wed 1:00 AM"
+    assert "into an open bench spot" in report.detail_line(rows["waiver:bo-nix"])
+    assert rows["waiver:now-guy"]["text"].endswith("; drop Bench WR"), "the open spot is the claim's; the pickup names a drop"
+
+
+def test_a_body_at_the_claimed_slot_is_a_row_only_when_clearly_better_and_then_leaves_the_call_to_claude():
+    """The 2026-10-21 card offered a second QB claim +0.2 over the one already in. Under `COMPETING_GAIN` the claim
+    stands and the body is not a row; above it the row says whose claim it competes with and the gap, for a ruling."""
+    lg = two_bye_qbs(open_spots=1)
+    lg["pending_claims"] = [claim_in(lg["waivers"][0])]
+    lg["waivers"].append(waiver("Aaron Rodgers", pos="QB", slot="QB", week_slot="QB", delta_week=15.2, delta_over_starter=0.0, on_waivers=True, lands="Wed 1:00 AM"))
+    assert "waiver:aaron-rodgers" not in by_id(lg)
+    lg["waivers"][1]["delta_week"] = 18.4
+    row = by_id(lg)["waiver:aaron-rodgers"]
+    assert row["text"] == "claim Aaron Rodgers (QB) and start him at QB; you have a claim in on Bo Nix; this one is +3.4 over him, your call"
+    assert report.words(row["text"]) <= report.MAX_ROW_WORDS
+    # a season upgrade at the claimed body's slot reads the same way by the season number
+    lg = league(waivers=[waiver("Claimed WR", slot="WR", delta_week=0.0, delta_over_starter=2.0),
+                         waiver("Better WR", slot="WR", delta_week=0.0, delta_over_starter=3.5)], open_spots=1)
+    lg["pending_claims"] = [claim_in(lg["waivers"][0], drop=None)]
+    row = by_id(lg)["waiver:better-wr"]
+    assert row["text"].endswith("you have a claim in on Claimed WR; this one is +1.5 over him, your call")
+
+
+def test_an_ir_or_drop_row_on_the_claims_drop_folds_into_the_claim_row_and_the_claim_covers_the_slot():
+    """L3 on 2026-10-21: the claim on Boswell drops Grupe, who has an IR verdict. The IR row would move the body the
+    claim cuts, so it folds into the claim row with the verdict he had; the Cover K row steps aside for the claim."""
+    lg = grupe_league()
+    lg["injuries"][0]["verdict"] = "ir"
+    lg["waivers"][0]["pos"] = "K"
+    lg["pending_claims"] = [claim_in(lg["waivers"][0], drop="Blake Grupe")]
+    rows = by_id(lg)
+    assert "injury:blake-grupe" not in rows and "cover:k" not in rows
+    row = rows[f"waiver:{report.slug(lg['waivers'][0]['name'])}"]
+    assert "(drop Blake Grupe)" in row["text"]
+    assert "Blake Grupe had an IR verdict (out ~4 wks, back wk 11): the claim cuts him instead, your call" in report.detail_line(row)
+    assert "TreVeyon Henderson" not in " ".join(x["text"] for x in rows.values()), "no row cuts the healthy RB4 for a spot the claim already has"
+    assert [o for o in report.card_lint(lg) if "claim" in o] == []   # the fixture seats a zero at K: that lint is its own
+
+
+def test_card_lint_flags_a_row_that_adds_the_claimed_body_or_spends_its_drop():
+    lg = grupe_league()
+    lg["pending_claims"] = [{"id": "c1", "add": "Chris Boswell", "add_id": 9, "add_pos": "K", "drop": "Blake Grupe", "drop_id": 2, "bid": 0,
+                             "lands": "Wed 1:00 AM", "lands_ts": 1, "status": "PENDING"}]
+    rows = [{"kind": "waiver", "id": "waiver:chris-boswell", "add": {"name": "Chris Boswell", "pos": "K"}, "drop": "Blake Grupe", "claimed": True},
+            {"kind": "cover", "id": "cover:k", "pos": "K", "add": {"name": "Chris Boswell", "pos": "K"}, "drop": None},
+            {"kind": "waiver", "id": "waiver:x", "add": {"name": "X", "pos": "RB"}, "drop": "Blake Grupe"}]
+    about_claims = lambda out: [o for o in out if "claim" in o]  # noqa: E731  (the fixture seats a zero at K: that lint is its own)
+    assert about_claims(report.card_lint(lg, rows)) == [
+        "cover:k adds Chris Boswell, who you already have a claim in on: skip it",
+        "waiver:x drops Blake Grupe, the drop your claim on Chris Boswell already spends: skip it or amend the drop"]
+    # the claim row alone is clean, and a `skip` on the offending rows clears it
+    assert about_claims(report.card_lint(lg, rows[:1])) == []
+    rows[1]["ruling"] = rows[2]["ruling"] = "skip"
+    assert about_claims(report.card_lint(lg, rows)) == []

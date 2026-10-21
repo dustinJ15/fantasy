@@ -82,3 +82,19 @@ def test_the_demo_card_passes_the_card_lint_and_render_email_prints_it(tmp_path)
     r = runner.invoke(app, ["render-email", "--packet", str(packet), "--out", str(tmp_path / "b.html")])
     assert r.exit_code == 0, r.output
     assert "card: demo: the detail lists" in r.output and "does not say why" in r.output
+
+
+def test_the_demo_carries_one_claim_in_and_the_card_prints_it_once():
+    """B20: the synthetic league has one claim already placed; the card shows it as a claim in, nothing else adds
+    the body or spends the drop, and the lint is clean."""
+    from ff import demo, report
+    p = demo.build_packet(None, sims=100, write=False)
+    lg = p["leagues"][0]
+    assert len(lg["pending_claims"]) == 1 and lg["pending_claims"][0]["drop"] == "Malik Okafor" and lg["pending_claims"][0]["bid"] == 9
+    rows = report.todos(lg)
+    claimed = [x for x in rows if x.get("claimed")]
+    assert len(claimed) == 1 and claimed[0]["label"] == "Waiver (claim in)"
+    name = claimed[0]["add"]["name"]
+    assert claimed[0]["text"].startswith(f"claim in: {name} (RB) ($9, drop Malik Okafor), lands ")
+    assert [x["id"] for x in rows if name in report.row_adds(x) or x.get("drop") == "Malik Okafor"] == [claimed[0]["id"]]
+    assert report.card_lint(lg) == []

@@ -163,6 +163,16 @@ class Spots:
         # can have one instead of a drop; a claim that lands before it (the waiver run is 3 AM, the trade 8 AM) cannot.
         self.after_open = max(int(lg.get("trade_spots_after") or 0), 0)
         self.after_ts = max((int(m.get("process_ts") or 0) for m in lg.get("pending_moves") or []), default=0) or None
+        # The claims I already have in (`pending_claims`, B20): each drop is spent and each add held before any row
+        # prints, so no row names either again; a claim with no drop takes an open spot on waiver day.
+        for c in lg.get("pending_claims") or []:
+            if c.get("drop"):
+                if c["drop"] not in self.dropped:
+                    self.dropped.append(c["drop"])
+                self.note(add_pos=c.get("add_pos"), drop=c["drop"])
+            else:
+                self.open = max(self.open - 1, 0)
+                self.note(add_pos=c.get("add_pos"))
 
     def note(self, add_pos: str | None = None, drop: str | None = None) -> None:
         """A row moved a body on or off the roster; keep the position counts honest for `cut`."""

@@ -123,6 +123,35 @@ def waiver_run_ts(league: League) -> int | None:
     return min(stamps) if stamps else None
 
 
+def pending_claims(league: League, my_team_id: int | None) -> list[dict[str, Any]]:
+    """The waiver claims I have in, from the raw `mPendingTransactions` view: the `WAIVER` records whose `teamId` is
+    mine (probed 2026-10-21, see `scripts/probe_pending_claims.py`). `waiver_run_ts` reads the same records for
+    their clock and throws the rest away; the card was blind to the claims Dustin had already placed (B20).
+
+    Each entry: {id, add_id, drop_id, bid, process_ts, proposed_ts, status, scoring_period}: the espn player id
+    the claim adds (the `ADD` item), the one it drops (the `DROP` item, None when the claim bids into an open spot),
+    the FAAB bid (`bidAmount`, 0 in a priority league), when ESPN processes it and the record's status. Nothing here
+    writes; a claim is placed and cancelled in the app."""
+    if my_team_id is None:
+        return []
+    raw = league.espn_request.league_get(params={"view": "mPendingTransactions"})
+    out = []
+    for tx in raw.get("pendingTransactions") or []:
+        if tx.get("type") != "WAIVER" or tx.get("teamId") != my_team_id:
+            continue
+        if tx.get("executionType") == "CANCEL" or tx.get("status") not in ("PENDING", None):
+            continue
+        items = tx.get("items") or []
+        add = next((i.get("playerId") for i in items if i.get("type") == "ADD"), None)
+        drop = next((i.get("playerId") for i in items if i.get("type") == "DROP"), None)
+        if add is None:
+            continue
+        out.append({"id": tx.get("id"), "add_id": add, "drop_id": drop, "bid": int(tx.get("bidAmount") or 0),
+                    "process_ts": tx.get("processDate"), "proposed_ts": tx.get("proposedDate"),
+                    "status": tx.get("status"), "scoring_period": tx.get("scoringPeriodId")})
+    return out
+
+
 def recent_drops(league: League) -> dict[str, int]:
     """{player id: ms} of the last time each player was dropped (a roster move, a processed claim's drop or a trade
     screen cut), from the `mTransactions2` history view: the clock a dropped player's waiver period runs from."""
@@ -411,19 +440,29 @@ def snapshot(ref: LeagueRef, league: League, week: int) -> dict[str, Any]:
     except Exception as exc:
         resolutions_err = f"{type(exc).__name__}: {exc}"
     # The league's clocks (`model/deadlines.py`): ESPN's stamp for the next waiver run and each player's last drop.
-    run_ts, drops, clocks_err = None, {}, None
+    # The claims I already have in ride the same view (`pending_claims`); the same error covers a failed read.
+    run_ts, drops, claims, clocks_err = None, {}, [], None
     try:
         run_ts, drops = waiver_run_ts(league), recent_drops(league)
+        claims = pending_claims(league, me.team_id if me else None)
     except Exception as exc:
         clocks_err = f"{type(exc).__name__}: {exc}"
+    roster, fas = [asdict(r) for r in roster_rows(league, week)], [asdict(r) for r in free_agent_rows(league, week)]
+    known = {r["espn_id"] for r in roster + fas}
+    for c in claims:   # a claimed body below the wire pull's depth: name him from ESPN so the card can still print him
+        if c["add_id"] not in known:
+            try:
+                p = league.player_info(playerId=c["add_id"])
+                c["add_name"], c["add_pos"], c["add_team"] = p.name, p.position, p.proTeam
+            except Exception:
+                pass
     return {
         "ref": asdict(ref), "week": week, "settings": asdict(settings(ref, league)),
         "my_team_id": me.team_id if me else None,
         "teams": teams, "matchups": matchups,
-        "roster": [asdict(r) for r in roster_rows(league, week)],
-        "free_agents": [asdict(r) for r in free_agent_rows(league, week)],
+        "roster": roster, "free_agents": fas,
         "faab_bids": bids,
         "pending_trades": pending, "pending_trades_error": pending_err,
         "trade_resolutions": resolutions, "trade_resolutions_error": resolutions_err,
-        "waiver_run_ts": run_ts, "recent_drops": drops, "clocks_error": clocks_err,
+        "waiver_run_ts": run_ts, "recent_drops": drops, "pending_claims": claims, "clocks_error": clocks_err,
     }

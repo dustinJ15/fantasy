@@ -8,10 +8,11 @@ from __future__ import annotations
 import json
 import random
 import time
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import patch
 
 from .config import PACKET_DIR
+from .model import deadlines
 from .packet import PACKET_VERSION, analyze_league, fantasycalc, injured_entry
 
 # Fictional people and fictional franchises. Any resemblance to a real player is a coincidence and a bad omen.
@@ -132,6 +133,10 @@ def make_snapshot(teams: int = 8, seed: int = 1) -> dict:
              "give": [pick(1, "TE", 1)], "get": [pick(3, "TE", 0)]},
         ],
         "pending_trades_error": None,
+        # one claim I already have in (B20): a wire RB for my hurt RB3, $9, landing at the next waiver run
+        "pending_claims": [{"id": "claim-1", "add_id": fas[9]["espn_id"], "drop_id": pick(1, "RB", 2), "bid": 9,
+                            "process_ts": deadlines.ms(deadlines.next_waiver_run(datetime.now(UTC), None)),
+                            "proposed_ts": now_ms - 3600_000, "status": "PENDING", "scoring_period": 5}],
     }
 
 
