@@ -15,17 +15,21 @@ The session then:
 
 1. Reads CLAUDE.md (the boundary rule, the layout, the failure table) and this file. Reads the files the item names
    before touching anything; the line numbers drift, the function names do not.
-2. Reproduces the finding first: a failing test, or the probe the item describes (`uv run ff briefing --demo`, a
+2. In the cloud, runs `bash scripts/cloud_setup.sh` before anything that touches ESPN: it writes `.env` and
+   `leagues.toml` from the environment variables (`ESPN_S2`, `SWID`, `LEAGUES_TOML`) and runs `ff doctor`. The
+   cookies are in the `fantasy` environment; a session that skips this reports "no cookies" or "no leagues.toml"
+   and leaves a live pull, the replay files or a probe undone (four of the eight Tier D sessions on 2026-10-20 did).
+3. Reproduces the finding first: a failing test, or the probe the item describes (`uv run ff briefing --demo`, a
    fixture from `tests/`, the projlog branch via `git fetch origin projlog`). An item that cannot be reproduced is
    reported back, not fixed on faith.
-3. Fixes that one item and nothing else. Scope creep is the thing this list exists to prevent; a second finding on
+4. Fixes that one item and nothing else. Scope creep is the thing this list exists to prevent; a second finding on
    the way is a new line here, not a second change in the PR.
-4. Adds the test that would have caught it, runs `uv run pytest` and `uv run ruff check`, and `uv run ff briefing
+5. Adds the test that would have caught it, runs `uv run pytest` and `uv run ruff check`, and `uv run ff briefing
    --demo --short` to see the card still renders.
-5. Deletes the finished item from this file (a ticked box is not a record: anything learned goes to the CLAUDE.md
+6. Deletes the finished item from this file (a ticked box is not a record: anything learned goes to the CLAUDE.md
    failure table when the fix closes a failure mode Dustin could see in an email, or to the relevant `docs/plans/`
    file otherwise). The commit history is the log of what was done.
-6. Opens a PR titled after the item id and its first clause; the body says what was wrong, what changed, how it was
+7. Opens a PR titled after the item id and its first clause; the body says what was wrong, what changed, how it was
    verified. Code reaches the cloud routine only after merge to main.
 
 Rules that hold for every item: read-only against ESPN; code owns numbers, Claude owns prose; never commit
