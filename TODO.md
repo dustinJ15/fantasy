@@ -70,10 +70,12 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   this week's number fixing the in-range wire body (-1.6 to -0.2) at +1.2 on every rostered body; it takes over if it
   lowers the rostered body's error too, or the in-range wire bias passes two points with the rostered one within half a
   point of zero.
-- [ ] **D19 (S, needs the replay files). The rostered body with no preseason total reads +2.5 to +2.8 a game over** what he
-  scores after (`ff backtest --prior`, 2026-10-21: 96 to 143 rows, 30 to 39 bodies a league; +1.6 to +1.9 on the rows where
-  he scored at all), under every prior the table tries. Who they are first (a backup QB starting this week, a streamed K or
-  D/ST, a body the designation the replay lacks would have docked), then whether `level_prior` or `weeks_out` owns it.
+- [ ] **D20 (XS, needs the replay files). Read the claim replay's `no_prior` split with the zeroed bodies apart.** D19
+  (2026-10-21) found ESPN zeroes the season row of a player on IR or Out on the pull day, so a mid-season replay's
+  "no preseason total" is half "hurt today" (`total_zeroed` on the universe row, `docs/accuracy.md` "The rostered body
+  with no total"); the prior tables read them apart, the claim tables (`ff backtest --claims`: `no_prior`,
+  `dark_no_prior`, and the D13 sample in `model/projections.py`'s comment) do not yet. Split them the same way and
+  re-read D13's "+0.5 to +0.9": with the prior tables' split the wire body near a starter reads +0.1 to +0.6.
 - [ ] **D15 (XS, end of the regular season). Re-read `MUST_TRY_PPW` (2.0)** on the full-season scan replay
   (`ff backtest --scan`, minutes per league): the ruling of 2026-10-21 is stays, the 2-4 bin realizing +2.4 to +3.6 in
   all three leagues on five weeks; the bar moves down only if the 1-2 bin realizes its promise at a hit rate over 0.55 in

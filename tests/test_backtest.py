@@ -289,7 +289,7 @@ def test_pull_keeps_the_box_scores_shape_and_skips_two_week_matchups_and_byes():
     assert rep["version"] == bt.REPLAY_VERSION and (rep["season"], rep["league"], rep["pulled"]) == (2025, "L1", "2026-10-20")
     assert (rep["universe_size"], rep["universe_missing"]) == (4, 1) and sorted(rep["players"]) == [10, 12, 99]   # D (13) is out with his bye matchup
     assert rep["players"][10] == {"espn_id": 10, "name": "A", "pos": "RB", "team": "SF", "eligible": ["RB", "RB/WR/TE"], "proj_season": 180.5,
-                                  "bye_weeks": [9], "weeks": {1: {"proj": 12.3, "actual": 15.0}, 2: {"proj": 13.0, "actual": 2.0}, 3: {"proj": 10.0}}}
+                                  "total_zeroed": False, "bye_weeks": [9], "weeks": {1: {"proj": 12.3, "actual": 15.0}, 2: {"proj": 13.0, "actual": 2.0}, 3: {"proj": 10.0}}}
     assert rep["players"][99]["weeks"][2] == {"proj": 5.0, "actual": 9.0} and rep["players"][12]["bye_weeks"] == []
     assert rep["settings"]["lineup_slots"] == {"QB": 1, "RB": 1, "WR": 1} and rep["settings"]["ppr"] == 0.5
     assert (rep["settings"]["playoff_team_count"], rep["settings"]["bench_slots"], rep["settings"]["position_limits"]) == (2, 5, {})   # the scanner replay's inputs
@@ -767,6 +767,39 @@ def test_prior_hits_scores_the_price_at_week_w_on_the_games_after_it_rostered_an
     assert (wire["every"]["n"], wire["every"]["bodies"], wire["every"]["unscored"]) == (5, 3, 1) and (wire["on_field"]["n"], wire["on_field"]["bodies"]) == (3, 2)
     assert res["near"]["no_total"]["every"]["n"] == 1 and res["near"]["no_total"]["every"]["stays"] == {"bias": 14.92, "mae": 14.92}   # U6 in week 2
     assert res["wire"]["no_total"]["every"]["stays"]["bias"] == 8.46                             # U6 in week 1 (priced 2) and week 2 (14.92), dark after both
+
+
+def test_a_body_whose_total_espn_zeroed_on_the_pull_day_is_read_apart_from_the_no_total_body():
+    """D19: ESPN zeroes the season row of a player on IR or Out on the pull day (Hurts with 82 points banked read a
+    total of 0), so `_universe_row` keeps `total_zeroed` for a no-total body under one of `TOTAL_ZEROED_STATUSES`
+    (not for one ESPN never projected, nor for one whose total survived), `prior_week` carries it, and `prior_hits`
+    reads him in the `zeroed` bucket, not `no_total`: U6 priced 14.92 at week 2 then dark is the 2026 replay's
+    rostered-no-total row in miniature. A file pulled before the flag reads `zeroed_known` False."""
+    uni = bt.universe([_up(1, "IR", "QB", {1: {"projected_points": 20.0, "points": 22.0}}, total=0.0),
+                       _up(2, "Out", "RB", {1: {"projected_points": 8.0}}, total=0.0),
+                       _up(3, "Backup", "QB", {1: {"projected_points": 15.0}}, total=0.0),
+                       _up(4, "Q", "WR", {1: {"projected_points": 5.0}}, total=0.0),
+                       _up(5, "Kept", "WR", {1: {"projected_points": 9.0}}, total=120.0)], set())[0]
+    assert bt._universe_row(_P(**vars(_up(1, "IR", "QB", {}, total=0.0)), injuryStatus="INJURY_RESERVE"))["total_zeroed"] is True
+    assert bt._universe_row(_P(**vars(_up(2, "Out", "RB", {}, total=0.0)), injuryStatus="OUT"))["total_zeroed"] is True
+    assert bt._universe_row(_P(**vars(_up(3, "Backup", "QB", {}, total=0.0)), injuryStatus="ACTIVE"))["total_zeroed"] is False
+    assert bt._universe_row(_P(**vars(_up(4, "Q", "WR", {}, total=0.0)), injuryStatus="DOUBTFUL"))["total_zeroed"] is False
+    assert bt._universe_row(_P(**vars(_up(5, "Kept", "WR", {}, total=120.0)), injuryStatus="INJURY_RESERVE"))["total_zeroed"] is False
+    assert uni[3]["total_zeroed"] is False                                                   # no `injuryStatus` at all reads as not zeroed
+
+    rep = _dark_replay()
+    before = bt.prior_hits(rep)
+    assert before["zeroed_known"] is False and before["wire"]["zeroed"]["every"]["n"] == 0
+    assert all(r["zeroed"] is False for r in bt.prior_week(rep, 2, 4))
+    rep["players"][6]["total_zeroed"] = True                                                # U6 is on IR on the pull day
+    rows = {r["espn_id"]: r for r in bt.prior_week(rep, 2, 4)}
+    assert (rows[6]["total"], rows[6]["zeroed"], rows[7]["zeroed"]) == (False, True, False)
+    res = bt.prior_hits(rep)
+    assert res["zeroed_known"] is True
+    assert (res["near"]["no_total"]["every"]["n"], res["wire"]["no_total"]["every"]["n"]) == (0, 0)                    # out of the D13 row
+    assert res["near"]["zeroed"]["every"]["n"] == 1 and res["near"]["zeroed"]["every"]["stays"] == {"bias": 14.92, "mae": 14.92}
+    assert res["wire"]["zeroed"]["every"]["stays"]["bias"] == 8.46 and res["wire"]["zeroed"]["on_field"]["n"] == 0    # dark after both weeks
+    assert res["wire"]["total"]["every"]["n"] == before["wire"]["total"]["every"]["n"]                                # the bodies with a total unmoved
 
 
 def test_a_week_w_prior_row_never_reads_a_week_w_or_later_actual():
