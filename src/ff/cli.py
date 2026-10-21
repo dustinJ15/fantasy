@@ -485,8 +485,8 @@ def _print_scan(res: dict) -> None:
 def _print_claims(res: dict) -> None:
     """The claim replay's tables: one row per sample (every row the ranking listed, the card's first claim per
     team-week, the claim-worthy rows, each with and without a zero touched, and each split again by whether the
-    claimed body or the displaced starter went dark after the row, the dark rows' share with no preseason total
-    apart; then the managers' actual adds) on the rest-of-season promise, with the distinct players behind each n;
+    claimed body or the displaced starter went dark after the row, and by the claimed body's preseason total: none, or
+    zeroed on the pull day because he is on IR or Out, each dark share apart; then the managers' actual adds) on the rest-of-season promise, with the distinct players behind each n;
     the same samples' START NOW rows on their one-week promise; then the reliability rows by promised upgrade."""
     fmt = lambda x: "—" if x is None else f"{x:+.2f}"
     rate = lambda x: "—" if x is None else f"{x:.2f}"
@@ -496,6 +496,9 @@ def _print_claims(res: dict) -> None:
            f"{res['through']}: {res['team_weeks']} team-weeks, {res['rows']} rows, {res['adds']['n']} adds the managers made"
            + (f" ({res['adds']['unpriced']} more not in the universe)" if res["adds"]["unpriced"] else ""))
     rprint(f"  [dim]{res['trending']}[/]")
+    if not res.get("zeroed_known"):
+        rprint("[yellow]pulled before the pull-day flag: the no-total rows still hold the bodies whose total ESPN zeroed (on IR or Out "
+               "on the pull day); `ff replay-pull` again reads them apart[/]")
     samples = (("all", "every row"), ("top1", "the card's first claim"), ("claim_worthy", "claim-worthy"))
     rows = []
     for sample, label in samples:
@@ -503,8 +506,11 @@ def _print_claims(res: dict) -> None:
             if split == "every" or res[sample]["touches_zero"]["n"]:
                 rows.append((label + word, res[sample][split]))
         for split, word in (("nobody_dark", ", both on the field after"), ("went_dark", ", a body dark after"),
-                            ("dark_no_prior", ", dark, no preseason total")):
-            if res[sample]["went_dark"]["n"]:
+                            ("dark_no_prior", ", dark, no preseason total"), ("dark_zeroed", ", dark, total zeroed on the pull day")):
+            if res[sample]["went_dark"]["n"] and (split != "dark_zeroed" or res[sample][split]["n"]):
+                rows.append((label + word, res[sample][split]))
+        for split, word in (("no_prior", ", no preseason total"), ("zeroed", ", total zeroed on the pull day")):
+            if res[sample][split]["n"]:
                 rows.append((label + word, res[sample][split]))
     rows.append(("the managers' adds", res["adds"]))
     t = Table("sample", "n", "bodies", "hit", "promised /wk over the starter", "realized /wk")

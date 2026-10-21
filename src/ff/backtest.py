@@ -693,8 +693,9 @@ def _week_edge(p: PlayerProj, week_lineup: dict[str, list[PlayerProj]], slots: d
 
 
 def _claim_row(p: PlayerProj, r: dict, my_lineup: dict[str, list[PlayerProj]], week_lineup: dict[str, list[PlayerProj]],
-               slots: dict[str, int], week: int, team: int, rank: int | None) -> dict:
-    """One claim row as the replay keeps it: what `rank_free_agents` said (`r`) plus the two bodies it displaces."""
+               slots: dict[str, int], week: int, team: int, rank: int | None, zeroed: bool = False) -> dict:
+    """One claim row as the replay keeps it: what `rank_free_agents` said (`r`) plus the two bodies it displaces.
+    `zeroed` is the universe's `total_zeroed` for the claimed body (on IR or Out on the pull day, D19)."""
     d_week, week_slot, week_sid = _week_edge(p, week_lineup, slots)
     starter_id = _weakest(my_lineup.get(r["slot"]) or [], "mu_ros") if r["slot"] else None
     starter_zero = any(s.espn_id == starter_id and s.p_zero >= 1.0 and not s.bye for ps in my_lineup.values() for s in ps)
@@ -707,7 +708,15 @@ def _claim_row(p: PlayerProj, r: dict, my_lineup: dict[str, list[PlayerProj]], w
             "touches_zero": (p.p_zero >= 1.0 and not p.bye) or starter_zero,
             # ESPN gave him no preseason total: `season_pg` had no prior to fade and his rest-of-season price is his
             # last game or two (D13)
-            "no_prior": not p.sources.get("prior_pg")}
+            "no_prior": not p.sources.get("prior_pg"),
+            # ESPN zeroed the total he had because he is on IR or Out on the pull day (D19): a known-hurt body, not the
+            # D13 one, so the tables read him apart from `no_prior`
+            "zeroed": zeroed}
+
+
+def _zeroed(rep: dict, espn_id: int) -> bool:
+    """The universe's `total_zeroed` for one body (False on a file pulled before the flag)."""
+    return bool((rep["players"].get(espn_id) or {}).get("total_zeroed"))
 
 
 def _team_lineups(mine: list[PlayerProj], slots: dict[str, int]) -> tuple[dict, list[PlayerProj], dict]:
@@ -729,7 +738,7 @@ def claim_week(rep: dict, week: int, through: int) -> list[dict]:
         rows = rank_free_agents(inp.pool, my_lineup, my_bench, inp.repl, inp.W, 0, {}, top=10**6, week_lineup=week_lineup, lineup_slots=inp.slots)
         by_id = {p.espn_id: p for p in inp.pool}
         for rank, r in enumerate(rows, 1):
-            out.append(_claim_row(by_id[r["espn_id"]], r, my_lineup, week_lineup, inp.slots, week, tid, rank))
+            out.append(_claim_row(by_id[r["espn_id"]], r, my_lineup, week_lineup, inp.slots, week, tid, rank, _zeroed(rep, r["espn_id"])))
     return out
 
 
@@ -763,7 +772,7 @@ def adds_week(rep: dict, week: int, through: int) -> tuple[list[dict], int]:
             d_week, week_slot, _ = _week_edge(p, week_lineup, inp.slots)
             fake = {"delta_over_starter": d_start, "slot": slot, "delta_week": d_week, "week_slot": week_slot,
                     "streamer": p.pos in ("K", "D/ST"), "score": None}
-            out.append(_claim_row(p, fake, my_lineup, week_lineup, inp.slots, week, tid, None))
+            out.append(_claim_row(p, fake, my_lineup, week_lineup, inp.slots, week, tid, None, _zeroed(rep, p.espn_id)))
     return out, unpriced
 
 
@@ -828,9 +837,12 @@ def claim_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
     first claim per team-week (`top1`), the claim-worthy rows (`delta_over_starter` at or over `CLAIM_WORTHY_PPW`, the
     rows `priority_cost` prices live), each split by `touches_zero` and again by `dark` (`nobody_dark`: the claimed body
     and the displaced starter both scored in some graded week, the rows that grade the ranking; `went_dark`: one of
-    them scored zero in every graded week; `dark_no_prior`: those whose claimed body had no preseason total, the hole
-    D13 names); and the managers' actual adds (`adds`) scored the same way, the comparison that says whether the wire
-    read or the ranking has the edge."""
+    them scored zero in every graded week); then by the claimed body's preseason total (`no_prior`: ESPN never gave him
+    one, the D13 body; `zeroed`: ESPN zeroed the one he had because he is on IR or Out on the pull day, D19, a
+    known-hurt body read apart) and the dark rows the same way (`dark_no_prior`, `dark_zeroed`); and the managers'
+    actual adds (`adds`) scored the same way, the comparison that says whether the wire read or the ranking has the
+    edge. `zeroed_known` is False on a file pulled before the flag: its `no_prior` rows then still carry the zeroed
+    bodies, and `ff replay-pull` again is the fix."""
     reg = rep["settings"].get("reg_season_weeks")
     played = [w["week"] for w in rep["weeks"] if reg is None or w["week"] <= reg]
     through = max(played) + 1 if played else 0
@@ -851,10 +863,14 @@ def claim_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
         return {"every": claim_table(cs), "clean": claim_table([c for c in cs if not c["touches_zero"]]),
                 "touches_zero": claim_table([c for c in cs if c["touches_zero"]]),
                 "nobody_dark": claim_table([c for c in cs if not c["dark"]]), "went_dark": claim_table(dark),
-                "dark_no_prior": claim_table([c for c in dark if c["no_prior"]])}
+                "no_prior": claim_table([c for c in cs if c["no_prior"] and not c["zeroed"]]),
+                "zeroed": claim_table([c for c in cs if c["zeroed"]]),
+                "dark_no_prior": claim_table([c for c in dark if c["no_prior"] and not c["zeroed"]]),
+                "dark_zeroed": claim_table([c for c in dark if c["zeroed"]])}
 
     return {"league": rep.get("league"), "season": rep.get("season"), "weeks": scored, "through": through - 1 if scored else None,
             "team_weeks": len({(c["week"], c["team"]) for c in rows}), "rows": len(rows), "trending": TRENDING_OFF,
+            "zeroed_known": any("total_zeroed" in u for u in rep["players"].values()),
             "all": split(rows), "top1": split([c for c in rows if c["rank"] == 1]), "claim_worthy": split([c for c in rows if c["claim_worthy"]]),
             "adds": {**claim_table(adds), "unpriced": unpriced}}
 
