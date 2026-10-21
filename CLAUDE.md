@@ -37,7 +37,7 @@ block is what the card prints). `acceptance.py` is the would-he-say-yes scorecar
 `deadlines.py` is the league's clocks (next waiver run from ESPN's `processDate` else `WAIVER_RUN_HOUR_ET`, a drop's clear time, when an accepted
 offer executes, next kickoff) as each league's `deadlines` block; claim and offer rows print them ("lands Wed 1:00 AM"). `lineup.py` is the P(win)
 optimizer (`MIN_WIN_GAIN` keeps the highest-points lineup under 1.5pp; `MIN_SWAP_GAIN` keeps a healthy starter under a 1-point swap, `held` on the why line); `projections.py` the blend (`season_pg`, `wind_mult`,
-`QUESTIONABLE_BY_WEEKDAY`; `OPPORTUNITY_WEIGHT` and `OPPONENT_K`, this week's defense factor from `usage.opponent_factors`, are fitted by `opfit.py`, `ff fit-opportunity`, on nflverse 2016-2025); `clock.py` locks players from kickoff; `waivers.py` `priority_cost` prices the priority a claim spends in a rolling
+`QUESTIONABLE_BY_WEEKDAY`; `OPPORTUNITY_WEIGHT`, `OPPONENT_K` (this week's defense factor from `usage.opponent_factors`) and `VEGAS_K` (the implied total) are fitted by `opfit.py`, `ff fit-opportunity`, on nflverse 2016-2025); `clock.py` locks players from kickoff; `waivers.py` `priority_cost` prices the priority a claim spends in a rolling
 league. `packet.py` builds the DecisionPacket (`apply_accepted_trades` moves an accepted trade's players before anything is priced; `title_deltas`
 re-sims on the baseline's seed). `ledger.py` is the roster-spot ledger behind the checklist: `Spots` hands out spots and drops (an open spot, the spot an IR
 row frees, a Drop-verdict player at cost 0, then the cheapest drop), counts bodies against `settings.position_limits`; `drop_order` / `drop_note` rank and word a cut.

@@ -2,9 +2,10 @@
 
 Status: planned 2026-10-21; step 1 done the same day (the opportunity weight and clip, the pass-attempt term: `src/ff/opfit.py`,
 `ff fit-opportunity`, the constants adopted in `model/projections.py` and `model/usage.py`); step 2 done 2026-10-21 (the opponent
-factor: `usage.opponent_factors`, `opfit.fit_opponent`, `OPPONENT_K` adopted, `blend` reads it this week). Steps 3-5 are in TODO.md under D10.
+factor: `usage.opponent_factors`, `opfit.fit_opponent`, `OPPONENT_K` adopted, `blend` reads it this week); step 3 done 2026-10-21 (the
+implied total: `opfit.fit_vegas` on nflverse `schedules`, `VEGAS_K` QB 0.41 adopted, RB, WR and TE kept). Steps 4-5 are in TODO.md under D10.
 Written: 2026-10-21 against `main` at 3db45b8 (a session with the network and no cookies: nflverse reachable, ESPN not).
-TODO ids: D10 (steps 2-5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
+TODO ids: D10 (steps 4-5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
 Still open: D10.
 
 For an agent fitting a projection constant to past seasons, or taking a D10 step. ROADMAP item 1's historical half in one
@@ -189,14 +190,68 @@ Adopted: `OPPONENT_K = {"QB": 0.20, "RB": 0.25, "WR": 0.09, "TE": 0.19}`, `OPPON
 - **Nothing about the game script**: the implied total (step 3) and the spread are the other half of the matchup, fitted
   on the same row next.
 
-## Steps 3-5 (one PR each, in order; the done-when of each)
+## Step 3: the implied team total (done 2026-10-21)
 
-3. **The implied-total term.** `VEGAS_K` per position was set by hand (2026-09). nflverse `schedules` carries
-   `spread_line` and `total_line` for every game since 1999, so the implied team total of every training game is
-   `total / 2 ± spread / 2`. Same row as step 2 with the implied total in place of the factor, model
-   `points ≈ ppg * (1 + k * (implied / LEAGUE_AVG_IMPLIED - 1))`, closed form in `k`. Done when the fitter prints
-   `VEGAS_K` per position next to the constants with the verdict; adopted the same way. The live source
-   (`sources/vegas.py`) is unchanged.
+`VEGAS_K` was set by hand (2026-09): `blend` multiplies this week's `mu` by `1 + k * (implied / LEAGUE_AVG_IMPLIED - 1)`
+beside the opponent multiplier. What it must not read: anything but the closing line of the week's own game; the
+rest-of-season level never sees it (`mu_neutral`).
+
+### The training row
+
+`opfit.vegas_frame`: step 2's player-week (2+ games before, 5.0+ PPR a game so far), without waiting on the defense's
+games; his team's implied total that week (`opfit.implied_lines` over nflverse `schedules`, REG games with a line:
+`spread_line` is the home margin, so home is `total / 2 + spread / 2`, the split `sources/vegas.py` reads off ESPN with
+the other sign; OAK, SD and STL read as the stats' LV, LAC and LA, `SCHEDULE_TEAM`, without which 2016-2019 lost the
+Raiders and the 2016 Chargers); `def_mult`, the live opponent multiplier at the adopted `OPPONENT_K` and cap (1.0 under
+`OPPONENT_MIN_GAMES` defense games, as live); and `level`, his `ppg` times the live `opportunity_mult`. 28,417 rows
+2016-2025, every player-week matched to a line: QB 4,402, RB 7,557, WR 12,031, TE 4,427.
+
+### The base is the level, not `ppg`
+
+The plan as written put `ppg` under the term, as step 2 did. On `ppg` the fit reads QB 0.0 (every fold), RB 0.12, WR
+0.01, TE 0.06, and every hand number loses to no term at all. That is a confound, not a finding: a hot start and his
+team's line rise together (the market reads the same box scores and the same quarterback), and the start then
+regresses, so on raw `ppg` the implied total is fitted against the regression to the mean. The live number the term
+multiplies is a projection, which has already regressed. On the opportunity-moved level (the step-1 read, the live
+code's own) the confound mostly goes, and the fitted `k` lands beside the hand numbers. The defense factor of step 2
+has no such tie to the player's own start, which is why `ppg` was the right base there. `k_ppg` stays on the printed
+row so the reader sees the confound.
+
+### What it printed (2016-2025, 2026-10-21)
+
+Mean implied total over every team-game with a line: 22.6 (`LEAGUE_AVG_IMPLIED` 23.0); 21.5-24.0 by season.
+
+| pos | n | k then | fit | rmse k=0 | rmse then | rmse fit | folds | k on raw ppg | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| QB | 4402 | 0.35 | 0.413 | 7.9148 | 7.8382 | 7.8377 | 0.400-0.439 | 0.0 | fit |
+| RB | 7557 | 0.3 | 0.378 | 7.5190 | 7.4786 | 7.4790 | 0.344-0.416 | 0.123 | keep prior |
+| WR | 12031 | 0.35 | 0.270 | 7.4796 | 7.4624 | 7.4626 | 0.240-0.307 | 0.01 | keep prior |
+| TE | 4427 | 0.3 | 0.329 | 6.3444 | 6.3242 | 6.3249 | 0.303-0.352 | 0.056 | keep prior |
+
+Adopted: `VEGAS_K["QB"] = 0.41` (was 0.35); RB, WR, TE, K and D/ST unchanged. A re-run reads QB 0.41 at rmse 7.8364 in
+place against the fit's 7.8377 out of sample and says `keep prior` in every position.
+
+### What the fit found
+
+- **The hand numbers were good.** The term takes 1.0% off the weekly error at QB, 0.5% at RB and 0.2-0.3% at WR and TE
+  against no term, more than the opponent factor (0.3-0.4%), and the 2026-09 numbers already had nearly all of it: the
+  fits at RB, WR and TE sit 0.03-0.08 from them and score the same to the third decimal out of sample, which by the
+  plan's rule is `keep prior`. Only QB moved, by 0.06, and by less than a thousandth of a point of error.
+- **The fold `k`s are one number.** Every position's ten folds sit within 0.05 of the whole-sample fit.
+- **WR fits under its prior** (0.27 against 0.35) and is the one hand number the data leans away from; it ties out of
+  sample, so it stays, and the next season's re-run says whether it keeps leaning.
+
+### What the fit could not see
+
+- **ESPN's number**, as in step 2: the base here is the step-1 level times the opponent multiplier, not the ESPN and
+  Sleeper blend, whose analysts read the same line. Whether `k` on the blend should be smaller is step 5's question,
+  for this term and the opponent's together (the two overlap: a weak defense raises the implied total).
+- **The live line's timing.** nflverse carries the closing line; the card reads ESPN's scoreboard on the morning it
+  runs, days before close on a Tuesday. The term is fitted on the better number.
+- **K and D/ST**: nflverse has no kicks, and a D/ST is the defense; their constants stay hand-set.
+
+## Steps 4-5 (one PR each, in order; the done-when of each)
+
 4. **The recent-usage trend.** The last three games' opportunity share against the season's (`tgt_share`, carries a
    game) as a second term on the rest-of-season level: `level ≈ ppg * (1 - w + w * ratio) * (1 + t * (recent / season - 1))`.
    Training row as step 1 with the trend added; `t` fitted at the adopted `w`, leave-one-season-out. Done when the
@@ -204,7 +259,7 @@ Adopted: `OPPONENT_K = {"QB": 0.20, "RB": 0.25, "WR": 0.09, "TE": 0.19}`, `OPPON
    The prior is zero (the public finding is that a share change persists only when a role changed, which the number
    cannot tell from a blowout).
 5. **The blend with consensus by out-of-sample error.** The point of the item: the fitted weekly number (steps 2-3 on
-   `ppg` so far) against ESPN's weekly number for the same player-week, on the 2026 replay (`players[].weeks[].proj`
+   the level so far) against ESPN's weekly number for the same player-week, on the 2026 replay (`players[].weeks[].proj`
    and `actual`, three leagues, every rostered and universe player) and the projlog (`espn_pts`, `sleeper_pts`, the
    blend, the actual). The mixing weight is the inverse-error one over the scored weeks, per position, refused under
    `projlog.FIT_MIN_N` as D2. Done when `ff backtest --fit` (or `ff accuracy --fit-blend`) prints the fitted number's
@@ -247,3 +302,12 @@ Adopted: `OPPONENT_K = {"QB": 0.20, "RB": 0.25, "WR": 0.09, "TE": 0.19}`, `OPPON
    table above), but the whole term is worth 0.3% of the weekly error; a schedule would move a few hundredths of that.
    Revisit with step 5 if the replay scores the early-season matchup read as the place the card is wrong, and then as
    `OPPONENT_MIN_GAMES` per position first (WR at 3-5 games fits zero).
+8. **Re-centre `LEAGUE_AVG_IMPLIED` on the sample's 22.6?** No. The out-of-sample error keeps falling as the centre
+   rises past the league's own mean (23.5 scores better than 23.0 in every position), because a higher centre shaves
+   every row down and the training base runs high (a body chosen for 5+ a game so far regresses even after the
+   opportunity read). That is the training row's bias, not the live projection's, so the data cannot place the centre;
+   it stays at 23.0, within half a point of the ten seasons' mean.
+9. **Refit `OPPONENT_K` jointly with the implied total?** Not here. The implied total was fitted with the opponent
+   multiplier on at its adopted `k`, so `VEGAS_K` is the term's worth on top of it, as `blend` applies them; the
+   reverse (whether the opponent factor still earns its place once the line is on) is the overlap step 5 scores on the
+   blend, where both terms meet ESPN's analysts.

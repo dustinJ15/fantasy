@@ -152,7 +152,15 @@ def _sigma(pos: str, mu: float, fp_sd: float | None) -> float:
     return float(s)
 
 
-VEGAS_K = {"QB": 0.35, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}
+# This week's implied team total (`sources/vegas.py`): `mu *= 1 + k * (implied / LEAGUE_AVG_IMPLIED - 1)`. Set by hand
+# (2026-09); QB, RB, WR and TE fitted (D10 step 3, `opfit.fit_vegas`, `ff fit-opportunity`, 2026-10-21): 28,417
+# player-weeks of 2016-2025, his points that week against his opportunity-moved level so far times the adopted opponent
+# multiplier, his team's implied total off nflverse's closing line, leave-one-season-out. Only QB beat the hand number
+# out of sample (fit 0.413, folds 0.40-0.44); RB (fit 0.38), WR (0.27) and TE (0.33) tie their priors and keep them.
+# The term is worth 1.0% of the weekly error at QB, 0.5% at RB, 0.2-0.3% at WR and TE. K and D/ST stay hand-set
+# (nflverse has no kicks). The plan has the table, why the base is the level and not raw ppg, and why the centre stays
+# at 23 (`docs/plans/fitted-projection.md`).
+VEGAS_K = {"QB": 0.41, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}   # QB was 0.35; fitted 2026-10-21
 LEAGUE_AVG_IMPLIED = 23.0
 
 # This week's opponent (D10 step 2, ROADMAP item 5's open piece). `model/usage.py` `opponent_factors` reads each
