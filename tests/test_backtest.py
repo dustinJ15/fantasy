@@ -578,6 +578,9 @@ def test_claim_hits_on_the_models_own_draw_reads_edge_and_the_realized_mean_trac
     wk = worthy["week"]                                           # the START NOW rows on their one-week promise
     assert wk["n"] >= 100 and wk["hit"] > 0.6 and abs(wk["realized_mean"] - wk["pred_mean"]) < 1.5
     assert res["all"]["touches_zero"]["n"] == 0 and res["all"]["clean"] == every   # no designation in the synthetic season
+    assert res["all"]["dark_no_prior"]["n"] == 0                                    # every synthetic body has a preseason total
+    assert res["all"]["went_dark"]["n"] + res["all"]["nobody_dark"]["n"] == every["n"] and res["all"]["went_dark"]["n"] < 0.05 * every["n"]
+    assert 0 < every["bodies"] < every["n"] and worthy["bodies"] < worthy["n"]       # n is rows; the bodies behind them are far fewer
     assert res["adds"]["n"] == 0 and res["adds"]["unpriced"] == 0                  # the synthetic rosters persist: nobody adds
 
 
@@ -644,15 +647,66 @@ def test_adds_week_prices_the_managers_add_as_a_claim_row_and_counts_one_beyond_
     assert bt.adds_week(rep, 3, 4) == ([], 0)                                 # the last week has no next one
 
 
+def _dark_replay() -> dict:
+    """`_two_team_replay` with three more wire RBs: U6 and U7 light up in week 1 and score nothing after, U6 with no
+    preseason total (the D13 body) and U7 the same games with one (85, five a game); U8 (a total of 85) plays every
+    week and is a small upgrade on team 1's starter from week 2."""
+    rep = _two_team_replay()
+    games = {1: {"proj": 2.0, "actual": 25.0}, 2: {"proj": 14.0, "actual": 0.0}, 3: {"proj": 14.0, "actual": 0.0}}
+    rep["players"][6] = _uni(6, "RB", copy.deepcopy(games), total=0.0)
+    rep["players"][7] = _uni(7, "RB", copy.deepcopy(games), total=85.0)
+    rep["players"][8] = _uni(8, "RB", {1: {"proj": 9.0, "actual": 9.0}, 2: {"proj": 12.0, "actual": 12.0}, 3: {"proj": 12.0, "actual": 14.0}})
+    return rep
+
+
+def test_a_wire_body_with_no_preseason_total_is_priced_on_his_last_game_and_the_tables_read_him_apart_once_dark():
+    """D13: ESPN gave U6 no preseason total, so `season_pg` has no prior to fade and his rest-of-season price after one
+    25-point game is that game (U7, the same games with a prior, prices eight points lower); his claim row carries
+    `no_prior`, and once he scores zero in every graded week `score_claims` marks him `claimed_dark` and `claim_hits`
+    reads the rows on him apart from the rows where both bodies stayed on the field."""
+    rep = _dark_replay()
+    uni = rep["players"]
+    hot = bt.replay_proj(bt.pool_row(uni[6], 2), uni, 2, 2)
+    prior = bt.replay_proj(bt.pool_row(uni[7], 2), uni, 2, 2)
+    assert hot.sources["prior_pg"] is None and prior.sources["prior_pg"] == 5.0
+    assert hot.mu_ros_active == pytest.approx(19.5) and prior.mu_ros_active == pytest.approx(11.17, abs=0.01)   # 0.5 * 25 + 0.5 * 14 against the faded prior
+    week1 = bt.claim_week(rep, 1, 4)
+    assert [(c["team"], c["espn_id"]) for c in week1] == [(1, 8), (2, 8)]   # week 1: only U8 is near a starter; U6 and U7 project 2
+    rows = bt.claim_week(rep, 2, 4)
+    by = {(c["team"], c["espn_id"]): c for c in rows}
+    assert set(by) == {(1, 6), (1, 7), (1, 8), (2, 6), (2, 7), (2, 8)}
+    u6, u7, u8 = by[(1, 6)], by[(1, 7)], by[(1, 8)]
+    assert u6["no_prior"] and not u7["no_prior"] and not u8["no_prior"]
+    assert u6["starter_id"] == 1 and u6["delta_over_starter"] > u7["delta_over_starter"] > u8["delta_over_starter"] > 0
+    assert u6["claim_worthy"] and u6["rank"] == 1 and by[(2, 6)]["rank"] == 1       # the card's first claim for both teams
+    bt.score_claims(rep, rows, 4)
+    # week 3, the one graded week: U6 0 - U1 12, so he realized twelve under a promise of eleven over; U1 scored, so only he is dark
+    assert (u6["weeks"], u6["realized_over_starter"], u6["hit"], u6["claimed_dark"], u6["starter_dark"], u6["dark"]) == (1, -12.0, False, True, False, True)
+    assert u7["dark"] and u7["claimed_dark"] and not u7["starter_dark"]              # U7: the same games, a prior, the same dark
+    assert (u8["realized_over_starter"], u8["hit"], u8["dark"]) == (2.0, True, False)   # U8 14 - U1 12: both on the field
+    assert by[(2, 6)]["realized_over_starter"] == -20.0 and by[(2, 6)]["claimed_dark"]
+    res = bt.claim_hits(rep)
+    every, dark, lit, nop = res["all"]["every"], res["all"]["went_dark"], res["all"]["nobody_dark"], res["all"]["dark_no_prior"]
+    assert (every["n"], every["bodies"]) == (8, 3) and every["n"] == dark["n"] + lit["n"]
+    assert (dark["n"], dark["bodies"], dark["realized_mean"]) == (4, 2, -16.0)        # U6 and U7 for both teams in week 2
+    # U8's four rows, the ones that grade the ranking: weeks 2-3 over U1 (+3.0) and U3 (+2.5) from week 1, week 3 over U1 (+2) and U3 (-6)
+    assert (lit["n"], lit["bodies"], lit["realized_mean"]) == (4, 1, 0.38)
+    assert (nop["n"], nop["bodies"], nop["realized_mean"]) == (2, 1, -16.0)           # U6 alone
+    top = res["top1"]                                             # the card's first claim: U8 in week 1 for both teams, U6 in week 2
+    assert (top["every"]["n"], top["went_dark"]["n"], top["dark_no_prior"]["n"], top["nobody_dark"]["n"]) == (4, 2, 2, 2)
+    assert top["dark_no_prior"]["realized_mean"] == -16.0 and top["dark_no_prior"]["pred_mean"] > 10 and top["nobody_dark"]["realized_mean"] == 2.75
+
+
 def test_claim_table_bins_on_the_promise_and_reads_the_start_now_rows_apart():
-    rows = [{"delta_over_starter": -1.0, "realized_over_starter": -2.0, "hit": True, "delta_week": 2.0, "realized_week": 3.0, "hit_week": True},
-            {"delta_over_starter": 0.5, "realized_over_starter": 1.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None},
-            {"delta_over_starter": 1.5, "realized_over_starter": -2.0, "hit": False, "delta_week": 4.0, "realized_week": -1.0, "hit_week": False},
+    rows = [{"delta_over_starter": -1.0, "realized_over_starter": -2.0, "hit": True, "delta_week": 2.0, "realized_week": 3.0, "hit_week": True, "espn_id": 1},
+            {"delta_over_starter": 0.5, "realized_over_starter": 1.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None, "espn_id": 1},
+            {"delta_over_starter": 1.5, "realized_over_starter": -2.0, "hit": False, "delta_week": 4.0, "realized_week": -1.0, "hit_week": False, "espn_id": 2},
             {"delta_over_starter": 2.0, "realized_over_starter": 4.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None},
             {"delta_over_starter": 4.0, "realized_over_starter": 5.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None},
-            {"delta_over_starter": 9.0, "realized_over_starter": None, "hit": None, "delta_week": 0.0, "realized_week": None, "hit_week": None}]
+            {"delta_over_starter": 9.0, "realized_over_starter": None, "hit": None, "delta_week": 0.0, "realized_week": None, "hit_week": None, "espn_id": 9}]
     t = bt.claim_table(rows)
     assert (t["n"], t["unscored"], t["hit"], t["pred_mean"], t["realized_mean"]) == (5, 1, 0.8, 1.4, 1.2)
+    assert t["bodies"] == 2                                       # U1 twice and U2 among the scored rows; U9 is unscored, the rest carry no id
     assert [(b["lo"], b["hi"], b["n"], b["hit"], b["realized_mean"]) for b in t["bins"]] == [
         (None, 0.0, 1, 1.0, -2.0), (0.0, 1.0, 1, 1.0, 1.0), (1.0, 2.0, 1, 0.0, -2.0), (2.0, 4.0, 1, 1.0, 4.0), (4.0, None, 1, 1.0, 5.0)]
     assert t["week"] == {"n": 2, "hit": 0.5, "pred_mean": 3.0, "realized_mean": 1.0}

@@ -689,7 +689,10 @@ def _claim_row(p: PlayerProj, r: dict, my_lineup: dict[str, list[PlayerProj]], w
             "streamer": r["streamer"], "score": r["score"], "mu_ros": p.mu_ros,
             "claim_worthy": (not r["streamer"]) and r["delta_over_starter"] >= CLAIM_WORTHY_PPW,
             "start_now": r["delta_week"] >= START_NOW_PPW,
-            "touches_zero": (p.p_zero >= 1.0 and not p.bye) or starter_zero}
+            "touches_zero": (p.p_zero >= 1.0 and not p.bye) or starter_zero,
+            # ESPN gave him no preseason total: `season_pg` had no prior to fade and his rest-of-season price is his
+            # last game or two (D13)
+            "no_prior": not p.sources.get("prior_pg")}
 
 
 def _team_lineups(mine: list[PlayerProj], slots: dict[str, int]) -> tuple[dict, list[PlayerProj], dict]:
@@ -755,20 +758,28 @@ def score_claims(rep: dict, rows: list[dict], through: int | None = None) -> lis
     displaced starter's (`starter_id`, fixed at week w), averaged; a week either has no actual for is `missing`, not
     zero; `hit` is its sign against `delta_over_starter`. `realized_week`: the claimed player's week-w actual minus the
     displaced week starter's (zero for an empty seat), `hit_week` its sign against `delta_week`; both None for a row
-    the card would not have printed as START NOW (`start_now`). The week-w actual is read here and nowhere else."""
+    the card would not have printed as START NOW (`start_now`). `claimed_dark` and `starter_dark` say the claimed body,
+    or the displaced starter, scored zero in every graded week (a fill-in whose starter came back, a body hurt the next
+    week, a bye when one week is graded); `dark` is either, and the tables read with and without them so the rows where
+    both stayed on the field read on their own (D13). The week-w actual is read here and nowhere else."""
     through = through or (max(w["week"] for w in rep["weeks"]) + 1 if rep["weeks"] else 0)
     _, actual = by_week(rep)
     for c in rows:
         mine, theirs = actual.get(c["espn_id"], {}), actual.get(c["starter_id"], {}) if c["starter_id"] is not None else None
-        deltas, missing = [], 0
+        deltas, missing, mine_pts, theirs_pts = [], 0, [], []
         for t in range(c["week"] + 1, through):
             if theirs is None or t not in mine or t not in theirs:
                 missing += 1
                 continue
             deltas.append(mine[t] - theirs[t])
+            mine_pts.append(mine[t])
+            theirs_pts.append(theirs[t])
         realized = round(sum(deltas) / len(deltas), 2) if deltas else None
+        claimed_dark = bool(deltas) and all(x == 0.0 for x in mine_pts)
+        starter_dark = bool(deltas) and all(x == 0.0 for x in theirs_pts)
         c.update(weeks=len(deltas), missing=missing, realized_over_starter=realized,
-                 hit=None if realized is None else (realized > 0) == (c["delta_over_starter"] > 0), realized_week=None, hit_week=None)
+                 hit=None if realized is None else (realized > 0) == (c["delta_over_starter"] > 0), realized_week=None, hit_week=None,
+                 claimed_dark=claimed_dark, starter_dark=starter_dark, dark=claimed_dark or starter_dark)
         if c["start_now"] and c["week"] in mine:
             base = actual.get(c["week_starter_id"], {}).get(c["week"], 0.0) if c["week_starter_id"] is not None else 0.0
             c["realized_week"] = round(mine[c["week"]] - base, 2)
@@ -777,9 +788,10 @@ def score_claims(rep: dict, rows: list[dict], through: int | None = None) -> lis
 
 
 def claim_table(rows: list[dict]) -> dict[str, Any]:
-    """n, the hit rate, the promised mean against the realized mean, and the reliability rows by promised
-    `delta_over_starter` (`CLAIM_BINS`), over the scored rows. `week` is the same read of the START NOW rows on their
-    one-week promise (`delta_week` against `realized_week`)."""
+    """n, the distinct claimed players behind it (`bodies`: one wire player's next month swings every team's row on him
+    at once, so n is rows, not outcomes), the hit rate, the promised mean against the realized mean, and the reliability
+    rows by promised `delta_over_starter` (`CLAIM_BINS`), over the scored rows. `week` is the same read of the START NOW
+    rows on their one-week promise (`delta_week` against `realized_week`)."""
     sc = [c for c in rows if c["realized_over_starter"] is not None]
     bins = []
     for lo, hi in CLAIM_BINS:
@@ -787,7 +799,8 @@ def claim_table(rows: list[dict]) -> dict[str, Any]:
         bins.append({"lo": lo, "hi": hi, "n": len(inb), "hit": _rate([float(c["hit"]) for c in inb]),
                      "pred_mean": _mean([c["delta_over_starter"] for c in inb]), "realized_mean": _mean([c["realized_over_starter"] for c in inb])})
     wk = [c for c in rows if c["realized_week"] is not None]
-    return {"n": len(sc), "unscored": len(rows) - len(sc), "hit": _rate([float(c["hit"]) for c in sc]),
+    return {"n": len(sc), "bodies": len({c.get("espn_id") for c in sc} - {None}),
+            "unscored": len(rows) - len(sc), "hit": _rate([float(c["hit"]) for c in sc]),
             "pred_mean": _mean([c["delta_over_starter"] for c in sc]), "realized_mean": _mean([c["realized_over_starter"] for c in sc]),
             "bins": bins,
             "week": {"n": len(wk), "hit": _rate([float(c["hit_week"]) for c in wk]),
@@ -798,8 +811,11 @@ def claim_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
     """The claim replay of one league: every regular-season week with a later replayed week (`weeks` narrows it),
     every team as me, `claim_week` then `score_claims`, into the tables (`claim_table`) over every row, the card's
     first claim per team-week (`top1`), the claim-worthy rows (`delta_over_starter` at or over `CLAIM_WORTHY_PPW`, the
-    rows `priority_cost` prices live), each split by `touches_zero`; and the managers' actual adds (`adds`) scored the
-    same way, the comparison that says whether the wire read or the ranking has the edge."""
+    rows `priority_cost` prices live), each split by `touches_zero` and again by `dark` (`nobody_dark`: the claimed body
+    and the displaced starter both scored in some graded week, the rows that grade the ranking; `went_dark`: one of
+    them scored zero in every graded week; `dark_no_prior`: those whose claimed body had no preseason total, the hole
+    D13 names); and the managers' actual adds (`adds`) scored the same way, the comparison that says whether the wire
+    read or the ranking has the edge."""
     reg = rep["settings"].get("reg_season_weeks")
     played = [w["week"] for w in rep["weeks"] if reg is None or w["week"] <= reg]
     through = max(played) + 1 if played else 0
@@ -816,8 +832,11 @@ def claim_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
     score_claims(rep, adds, through)
 
     def split(cs: list[dict]) -> dict:
+        dark = [c for c in cs if c["dark"]]
         return {"every": claim_table(cs), "clean": claim_table([c for c in cs if not c["touches_zero"]]),
-                "touches_zero": claim_table([c for c in cs if c["touches_zero"]])}
+                "touches_zero": claim_table([c for c in cs if c["touches_zero"]]),
+                "nobody_dark": claim_table([c for c in cs if not c["dark"]]), "went_dark": claim_table(dark),
+                "dark_no_prior": claim_table([c for c in dark if c["no_prior"]])}
 
     return {"league": rep.get("league"), "season": rep.get("season"), "weeks": scored, "through": through - 1 if scored else None,
             "team_weeks": len({(c["week"], c["team"]) for c in rows}), "rows": len(rows), "trending": TRENDING_OFF,

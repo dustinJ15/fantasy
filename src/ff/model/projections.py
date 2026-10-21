@@ -329,6 +329,9 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
+                 # ESPN's preseason total per NFL game, the prior `season_pg` fades; None when ESPN gave him no total,
+                 # so his rest-of-season level is his own games alone (TODO D13: the wire body with no preseason total)
+                 "prior_pg": round(prior_pg, 2) if prior_pg else None,
                  # the opportunity read on his season so far: xFP-lite over actual, weighted (1.0 when it has no say)
                  "opp_mult": round(opp_mult, 3),
                  "actual_prev": row.get("actual_prev_week"),   # ESPN's final for last week: the accuracy log's truth

@@ -57,17 +57,21 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D13 (S). The wire body with no preseason total.** The first claim replay (`docs/accuracy.md`, "The claim
-  ranking", 2026-10-21): the card's first claim per team-week realized 4.5-7.6 a week under the starter it displaces, and
-  every one of the 96 first-claim rows whose body scored zero in every later week (36 of L1's 60, 34 of L2's 50, 26 of
-  L3's 50; five to seven distinct players per league, Carson Wentz in week 2 the first claim for most of every league)
-  has `proj_season` 0: ESPN gave him no preseason total, `season_pg` in `model/projections.py` has no prior to fade,
-  and his rest-of-season price is his last game or two. The live ranking reads the same `projected_total_points`.
-  The fix is a floor prior for a body with no season total (the position's replacement level, or ESPN's weekly
-  number alone until he has a month of games), decided on the replay: `claim_table` in `backtest.py` should print the
-  split (the claimed body, or the displaced starter, at zero in every later week) so the clean rows read on their own,
-  then the floor, then the tables again. Not a `CLAIM_WORTHY_PPW` change: the clean claim-worthy rows realize more
-  than they promise.
+- [ ] **D13 (S, needs the replay files). The floor prior for the wire body with no preseason total.** The first claim
+  replay (`docs/accuracy.md`, "The claim ranking", 2026-10-21): the card's first claim per team-week realized 4.5-7.6 a
+  week under the starter it displaces, and every one of the 96 first-claim rows whose body scored zero in every later
+  week (five to seven distinct players per league, Carson Wentz in week 2 the first claim for most of every league) has
+  `proj_season` 0: ESPN gave him no preseason total, `season_pg` in `model/projections.py` has no prior to fade, and his
+  rest-of-season price is his last game or two (`tests/test_backtest.py`, the `_dark_replay` test: 19.5 a game after
+  one 25-point game, 11.2 for the same games with a prior). The live ranking reads the same `projected_total_points`.
+  Done 2026-10-21 (a session without `leagues.toml`, so no replay to decide on): `score_claims` marks `claimed_dark` /
+  `starter_dark`, `claim_hits` splits every sample into `nobody_dark`, `went_dark` and `dark_no_prior` with the
+  distinct `bodies` behind each n, `blend` records `prior_pg` in `sources` and each claim row carries `no_prior`;
+  `ff backtest --claims` prints them. Left: the floor itself (the position's replacement level, or ESPN's weekly
+  number alone until he has a month of games), decided on those printed rows: pull the replay (`ff replay-pull
+  --season 2026`, the cookies), read the `dark, no preseason total` and `both on the field after` rows, build the
+  floor in `blend` (replacement level needs a second pass: `replacement_levels` runs after everyone is priced), and
+  print the tables again. Not a `CLAIM_WORTHY_PPW` change: the clean claim-worthy rows realize more than they promise.
 - [ ] **D14 (XS, end of the regular season). Re-read `CLAIM_WORTHY_PPW` (1.0)** on the full-season claim replay after
   D13 (`ff replay-pull --season 2026`, `ff backtest --claims`): the ruling of 2026-10-21 is stays, on clean claim-worthy
   rows of n 10, 29 and 6 realizing +4.7, +3.7 and +1.6 against a promise of +1.5; the bar moves only if the 1-2 bin's

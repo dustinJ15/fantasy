@@ -423,9 +423,10 @@ def _print_scan(res: dict) -> None:
 
 def _print_claims(res: dict) -> None:
     """The claim replay's tables: one row per sample (every row the ranking listed, the card's first claim per
-    team-week, the claim-worthy rows, each with and without a zero touched, then the managers' actual adds) on the
-    rest-of-season promise; the same samples' START NOW rows on their one-week promise; then the reliability rows by
-    promised upgrade."""
+    team-week, the claim-worthy rows, each with and without a zero touched, and each split again by whether the
+    claimed body or the displaced starter went dark after the row, the dark rows' share with no preseason total
+    apart; then the managers' actual adds) on the rest-of-season promise, with the distinct players behind each n;
+    the same samples' START NOW rows on their one-week promise; then the reliability rows by promised upgrade."""
     fmt = lambda x: "—" if x is None else f"{x:+.2f}"
     rate = lambda x: "—" if x is None else f"{x:.2f}"
     if not res["weeks"]:
@@ -440,10 +441,14 @@ def _print_claims(res: dict) -> None:
         for split, word in (("every", ""), ("clean", ", nobody at zero"), ("touches_zero", ", touching a zero")):
             if split == "every" or res[sample]["touches_zero"]["n"]:
                 rows.append((label + word, res[sample][split]))
+        for split, word in (("nobody_dark", ", both on the field after"), ("went_dark", ", a body dark after"),
+                            ("dark_no_prior", ", dark, no preseason total")):
+            if res[sample]["went_dark"]["n"]:
+                rows.append((label + word, res[sample][split]))
     rows.append(("the managers' adds", res["adds"]))
-    t = Table("sample", "n", "hit", "promised /wk over the starter", "realized /wk")
+    t = Table("sample", "n", "bodies", "hit", "promised /wk over the starter", "realized /wk")
     for label, x in rows:
-        t.add_row(label, str(x["n"]), rate(x["hit"]), fmt(x["pred_mean"]), fmt(x["realized_mean"]))
+        t.add_row(label, str(x["n"]), str(x["bodies"]), rate(x["hit"]), fmt(x["pred_mean"]), fmt(x["realized_mean"]))
     rprint(t)
     t = Table("START NOW rows", "n", "hit", "promised this week", "realized")
     for label, x in rows:
