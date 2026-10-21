@@ -4,6 +4,7 @@ from __future__ import annotations
 import polars as pl
 
 from ..sources import nflverse
+from .projections import RECENT_GAMES  # the recent-usage window `season_summary` carries (D10 step 4)
 
 # xFP-lite: what a season's opportunities are worth at league-average PPR values, so a player's points over or under
 # them can be read as luck to regress (`projections.opportunity_mult`). A target and a carry were set by hand
@@ -124,8 +125,9 @@ def opponent_factor_index(season: int, through_week: int) -> dict[tuple[str, str
 
 def season_summary(season: int, through_week: int | None = None) -> pl.DataFrame:
     """Aggregate usage with an expected-points-lite: opportunity-weighted expectation vs actual (FPOE-lite)."""
-    w = weekly_usage(season, through_week)
+    w = weekly_usage(season, through_week).with_columns(xfp_lite_expr().alias("xfp_week"))
     g = w.group_by(["gsis_id", "name", "team", "pos"]).agg([
+        pl.col("xfp_week").sort_by("week").tail(RECENT_GAMES).sum().alias("xfp_recent"),
         pl.col("week").n_unique().alias("games"),
         pl.col("targets").sum().alias("targets"), pl.col("receptions").sum().alias("rec"),
         pl.col("air_yards").sum().alias("air_yards"), pl.col("carries").sum().alias("carries"),
@@ -139,13 +141,15 @@ def season_summary(season: int, through_week: int | None = None) -> pl.DataFrame
         (pl.col("carries").fill_null(0) / pl.col("games")).alias("carry_pg"),
         (pl.col("attempts").fill_null(0) / pl.col("games")).alias("att_pg"),
         (pl.col("fpts_ppr") / pl.col("games")).alias("ppg"),
+        (pl.col("xfp_recent") / pl.min_horizontal(pl.col("games"), pl.lit(RECENT_GAMES))).alias("xfp_recent_pg"),
     ])
     return g.sort("xfp_lite", descending=True)
 
 
 def signals(summary: pl.DataFrame) -> dict[str, dict]:
     """gsis_id -> buy_low / sell_high / usage flags, and the per-game numbers `projections.opportunity_mult` reads
-    (`games`, `ppg`, `xfp_pg`, both PPR; their ratio is what moves a rest-of-season level)."""
+    (`games`, `ppg`, `xfp_pg`, both PPR; their ratio is what moves a rest-of-season level; `xfp_recent_pg`, the last
+    RECENT_GAMES games' xFP-lite a game, is the trend `projections.trend_mult` reads against `xfp_pg`)."""
     out = {}
     for r in summary.iter_rows(named=True):
         flags = []
@@ -161,5 +165,5 @@ def signals(summary: pl.DataFrame) -> dict[str, dict]:
         out[r["gsis_id"]] = {"flags": flags, "games": int(r["games"] or 0),
                              "ppg": round(r["ppg"] or 0, 1), "xfp_pg": round((r["xfp_lite"] or 0) / max(r["games"], 1), 1),
                              "tgt_share": r["tgt_share"], "tgt_pg": round(r["tgt_pg"] or 0, 1), "carry_pg": round(r["carry_pg"] or 0, 1),
-                             "att_pg": round(r["att_pg"] or 0, 1)}
+                             "att_pg": round(r["att_pg"] or 0, 1), "xfp_recent_pg": round(r.get("xfp_recent_pg") or 0, 1)}
     return out

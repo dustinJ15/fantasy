@@ -92,9 +92,10 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   (`sources.def_factor`, `def_mult`, the `def:x1.08` flag). Step 3 done 2026-10-21: the implied total (`opfit.fit_vegas` on
   nflverse `schedules` closing lines, fitted on the opportunity-moved level times the opponent multiplier: on raw `ppg` a
   hot start and his line rise together and the fit reads zero) took `VEGAS_K` QB 0.41 (was 0.35); RB, WR and TE tie their
-  hand numbers and keep them. Left, one PR each, in order: 4. the
-  recent-usage trend (the last three games' share against the season's, a second term on the
-  rest-of-season level, the same closed form as step 1); 5. the blend with consensus by out-of-sample error (the
+  hand numbers and keep them. Step 4 done 2026-10-21: the recent-usage trend
+  (`TREND_K` QB 0.33, RB 0.16, WR 0.10, TE 0.15 on the last three games' xFP-lite a game against the season's, a second
+  term on the rest-of-season level read by `projections.trend_mult` inside `opportunity_mult`; 0.1-0.7% of the error).
+  Left, one PR: 5. the blend with consensus by out-of-sample error (the
   historical model's weekly number against ESPN's in the 2026 replay and the projlog; needs the replay files and the
   cookies; it also says whether `OPPONENT_K` on top of ESPN's number double counts the matchup its analysts priced).
   Each step's done-when and what it must not read are in the plan.
