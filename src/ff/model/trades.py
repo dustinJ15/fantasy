@@ -67,6 +67,14 @@ MUST_TRY_PPW = 2.0
 # detail can say why a candidate it lists is not on the card.
 SEND_MIN_PPW = 1.0        # my gain per week, a lost backup charged against it
 THEIR_FLOOR_PPW = -0.25   # what it may cost him per week before it reads as a loss on his side
+# The variance sign on a consolidation (fewer, bigger starters back): an underdog buys variance, a favorite buys floor
+# (Skinner, JQAS 2011; docs/research/trade-acceptance.md §2). Under UNDERDOG_PCT playoff odds my gain on one is scaled
+# up by VARIANCE_SIGN, over FAVORITE_PCT down by it; points per week stay the measure in between and with no sim. The
+# 10% is the plan's guess (docs/plans/trade-acceptance.md question 4), not a fit. Title odds as the objective wait on a
+# 10k sim for the top three, which the MUST_TRY_PPW comment says the morning run cannot afford.
+UNDERDOG_PCT = 40.0
+FAVORITE_PCT = 70.0
+VARIANCE_SIGN = 0.10
 # A rival reads an offer by what the pieces are worth to him, not by my lineup math. A piece worth under this share of
 # what he gives up, that would also ride his bench, is a throw-in: it carries no weight in the market check, and a
 # 2-for-1 built on one is the 1-for-1 it really is, which the scan proposes on its own anyway. The lesson of the Purdy
@@ -433,8 +441,15 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
             p_accept, reasons = acc.score(sig)
             if p_accept < 0.2:
                 continue  # not a row, not a detail line: the shapes people laugh at are not worth the ink
-            # My gain, with a backup lost on my side charged against it; ranking is p_accept times that.
-            my_gain = d_me - 0.75 * len(new_thin)
+            # My gain, with a backup lost on my side charged against it and a consolidation signed by my odds;
+            # ranking is p_accept times that.
+            my_pct = odds.get(my_id)
+            vmult = variance_mult(len(give), len(get), my_pct)
+            my_gain = (d_me - 0.75 * len(new_thin)) * vmult
+            if vmult > 1:
+                why.append(f"consolidates as an underdog ({my_pct:.0f}% playoff odds): +{VARIANCE_SIGN:.0%} on my gain")
+            elif vmult < 1:
+                why.append(f"consolidates as a favorite ({my_pct:.0f}% playoff odds): -{VARIANCE_SIGN:.0%} on my gain")
             after = rival_after(new_theirs, list(get), slots, their_ctx)
             why_not = why_not_sendable(p_accept, my_gain, d_them, streams, ratio)
             sendable = not why_not
@@ -442,6 +457,8 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
                 "rival_team_id": rid, "rival": meta.get("name"), "give": [p.name for p in give], "get": [p.name for p in get],
                 "give_ids": [p.espn_id for p in give], "get_ids": [p.espn_id for p in get],
                 "my_delta_ppw": round(float(d_me), 2), "their_delta_ppw": round(float(d_them), 2),
+                # What the gate and the ranking read: the delta less a lost backup, times the variance sign.
+                "my_gain": round(float(my_gain), 2), "variance_mult": vmult,
                 # Cuts ESPN demands in the trade screen (position cap), priced into the deltas above.
                 "drops": _drop_rows(drops, limits), "their_drops": [p.name for p in their_drops],
                 "get_pos": [p.pos for p in get],
@@ -473,6 +490,18 @@ def scan(my_id: int, rosters: dict[int, list[PlayerProj]], slots: dict[str, int]
         cands += kept
     cands.sort(key=lambda c: -c["score"])
     return cands[:top]
+
+
+def variance_mult(n_give: int, n_get: int, my_playoff_pct: float | None) -> float:
+    """The variance sign on my gain: a consolidation (I send more bodies than I get) is worth VARIANCE_SIGN more to
+    an underdog and that much less to a favorite. Every other shape, the middle band and an unknown odds read 1."""
+    if my_playoff_pct is None or n_give <= n_get:
+        return 1.0
+    if my_playoff_pct < UNDERDOG_PCT:
+        return 1.0 + VARIANCE_SIGN
+    if my_playoff_pct > FAVORITE_PCT:
+        return 1.0 - VARIANCE_SIGN
+    return 1.0
 
 
 def why_not_sendable(p_accept: float, my_gain: float, d_them: float, streams: list[str], ratio: float | None) -> list[str]:

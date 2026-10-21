@@ -4,8 +4,8 @@ Status: implemented 2026-10-07 in three PRs (#10 stop the bleeding, #11 the mode
 what moved during the build is under **Deviations** at the end, and the questions that were open are closed under
 **Questions, as decided**.
 Written: 2026-10-07 against `main` at 24ae9a8 (164 tests passing). Research behind it: `docs/research/trade-acceptance.md`.
-TODO ids: D9 (the variance sign on `my_gain`, from question 4 below).
-Still open: D9.
+TODO ids: D9 (the variance sign on `my_gain`, from question 4 below; done 2026-10-21).
+Still open: none.
 
 The container had no ESPN cookies, so the two rows from that morning's email were reconstructed from the projlog branch
 (`pushed_trades.json`, `skipped_trades.json`, the week 5 projection log) and live FantasyCalc values pulled that day.
@@ -310,9 +310,12 @@ changes; `transactionCounter` in the snapshot. Tests: the full 3.7 bench and the
    same pattern it is the `CANCELED` copy under my member id with no decline, and that is what
    `espn.trade_resolutions` reads as `withdrawn`. The activity feed (`kona_league_communication`) was not needed.
 4. **Should the sim's title odds replace points per week as `my_gain`?** Decided as recommended: ppw for the gate and
-   the ranking, title odds (on common random numbers since A3) for the tiebreak and the row text. The part not built,
-   a variance-sign term on `my_gain` (a consolidation gets +10% when my playoff odds are under 40% and -10% over 70%,
-   after Skinner's result in the research) and title odds as the objective once the sim is cheap at 10k, is TODO D9.
+   the ranking, title odds (on common random numbers since A3) for the tiebreak and the row text. The variance sign
+   on `my_gain` is in since 2026-10-21 (D9): `trades.variance_mult` scales a consolidation's gain (I send more bodies
+   than I get) by 1.1 under `UNDERDOG_PCT` (40%) playoff odds and 0.9 over `FAVORITE_PCT` (70%), after Skinner's result
+   in the research; the gate, `must_try` and the ranking read the signed gain, the row carries `my_gain` and
+   `variance_mult`, and the printed `my_delta_ppw` stays the unsigned delta. The 10% is the plan's guess, not a fit:
+   revisit it with the outcome log. Title odds as the objective still waits on a sim cheap enough at 10k.
 
 ## Deviations from the brief
 
