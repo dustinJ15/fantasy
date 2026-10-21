@@ -5,7 +5,7 @@ what moved during the build is under **Deviations** at the end, and the question
 **Questions, as decided**.
 Written: 2026-10-07 against `main` at 24ae9a8 (164 tests passing). Research behind it: `docs/research/trade-acceptance.md`.
 TODO ids: D9 (the variance sign on `my_gain`, from question 4 below; done 2026-10-21).
-Still open: D9.
+Still open: none.
 
 The container had no ESPN cookies, so the two rows from that morning's email were reconstructed from the projlog branch
 (`pushed_trades.json`, `skipped_trades.json`, the week 5 projection log) and live FantasyCalc values pulled that day.
