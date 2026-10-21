@@ -57,21 +57,30 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D12 (L, steps 1-4 done). The scanner replay.** Plan: `docs/plans/scanner-replay.md` (2026-10-20): every
-  team-week of a replayed season, every package `model/trades.py` `scan` proposes and every claim `model/waivers.py`
-  `rank_free_agents` ranks, graded against the weeks that followed; the sample the trade and waiver hit rates need while
-  the outcome log has one executed trade. Live season only (D11: a completed season has no lineups). The probe ran
-  2026-10-20 ("What the probe found" in the plan); the universe is in the replay since 2026-10-20 (`REPLAY_VERSION` 2;
-  the version-1 files under `data/replay/` are refused until `ff replay-pull --season 2026` is re-run on the three
-  leagues, which needs the cookies); `scan_hits` (`ff backtest --scan`) since 2026-10-20 ("What step 3 found" in the
-  plan: the wire sits in both realized lineups, the synthetic rosters persist, the promise is selected on its own
-  noise); `claim_hits` (`ff backtest --claims`) since 2026-10-21 ("What step 4 found": no sim so seconds per league,
-  the managers' adds priced as claim rows, the shuffled world's position structure). One step left: 5. the first real
-  tables in `docs/accuracy.md` (the re-pull first, with the cookies; `ff backtest --scan` takes minutes per league,
-  `--claims` seconds), read the way the plan says; what they say about `MUST_TRY_PPW`, `SEND_MIN_PPW` and
-  `CLAIM_WORTHY_PPW` is a TODO line each, not a constant change in the same PR. Market values have no archive: the
-  chart is off in the replay and the tables say so.
-- [ ] **D10 (L, after D12). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
+- [ ] **D13 (S). The wire body with no preseason total.** The first claim replay (`docs/accuracy.md`, "The claim
+  ranking", 2026-10-21): the card's first claim per team-week realized 4.5-7.6 a week under the starter it displaces, and
+  every one of the 96 first-claim rows whose body scored zero in every later week (36 of L1's 60, 34 of L2's 50, 26 of
+  L3's 50; five to seven distinct players per league, Carson Wentz in week 2 the first claim for most of every league)
+  has `proj_season` 0: ESPN gave him no preseason total, `season_pg` in `model/projections.py` has no prior to fade,
+  and his rest-of-season price is his last game or two. The live ranking reads the same `projected_total_points`.
+  The fix is a floor prior for a body with no season total (the position's replacement level, or ESPN's weekly
+  number alone until he has a month of games), decided on the replay: `claim_table` in `backtest.py` should print the
+  split (the claimed body, or the displaced starter, at zero in every later week) so the clean rows read on their own,
+  then the floor, then the tables again. Not a `CLAIM_WORTHY_PPW` change: the clean claim-worthy rows realize more
+  than they promise.
+- [ ] **D14 (XS, end of the regular season). Re-read `CLAIM_WORTHY_PPW` (1.0)** on the full-season claim replay after
+  D13 (`ff replay-pull --season 2026`, `ff backtest --claims`): the ruling of 2026-10-21 is stays, on clean claim-worthy
+  rows of n 10, 29 and 6 realizing +4.7, +3.7 and +1.6 against a promise of +1.5; the bar moves only if the 1-2 bin's
+  clean rows realize under a point in all three leagues over the season.
+- [ ] **D15 (XS, end of the regular season). Re-read `MUST_TRY_PPW` (2.0)** on the full-season scan replay
+  (`ff backtest --scan`, minutes per league): the ruling of 2026-10-21 is stays, the 2-4 bin realizing +2.4 to +3.6 in
+  all three leagues on five weeks; the bar moves down only if the 1-2 bin realizes its promise at a hit rate over 0.55 in
+  all three, up only if the 2-4 bin falls under +2.
+- [ ] **D16 (XS, end of the regular season). Re-read `SEND_MIN_PPW` (1.0)** on the same scan replay: the 0-1 bin is noise
+  in every league (hit 0.47-0.57, realized -0.3 to +2.0) and the 1-2 bin realized +0.78 in L2 at a coin flip; 1.5 is the
+  case if the 1-2 bin realizes under a point in two leagues over the season, and a ruling on it is one line here, not a
+  constant change without the table.
+- [ ] **D10 (L). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
   play-by-play 2016-2025, per-player weekly points ~ f(opportunity share, team implied total, opponent
   schedule-adjusted points allowed, recent usage trend), blended with consensus by out-of-sample error. Its first
   deliverable is the fitted weight that replaces `OPPORTUNITY_WEIGHT` (0.5) and the clip in `model/projections.py`

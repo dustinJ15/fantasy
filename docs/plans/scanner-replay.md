@@ -1,13 +1,15 @@
 # Plan: the scanner replay (every trade row and every claim row of every replayed week, graded)
 
-Status: steps 1-4 done (TODO D12): the probe (`scripts/probe_replay_pool.py`, "What the probe found"), the universe pull,
-`scan_hits` (`ff backtest --scan`, "What step 3 found") and `claim_hits` (`ff backtest --claims`, "What step 4 found");
-step 5 planned. Written 2026-10-20 in a session without `leagues.toml`. The harness this extends: `docs/plans/backtest.md`.
-Written: 2026-10-20 against `main` at 4a67182; the probe's findings against 4230107, the universe pull against eafbcf0,
-`scan_hits` against 01610b6, `claim_hits` against 9dbd49b.
-TODO ids: D12 (step 5, in TODO.md).
-Still open: D12 step 5; the re-pull of the three leagues (`ff replay-pull --season 2026`, the cookies) before the first
-real `ff backtest --scan` or `--claims`.
+Status: done (TODO D12, steps 1-5): the probe ("What the probe found"), the universe pull, `scan_hits` ("What step 3
+found"), `claim_hits` ("What step 4 found") and the first real tables, read in `docs/accuracy.md` ("The scanner replay",
+2026-10-21). The harness this extends: `docs/plans/backtest.md`.
+Written: 2026-10-20 (a session without `leagues.toml`) against `main` at 4a67182; the probe's findings against 4230107, the
+universe pull against eafbcf0, `scan_hits` against 01610b6, `claim_hits` against 9dbd49b, the real tables against 6c5bc32.
+TODO ids: D13 (the wire body with no preseason total, what the first claim tables found); D14, D15, D16 (the three
+constants, re-read at the end of the regular season).
+Still open: none in this plan; what the tables said is D13-D16 in TODO.md. Refresh the tables with a re-pull
+(`ff replay-pull --season 2026` on the three leagues, the cookies; `ff backtest --scan` is minutes per league, `--claims`
+seconds).
 
 For an agent building or reading the scanner replay: the part of the backtest that grades the trade scan (`model/trades.py`
 `scan`) and the waiver ranking (`model/waivers.py` `rank_free_agents`) rather than the lineup. ROADMAP item 8's second
@@ -178,9 +180,12 @@ projection shape, every player with a preseason total and actuals in every week.
    two realized scores, the tables, `ff backtest --scan`; the three synthetic properties as tests. "What step 3 found".
 4. **`claim_hits`** (S, done 2026-10-21): the claim rows per team-week, the two realized scores, the managers' actual
    adds, `ff backtest --claims`; the three synthetic properties as tests. "What step 4 found".
-5. **The first real tables** (XS, after the pull): `docs/accuracy.md` gets the scan and claim tables for 2026 to
+5. **The first real tables** (XS, done 2026-10-21): `docs/accuracy.md` gets the scan and claim tables for 2026 to
    date, read the way this plan says; what they say about `MUST_TRY_PPW`, `SEND_MIN_PPW` and `CLAIM_WORTHY_PPW` is a
-   TODO line each, not a constant change in the same PR.
+   TODO line each, not a constant change in the same PR. The first real pull found `espn.player_universe` handing
+   espn-api's `Player` the one-week schedule shape (`_get_pro_schedule`, BoxPlayer's) where it reads the all-weeks
+   one (`_get_all_pro_schedule`), a TypeError the stubbed test had hidden; fixed in the same PR, the test now carries
+   a schedule.
 
 ## What the probe found
 

@@ -1,11 +1,12 @@
 # Projection accuracy, by source and position
 
 Status: measurement, re-run with `uv run ff accuracy` (the projlog branch restored first: `scripts/projlog_push.sh --restore`)
-and `uv run ff backtest` / `ff backtest --trades` (the replays pulled first: `ff replay-pull --season 2026`).
+and `uv run ff backtest` / `ff backtest --trades` / `--scan` / `--claims` (the replays pulled first: `ff replay-pull --season 2026`).
 Written: 2026-10-08 against the week 1-4 logs; moved here from ROADMAP.md on 2026-10-20 (Docs-1); the backtest tables added
-2026-10-20 (D11).
-TODO ids: D2 (adopt the fitted variance once a position has 150 scored forecasts); D12 (the scanner replay).
-Still open: D2, D12.
+2026-10-20 (D11); the scanner replay tables 2026-10-21 (D12 step 5).
+TODO ids: D2 (adopt the fitted variance once a position has 150 scored forecasts); D13 (the wire body with no preseason total);
+D14, D15, D16 (re-read `CLAIM_WORTHY_PPW`, `MUST_TRY_PPW`, `SEND_MIN_PPW` at the end of the regular season).
+Still open: D2, D13, D14, D15, D16.
 
 For an agent or Dustin deciding whether a source earns its weight (ROADMAP: re-weight or drop a source only if it trails the
 blend by more than 5% for six or more weeks), or whether the P(win) prior and the optimizer's floor hold up against a season
@@ -137,3 +138,175 @@ per replayed week after the close, bench or not (the plan's definition; a 3-for-
 
 Read: one trade, one week (Hubbard 19.1 against Tuten 24.7, Coker 15.7 and Rodriguez 5.5 on the bench), no prediction recorded
 on it (the outcome predates `rulings.predicted_ppw`). Not a number to act on; the row is here so the next one has a neighbour.
+
+## The scanner replay: 2026 weeks 1-5, graded through week 6, pulled and scored 2026-10-21
+
+`ff replay-pull --season 2026` for the three leagues (the version-2 file: the player universe, 1054 players in each), then
+`ff backtest --scan` and `ff backtest --claims` (D12 step 5, the first real run of `docs/plans/scanner-replay.md`'s two
+scorers). Every regular-season week with a later replayed week, every team as me: a week-1 package or claim is graded on
+five weeks, a week-5 one on week 6 alone. What the replay cannot carry, and the tables are read with: FantasyCalc keeps no
+archive, so the scan ran with no market values (no lowball veto, no star, no throw-in; `p_accept` on the other signals and
+with no truth to grade it against); Sleeper keeps no archive of adds and ESPN none of the waiver order, so the claim ranking
+ran with no trend and the priority a claim spends was not priced; the archive keeps no designation, so a player ESPN had at
+zero that week is priced as healthy from the next (the `touching a zero` rows) and a player hurt after the row is a healthy
+body who scored nothing.
+
+### The trade scan
+
+`promised /wk` is `my_delta_ppw`, the lineup delta the card prints; `realized lineup /wk` is what it forecasts (the week-w
+roster with and without the swap, each seated by the highest-points lineup on each later week's projection and scored with
+the actuals, the week-w wire in both); `realized raw /wk` is `score_trade`'s definition (the players got minus the players
+given, bench or not, the outcome log's scale). `hit` is the sign of the lineup number against the promise. The card's top 3
+are the three packages per team-week by `p_accept × my_delta_ppw`.
+
+L1: packages proposed in weeks 1-5, graded through week 6, 60 team-weeks, 2141 packages, the sim at 1000 draws
+L2: packages proposed in weeks 1-5, graded through week 6, 50 team-weeks, 845 packages, the sim at 1000 draws
+L3: packages proposed in weeks 1-5, graded through week 6, 50 team-weeks, 1534 packages, the sim at 1000 draws
+
+| league | sample | n | hit | promised /wk | realized lineup /wk | realized raw /wk |
+|---|---|---|---|---|---|---|
+| L1 | every package | 2141 | 0.56 | +1.73 | +1.73 | +2.28 |
+| L1 | every package, nobody at zero | 2043 | 0.55 | +1.74 | +1.66 | +2.28 |
+| L1 | every package, touching a zero | 98 | 0.66 | +1.64 | +3.29 | +2.32 |
+| L1 | the card's top 3 | 178 | 0.69 | +2.68 | +4.94 | +8.52 |
+| L1 | the card's top 3, nobody at zero | 173 | 0.69 | +2.68 | +4.94 | +8.50 |
+| L1 | the card's top 3, touching a zero | 5 | 0.60 | +2.90 | +4.88 | +9.35 |
+| L2 | every package | 845 | 0.53 | +1.24 | +1.38 | -0.13 |
+| L2 | every package, nobody at zero | 809 | 0.53 | +1.25 | +1.27 | -0.31 |
+| L2 | every package, touching a zero | 36 | 0.67 | +1.06 | +3.82 | +3.99 |
+| L2 | the card's top 3 | 145 | 0.57 | +1.54 | +1.87 | +1.31 |
+| L2 | the card's top 3, nobody at zero | 132 | 0.55 | +1.57 | +1.72 | +1.39 |
+| L2 | the card's top 3, touching a zero | 13 | 0.77 | +1.21 | +3.42 | +0.53 |
+| L3 | every package | 1534 | 0.51 | +1.51 | +1.17 | +0.39 |
+| L3 | every package, nobody at zero | 1504 | 0.51 | +1.52 | +1.09 | +0.46 |
+| L3 | every package, touching a zero | 30 | 0.80 | +1.41 | +5.17 | -3.15 |
+| L3 | the card's top 3 | 150 | 0.54 | +2.20 | +1.06 | -0.42 |
+| L3 | the card's top 3, nobody at zero | 148 | 0.54 | +2.20 | +1.05 | -0.29 |
+| L3 | the card's top 3, touching a zero | 2 | 0.50 | +2.12 | +1.69 | -10.25 |
+
+| promised /wk | sample | L1 n | L1 hit | L1 realized | L2 n | L2 hit | L2 realized | L3 n | L3 hit | L3 realized |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0-1 | every package | 458 | 0.47 | -0.32 | 310 | 0.57 | +2.03 | 401 | 0.49 | +0.22 |
+| 1-2 | every package | 1077 | 0.54 | +1.38 | 480 | 0.50 | +0.78 | 813 | 0.51 | +1.18 |
+| 2-4 | every package | 534 | 0.65 | +3.58 | 55 | 0.56 | +2.88 | 307 | 0.56 | +2.40 |
+| 4+ | every package | 72 | 0.67 | +6.32 | 0 | — | — | 13 | 0.39 | +0.92 |
+| 0-1 | the card's top 3 | 3 | 0.67 | +2.11 | 21 | 0.71 | +2.06 | 7 | 0.57 | -1.61 |
+| 1-2 | the card's top 3 | 55 | 0.56 | +0.58 | 95 | 0.55 | +1.99 | 54 | 0.44 | -1.31 |
+| 2-4 | the card's top 3 | 94 | 0.76 | +6.16 | 29 | 0.52 | +1.36 | 82 | 0.63 | +3.20 |
+| 4+ | the card's top 3 | 26 | 0.73 | +10.10 | 0 | — | — | 7 | 0.14 | -2.99 |
+
+Read: the lineup promise is calibrated at this size. Every package in L1 promised +1.73 a week and realized +1.73; L2 +1.24
+against +1.38; L3 +1.51 against +1.17. The reliability rows hold their order in every league: the 2-4 bin realizes +2.4 to
++3.6 with a hit rate of 0.56 to 0.65, the 1-2 bin +0.8 to +1.4 at a coin flip, the 0-1 bin -0.3 to +2.0 at a coin flip. The
+card's top 3 beat their promise in L1 (+2.7 promised, +4.9 realized, hit 0.69) and L2 (+1.5, +1.9) and fell short in L3
+(+2.2, +1.1, the 4+ bin there 7 packages at -3.0). The winner's curse the synthetic season showed (1.4 promised, 0.6
+realized) is not in the real one: the synthetic's packages were selected on a few games of noise, the real ones on a preseason
+total and five games. The raw delta sits well above the lineup delta in L1 (+8.5 a week on the top 3): the 2-for-1s, whose
+bench points the lineup number rightly ignores. Three cautions. Five weeks, graded on one to five weeks each, and the same
+players recur across teams, so n is packages, not independent outcomes. The chart was off: some of these packages the live
+scan would veto as a lowball or refuse to send for a star, and whether the rival says yes has no truth here. The
+`touching a zero` rows realize two to four points over the rest (a player ESPN zeroed in week w who came back the next):
+the live scan would have priced his return week and promised less. **Ruling on `MUST_TRY_PPW` (2.0): stays**: the bar
+sits where the 2-4 bin starts realizing its promise in all three leagues (TODO D15 re-reads it at the end of the regular
+season). **Ruling on `SEND_MIN_PPW` (1.0): stays**: the 0-1 bin is noise in every league (hit 0.47 to 0.57, realized either
+side of zero), and the 1-2 bin realizes under a point in L2 with a coin-flip hit, which is the case for 1.5 if it holds at
+the end of the regular season (TODO D16).
+
+### The claim ranking
+
+`promised /wk over the starter` is `delta_over_starter`, the upgrade the card prints over the weakest rest-of-season starter
+at the row's slot; `realized /wk` is the claimed player's actual minus that starter's, averaged over the later weeks, the
+starter fixed at week w. START NOW rows are the ones with `delta_week` at 1.5 or more, graded on week w alone against the
+week starter they displace. The managers' adds are the players on no week-w roster and on one in week w+1, priced at week
+w for the team that added them exactly as a claim row.
+
+L1: weeks 1-5 graded through week 6, 60 team-weeks, 1233 rows, 67 adds the managers made (3 more not in the universe)
+L2: weeks 1-5 graded through week 6, 50 team-weeks, 1772 rows, 70 adds the managers made (1 more not in the universe)
+L3: weeks 1-5 graded through week 6, 50 team-weeks, 962 rows, 71 adds the managers made (3 more not in the universe)
+
+| league | sample | n | hit | promised /wk over the starter | realized /wk |
+|---|---|---|---|---|---|
+| L1 | every row | 1233 | 0.64 | -1.85 | -2.86 |
+| L1 | every row, nobody at zero | 1216 | 0.63 | -1.84 | -2.77 |
+| L1 | every row, touching a zero | 17 | 0.88 | -2.71 | -9.17 |
+| L1 | the card's first claim | 60 | 0.55 | -0.21 | -4.55 |
+| L1 | claim-worthy | 27 | 0.37 | +1.98 | -2.60 |
+| L1 | the managers' adds | 67 | 0.49 | -3.78 | +0.41 |
+| L2 | every row | 1772 | 0.59 | -1.89 | -1.26 |
+| L2 | every row, nobody at zero | 1749 | 0.58 | -1.87 | -1.17 |
+| L2 | every row, touching a zero | 23 | 1.00 | -2.80 | -7.57 |
+| L2 | the card's first claim | 50 | 0.38 | +0.26 | -4.98 |
+| L2 | claim-worthy | 52 | 0.46 | +1.71 | -1.02 |
+| L2 | the managers' adds | 70 | 0.44 | -3.05 | +1.25 |
+| L3 | every row | 959 | 0.60 | -2.00 | -2.73 |
+| L3 | every row, nobody at zero | 952 | 0.60 | -1.99 | -2.71 |
+| L3 | every row, touching a zero | 7 | 0.57 | -2.62 | -6.03 |
+| L3 | the card's first claim | 50 | 0.54 | -0.43 | -7.57 |
+| L3 | claim-worthy | 12 | 0.33 | +1.80 | -6.57 |
+| L3 | the managers' adds | 71 | 0.54 | -2.92 | -2.01 |
+
+| league | START NOW rows | n | hit | promised this week | realized |
+|---|---|---|---|---|---|
+| L1 | every row | 16 | 0.69 | +2.91 | +2.57 |
+| L2 | every row | 66 | 0.68 | +3.53 | +2.80 |
+| L2 | the card's first claim | 5 | 0.40 | +3.27 | -2.08 |
+| L2 | claim-worthy | 6 | 0.33 | +2.21 | -0.72 |
+| L3 | every row | 17 | 0.29 | +2.27 | -4.71 |
+| L3 | the card's first claim | 1 | 0.00 | +3.59 | -7.74 |
+
+| promised /wk | sample | L1 n | L1 hit | L1 realized | L2 n | L2 hit | L2 realized | L3 n | L3 hit | L3 realized |
+|---|---|---|---|---|---|---|---|---|---|---|
+| under 0 | every row | 1016 | 0.69 | -3.16 | 1524 | 0.61 | -1.34 | 827 | 0.64 | -2.76 |
+| 0-1 | every row | 62 | 0.40 | -1.60 | 117 | 0.42 | -1.23 | 46 | 0.28 | -5.38 |
+| 1-2 | every row | 57 | 0.42 | -1.05 | 71 | 0.51 | +0.47 | 34 | 0.44 | -1.94 |
+| 2-4 | every row | 72 | 0.29 | -2.13 | 44 | 0.34 | -1.74 | 35 | 0.34 | -1.17 |
+| 4+ | every row | 26 | 0.50 | -0.06 | 16 | 0.50 | -0.18 | 17 | 0.59 | +1.20 |
+| under 0 | the card's first claim | 36 | 0.78 | -5.08 | 20 | 0.75 | -4.94 | 28 | 0.79 | -7.33 |
+| 0-1 | the card's first claim | 7 | 0.29 | -2.11 | 12 | 0.08 | -3.84 | 12 | 0.17 | -7.58 |
+| 1-2 | the card's first claim | 9 | 0.33 | -0.26 | 10 | 0.20 | -4.10 | 7 | 0.43 | -3.88 |
+| 2-4 | the card's first claim | 6 | 0.00 | -9.62 | 8 | 0.12 | -7.86 | 2 | 0.00 | -19.24 |
+| 4+ | the card's first claim | 2 | 0.00 | -7.67 | 0 | — | — | 1 | 0.00 | -16.64 |
+| under 0 | claim-worthy | 0 | — | — | 0 | — | — | 0 | — | — |
+| 0-1 | claim-worthy | 0 | — | — | 0 | — | — | 0 | — | — |
+| 1-2 | claim-worthy | 17 | 0.41 | -0.88 | 39 | 0.51 | +0.01 | 8 | 0.50 | -2.60 |
+| 2-4 | claim-worthy | 8 | 0.38 | -4.98 | 13 | 0.31 | -4.08 | 3 | 0.00 | -13.79 |
+| 4+ | claim-worthy | 2 | 0.00 | -7.67 | 0 | — | — | 1 | 0.00 | -16.64 |
+| under 0 | the managers' adds | 59 | 0.46 | -0.63 | 60 | 0.45 | +1.24 | 60 | 0.55 | -2.39 |
+| 0-1 | the managers' adds | 4 | 0.75 | +9.71 | 5 | 0.60 | +2.11 | 7 | 0.43 | -0.85 |
+| 1-2 | the managers' adds | 1 | 1.00 | +22.33 | 1 | 1.00 | +6.00 | 2 | 0.50 | +1.80 |
+| 2-4 | the managers' adds | 3 | 0.67 | +1.14 | 3 | 0.00 | -0.96 | 2 | 0.50 | +1.58 |
+| 4+ | the managers' adds | 0 | — | — | 1 | 0.00 | -0.33 | 0 | — | — |
+
+Read: the card's first claim per team-week realized 4.5 to 7.6 a week *under* the starter he displaces, in all three
+leagues, on a promise near zero; the claim-worthy rows (an upgrade of a point or more, the rows `priority_cost` prices
+live) promised +1.7 to +2.0 and realized -1.0 to -6.6 with a hit rate of 0.33 to 0.46; the managers' own adds, which the
+ranking priced at -3 to -4 a week (bench depth, handcuffs, a streamer), realized +0.4, +1.3 and -2.0. On its face the
+ranking is worse than the league. It is not that simple, and the rows say why.
+
+- **The top of the ranking is bodies that went dark.** A hand count over the scored rows (`claim_week` then
+  `score_claims`, the claimed player's actuals in every later week): 36 of L1's 60 first claims, 34 of L2's 50 and
+  26 of L3's 50 scored zero in every week after the claim, and those 96 rows are 5, 7 and 5 distinct players (Carson
+  Wentz in week 2 is the first claim for seven to nine teams in every league; David Njoku, Demarcus Robinson, Mack
+  Hollins, Tyquan Thornton, Marcus Mariota the rest): a fill-in starter whose starter came back, a body hurt the next
+  week. Every one of the 96 has `proj_season` 0: ESPN gave him no preseason total, so `season_pg` has no prior to fade
+  and the rest-of-season price is his last game or two. The same number reaches the live ranking through
+  `projected_total_points`, so this is the live card's shape too, less the signals the replay lacks (the designation,
+  Sleeper's trend, FantasyPros' rest-of-season rank, Claude's read of why he was on the wire). A new TODO line (D13)
+  is that floor; the replay shows the size of the hole, not the fix.
+- **Where the body stayed on the field the ranking has edge.** The claim-worthy rows with neither the claimed player
+  nor the displaced starter dark: L1 n 10, hit 0.90, promised +1.7, realized +4.7; L2 n 29, hit 0.76, promised +1.5,
+  realized +3.7; L3 n 6, hit 0.67, promised +1.4, realized +1.6 (the same hand count). Under-promised, not over: the
+  starter a claim displaces is the weakest at his slot by `mu_ros`, and he lost his job or his health as often as the
+  wire body did.
+- **The one-week promise reads honestly.** START NOW rows (`delta_week` at 1.5 or more) promised +2.9, +3.5 and +2.3
+  this week and realized +2.6, +2.8 and -4.7: two leagues within half a point at n 16 and 66, L3 at n 17 one bad
+  Sunday wide. The week-w projection is ESPN's own; the one-week read adds nothing to it and loses nothing.
+- **The reliability rows have the winner's-curse shape step 4 predicted**, at full size: the 0-1 and 1-2 bins realize
+  one to two points under their promise in every league, every sample; the 4+ bin is one to two players.
+- **The sample is five weeks and a handful of bodies.** The team-weeks are not independent: one wire player's next
+  month swings seven to twelve rows at once. n in these tables is rows; the bodies behind the top rows are five to
+  eight per league.
+
+**Ruling on `CLAIM_WORTHY_PPW` (1.0): stays.** The clean claim-worthy rows realize more than they promise in all three
+leagues, which argues for no higher bar; the dark ones are a pricing hole, not a threshold one (the bar cannot tell a
+hot fill-in from a starter). Re-read after D13 and at the end of the regular season (TODO D14 holds the line).

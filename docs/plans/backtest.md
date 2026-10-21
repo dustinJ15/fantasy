@@ -4,8 +4,9 @@ Status: harness built 2026-10-20 in one PR (TODO D8): `src/ff/backtest.py`, `ff 
 run 2026-10-20 (D11) on 2026 weeks 1-6, the tables in `docs/accuracy.md`; 2025 cannot be replayed (ESPN keeps a completed
 season's scores, not its lineups: "What the first run found"). The numbers in the synthetic-check section are synthetic.
 Written: 2026-10-20 against `main` at 5d705c1; D11 findings added the same day.
-TODO ids: D8 (the harness); D11 (the live replay, the first real numbers); D12 (the scanner replay).
-Still open: D12.
+TODO ids: D8 (the harness); D11 (the live replay, the first real numbers); D12 (the scanner replay); D13 (the wire body with
+no preseason total, the scanner replay's first finding).
+Still open: D13.
 
 For an agent running or extending the backtest, or reading its tables before changing a constant in `model/lineup.py`
 or `model/projections.py`. ROADMAP item 8 in one line: replay a season with the same code and measure, so a model
@@ -132,5 +133,7 @@ are in `docs/accuracy.md`. The three things this plan could not know:
 
 - **D12**, the scanner replay (on the live season: a completed season has no lineups, above): planned 2026-10-20 in
   `docs/plans/scanner-replay.md` (the player universe as the pool, the chart off, `scan_hits` and `claim_hits`, five steps);
-  the probe of ESPN's past-period player list (`scripts/probe_replay_pool.py`), the universe pull (replay version 2,
-  above) and the two scorers (`ff backtest --scan`, `ff backtest --claims`) are done; the first real tables are open.
+  done 2026-10-21: the probe of ESPN's past-period player list (`scripts/probe_replay_pool.py`), the universe pull (replay
+  version 2, above), the two scorers (`ff backtest --scan`, `ff backtest --claims`) and the first real tables
+  (`docs/accuracy.md`, "The scanner replay"). What they found is D13 (a wire body with no preseason total is priced
+  from his last game or two) and the three constant re-reads D14-D16.
