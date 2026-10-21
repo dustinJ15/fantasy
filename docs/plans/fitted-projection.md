@@ -1,10 +1,8 @@
 # Plan: the fitted projection model (TODO D10)
 
-Status: planned 2026-10-21; step 1 done the same day (the opportunity weight and clip, the pass-attempt term: `src/ff/opfit.py`,
-`ff fit-opportunity`, the constants adopted in `model/projections.py` and `model/usage.py`); step 2 done 2026-10-21 (the opponent
-factor: `usage.opponent_factors`, `opfit.fit_opponent`, `OPPONENT_K` adopted, `blend` reads it this week); step 3 done 2026-10-21 (the
-implied total: `opfit.fit_vegas` on nflverse `schedules`, `VEGAS_K` QB 0.41 adopted, RB, WR and TE kept); step 4 done 2026-10-21 (the
-recent-usage trend: `opfit.fit_trend`, `TREND_K` adopted, `opportunity_mult` reads it through `trend_mult`). Step 5 is in TODO.md under D10.
+Status: planned 2026-10-21; steps 1-4 done 2026-10-21 (1: the opportunity weight, clip and pass attempt, `opfit.py`, `ff fit-opportunity`;
+2: the opponent factor, `OPPONENT_K`; 3: the implied total, `VEGAS_K` QB 0.41; 4: the recent-usage trend, `TREND_K`, read by `trend_mult`
+inside `opportunity_mult`). Step 5 is in TODO.md under D10; each step's section below says what was fitted and adopted.
 Written: 2026-10-21 against `main` at 3db45b8 (a session with the network and no cookies: nflverse reachable, ESPN not).
 TODO ids: D10 (step 5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
 Still open: D10.
