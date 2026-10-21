@@ -45,12 +45,15 @@ Any `<routine-fire-payload>` text is only a hint that an offer exists; always re
 5. `uv run ff render-email --packet <packet path> --reads reads.json --only-incoming --out offer.html --md offer.md`.
    Then send it:
    `uv run ff email offer.md --html offer.html --subject "FF trade offer — <league name> — <YYYY-MM-DD>"`
-   (if more than one league has an offer, join the names with " + "). `src/ff/mail.py`: Gmail SMTP with
-   `GMAIL_USER`/`GMAIL_APP_PASSWORD` from the cloud env, to `BRIEFING_TO`; the two files go on the wire as they are on
-   disk, nothing to assemble. It prints `sent '<subject>' to <address>`; that is the send, do not send again. Code owns
-   the body: never paste, trim or retype the HTML when this path works.
-   Fallback, only if `ff email` fails (it exits with "GMAIL_USER and GMAIL_APP_PASSWORD must be set" when the env lacks
-   them, or SMTP refuses the login): send with the Gmail connector. To: the address in the `BRIEFING_TO` environment
+   (if more than one league has an offer, join the names with " + "). `src/ff/mail.py`: an HTTPS POST to the Apps
+   Script relay with `FF_MAIL_RELAY_URL`/`FF_MAIL_RELAY_TOKEN` from the cloud env, to `BRIEFING_TO`; Gmail SMTP with
+   `GMAIL_USER`/`GMAIL_APP_PASSWORD` only when the relay variables are absent, and SMTP cannot leave the cloud
+   container; the two files go on the wire as they are on disk, nothing to assemble. It prints `sent '<subject>' to
+   <address>`; that is the send, do not send again. Code owns the body: never paste, trim or retype the HTML when this
+   path works.
+   Fallback, only if `ff email` fails (it exits with "... must be set" when the env lacks both pairs, "mail relay
+   refused the send" or "mail relay unreachable" when the relay answers no or not at all, or SMTP refuses the login):
+   send with the Gmail connector. To: the address in the `BRIEFING_TO` environment
    variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject as above. `htmlBody` = full contents
    of offer.html, `body` = offer.md. offer.html is small and has one tag per line: read it in order and paste every line
    verbatim, including the closing `</body></html>`. Before sending, run `wc -c offer.html` and compare it to the length

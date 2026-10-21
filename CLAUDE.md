@@ -60,8 +60,7 @@ the synthetic league. `backtest.py` replays a season's box scores (`ff replay-pu
 
 ## Operations (the whole of it: `docs/operations.md`; trigger ids, env id, routine URLs and the recipient address: `ops.local.md`, untracked)
 - Debug a run: `RemoteTrigger list_runs` (trigger_id in ops.local.md) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
-- Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. No credentials: `uv run ff briefing --demo`.
-- Code reaches the cloud routine only after `git push` to main (the VM clones fresh each time); rulings and memories ride the `projlog` branch.
+- Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. No credentials: `uv run ff briefing --demo`. Code reaches the cloud routine only after `git push` to main (the VM clones fresh each time); rulings and memories ride the `projlog` branch.
 
 ## Known failure modes (open, or checks to run; the fixed ones are in `docs/failures.md`)
 | symptom | cause | fix |
@@ -77,6 +76,7 @@ the synthetic league. `backtest.py` replays a season's box scores (`ff replay-pu
 | Same trade package returns the morning after a `skip` | `data/projlog/skipped_trades.json` missing (projlog branch not restored) | check cloud_setup.sh fetched `origin/projlog`; the key is `<league>|<get names>` |
 | Email card says do it and Claude's read says don't (the morning checklist, or the trade-offer alert's verdict badge with a read underneath disagreeing), or two rows add the same body | a row was argued with in prose instead of ruled on | `items` in reads.json: `skip` strikes the row, `amend` corrects it; `ff render-email` warns about unruled trade rows and prints `card:` lines (`report.card_lint`) when the card contradicts itself: `skip` the extra row, a note under the other is not a ruling. The `--only-incoming` alert folds a ruling on the `offer:` row the same way (`ff incoming --json` prints the id as `row_id`) |
 | Cloud Bash killed a long command | 120 s default timeout | run `ff` steps with timeout 600000, never `&` |
+| Run log shows `ff email` hanging, then the Gmail connector paste | the cloud egress is an HTTP/HTTPS proxy, so SMTP never connects; `ff doctor`'s `email:` line names the path | the first path is the Apps Script relay (`src/ff/mail.py`, `scripts/gmail_send_relay.md`): set `FF_MAIL_RELAY_URL` + `FF_MAIL_RELAY_TOKEN` in the cloud env; SMTP is for a laptop only |
 | Email says hold a player who is done for the year, or trade/drop one who is back Sunday | `weeks_out` still at its designation default (IR = 4, Out = 1) | the player is in `shared.injured`; write `weeks_out` (or `"season"`) in overrides.json and re-run step 5 |
 | Card says drop a hurt starter (or hold a backup who is plainly dead weight) | `mu_ros_active` is off: ESPN docked his season total for the injury, or his healthy level is not what ESPN thinks | `shared.injured` shows `mu_ros_active`; write `ros_mult` in overrides.json; the drop rule fires when he is below replacement on return |
 | Card says move a player to IR and the app refuses | league's IR eligibility is stricter than `IR_ELIGIBLE` in `model/injuries.py` | `scripts/probe_injuries.py` shows what ESPN says; narrow the constant |

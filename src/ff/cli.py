@@ -257,7 +257,7 @@ def odds(league: str | None = LeagueOpt):
 @app.command()
 def email(file: str = typer.Argument(..., help="markdown file to send"), subject: str | None = typer.Option(None), to: str | None = typer.Option(None),
           html: str | None = typer.Option(None, "--html", help="HTML file from `ff render-email` to use as the rich body")):
-    """Email a briefing via Gmail SMTP (needs GMAIL_USER / GMAIL_APP_PASSWORD in .env)."""
+    """Email a briefing: the Apps Script relay over HTTPS (FF_MAIL_RELAY_URL / FF_MAIL_RELAY_TOKEN) or Gmail SMTP (GMAIL_USER / GMAIL_APP_PASSWORD)."""
     from . import mail
     body = open(file).read()
     subj = subject or f"FF briefing — {date.today().isoformat()}"
