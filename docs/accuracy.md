@@ -416,3 +416,34 @@ card. The under-pricing is a known bias of the claim ranking (the clean claim-wo
 above) and `CLAIM_WORTHY_PPW`'s re-read is where it is priced (D14). Re-read on the full-season replay (D18): `larger`
 takes over if it lowers the rostered body's error too, or if the in-range wire bias passes two points while the rostered
 one holds within half a point of zero.
+
+**The rostered body with no total (D19, 2026-10-21): the row was a leak, not a pricing bias.** The bodies behind it were
+Hurts, Achane, Pittman, Dart, Jayden Reed and Jonathon Brooks: starters priced healthy at week w who went dark after,
+every one on IR or Out on the day of the pull. ESPN zeroes the season row (period 0's `projected_points`) of a player it
+lists on IR or Out that day (Hurts read a total of 0 with 82 points banked; of the universe's IR bodies at QB, RB, WR and
+TE, 80 had no total and 8 did; Questionable and Doubtful leave it alone), so "no total" in a replay pulled mid-season is
+"hurt today" for a body the live packet priced with his total every week until he was hurt: a selection on the future
+that no prior removes, and neither `level_prior` nor `weeks_out` owns. The pull now keeps `total_zeroed` (no total and
+IR or Out on the pull day, `backtest.TOTAL_ZEROED_STATUSES`: the one thing it reads from today's designation) and the
+tables set those bodies aside; a file pulled before the flag prints a warning. Re-pulled 2026-10-21, weeks 1-5 graded
+through week 6 (the rows with a total are unchanged; `larger` and `week` equal `stays` on a no-total body and are left out):
+
+| league | sample | n | bodies | stays | faster | none |
+|---|---|---|---|---|---|---|
+| L1 | rostered, no total | 76 | 21 | +0.33 / 3.13 | +0.18 / 3.02 | +0.08 / 3.09 |
+| L1 | rostered, total zeroed on the pull day | 67 | 18 | +5.49 / 5.86 | +5.33 / 5.76 | +5.06 / 5.75 |
+| L1 | wire near a starter, no total | 123 | 40 | +0.06 / 3.66 | -0.14 / 3.64 | -0.27 / 3.62 |
+| L2 | rostered, no total | 56 | 18 | -0.83 / 3.33 | -0.83 / 3.42 | -0.96 / 3.63 |
+| L2 | rostered, total zeroed on the pull day | 59 | 18 | +5.74 / 6.17 | +5.60 / 6.09 | +5.31 / 6.10 |
+| L2 | wire near a starter, no total | 147 | 50 | +0.61 / 3.54 | +0.38 / 3.43 | +0.27 / 3.40 |
+| L3 | rostered, no total | 53 | 16 | -0.42 / 3.44 | -0.39 / 3.48 | -0.42 / 3.78 |
+| L3 | rostered, total zeroed on the pull day | 43 | 14 | +6.76 / 7.18 | +6.59 / 7.11 | +6.28 / 7.21 |
+| L3 | wire near a starter, no total | 136 | 42 | +0.20 / 3.69 | -0.05 / 3.58 | -0.19 / 3.53 |
+
+Read: the genuine no-total rostered body (a kicker or D/ST, a fill-in QB, a backup) reads within a point of zero in all
+three leagues (+0.3, -0.8, -0.4; the kickers alone were +0.3, -0.4 and -0.6 before the split), and the zeroed bodies
++5.5 to +6.8, a starter who got hurt under any price. The D13 wire sample (`wire near a starter, no total`) carried the
+same bodies: +1.1 to +1.6 in the table above, +0.1 to +0.6 with them apart, and there `none` reads 0.05 to 0.15 better
+in error, while on the rostered no-total body it reads 0.3 worse in two leagues; the D13 prior stays (it was adopted to
+keep a one-game kicker off the top of the claim ranking, which the error alone does not price) and is re-read with D18.
+The claim tables' `no_prior` and `dark_no_prior` splits hold the same zeroed bodies and are not yet read apart (TODO D20).

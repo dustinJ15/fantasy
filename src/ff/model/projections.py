@@ -52,7 +52,10 @@ NFL_GAMES = 17
 # a one-game kicker and a fill-in QB at the top of the claim ranking. The 2026 replay (weeks 1-5, the wire bodies within
 # three points of a starter): this week's number as the prior reads the no-prior body at +0.5 to +0.9 a game over what he
 # scored after, 3.3 mean absolute, against +0.6 to +1.0 and 3.35-3.5 with no prior; the position's replacement level as
-# the prior read worse than no prior on every row set and needs a second pricing pass. The prior itself was re-read on
+# the prior read worse than no prior on every row set and needs a second pricing pass. That sample held the bodies whose
+# total ESPN zeroed on the pull day because they are on IR or Out today (D19, 2026-10-21, `backtest.TOTAL_ZEROED_STATUSES`);
+# with them apart the same wire body reads +0.1 to +0.6 (3.5-3.7) against -0.3 to +0.3 (3.4-3.6) with no prior, and the
+# rostered no-total body +0.3 to -0.8 either way; the prior stays, re-read with D18 (TODO D20 splits the claim tables). The prior itself was re-read on
 # everyone (D17, 2026-10-21, `ff backtest --prior`, docs/accuracy.md "The rest-of-season prior"): the in-range wire body
 # *with* a total reads 1.3 to 1.8 a game under what he scores after (his total is a backup's), and the larger of the total
 # and this week's number is the one prior that fixes him, but it reads every rostered body +1.2 to +1.3 over (this week's

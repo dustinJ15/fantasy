@@ -528,17 +528,21 @@ def _print_claims(res: dict) -> None:
 
 def _print_prior(res: dict) -> None:
     """The prior replay's table: one row per sample (the rostered bodies, the wire, the wire bodies near a starter, each
-    with and without a preseason total and again on the rows where he scored after), a column per prior with its bias
-    (the price over his points a game after) and mean absolute error."""
+    with and without a preseason total, the bodies whose total ESPN zeroed on the pull day apart, and again on the rows
+    where he scored after), a column per prior with its bias (the price over his points a game after) and mean
+    absolute error."""
     fmt = lambda v: "—" if v["bias"] is None else f"{v['bias']:+.2f} / {v['mae']:.2f}"
     if not res["weeks"]:
         rprint(f"\n[bold]{res['league']} {res['season']}[/]: no regular-season week with a later one to grade"); return
     rprint(f"\n[bold]{res['league']} {res['season']}[/] every body priced in weeks {res['weeks'][0]}-{res['weeks'][-1]}, graded through week "
            f"{res['through']}: {res['rows']} rows; each cell is bias / mean absolute error, points a game. stays fades the total "
            f"over {res['fades']['stays']} games, faster over {res['fades']['faster']}; larger takes the larger of the total and this week's number")
+    if not res.get("zeroed_known"):
+        rprint("[yellow]pulled before the pull-day flag: the no-total rows still hold the bodies whose total ESPN zeroed (on IR or Out "
+               "on the pull day); `ff replay-pull` again reads them apart[/]")
     t = Table("sample", "n", "bodies", *res["variants"])
     for kind, label in (("rostered", "rostered"), ("wire", "wire"), ("near", "wire near a starter")):
-        for prior, pw in (("total", "a total"), ("no_total", "no total")):
+        for prior, pw in (("total", "a total"), ("no_total", "no total"), ("zeroed", "total zeroed on the pull day")):
             for split, sw in (("every", ""), ("on_field", ", on the field after")):
                 x = res[kind][prior][split]
                 if x["n"]:

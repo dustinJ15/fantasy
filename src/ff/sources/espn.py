@@ -277,7 +277,8 @@ def player_universe(league: League, week: int, size: int = UNIVERSE_LIMIT) -> li
     filter, each player's `stats` holds `projected_points` for periods 1-18 (the past ones frozen as of their
     kickoff, the box score's number) and `points` for every played period; without it only the pull's own period
     comes back. The past-period payload is otherwise today's (ownership, designation, team), so nothing but the
-    stats and the static season total is read from it. Read-only."""
+    stats and the season total is read from it, plus today's designation only to say whether ESPN zeroed that total
+    (`backtest.TOTAL_ZEROED_STATUSES`). Read-only."""
     import json as _json
     filters = {"players": {"filterSlotIds": {"value": []}, "limit": size,
                            "filterStatsForCurrentSeasonScoringPeriodId": {"value": UNIVERSE_PERIODS},

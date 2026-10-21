@@ -27,6 +27,12 @@ What the archive keeps and what it lost, so the replay is honest about which hal
   scanner replay can build the week-w wire (the universe minus the week-w rosters: ESPN keeps no past pool, the
   probe found) and the rest-of-season prior the live scan has. `universe_missing` counts the rostered players the
   list does not reach (or carries without a `stats` block); each is priced from his box-score rows alone.
+- The season total is read on the pull day, and ESPN zeroes the season row of a player on IR or Out that day (D19:
+  Hurts with 82 points banked read `projected_points` 0), so a body hurt today has no total in any replayed week,
+  which the live packet never saw: at week 1 he had one. The pull keeps `total_zeroed` (no total, IR or Out today:
+  the one thing it reads from today's designation) and the prior tables set those bodies aside, since what the
+  pre-injury total was is not in the archive. The 2026 replay's "rostered, no total" row was those bodies (Hurts,
+  Achane, Pittman, Dart), priced healthy at week w and dark after: a selection on the future, not a pricing bias.
 """
 from __future__ import annotations
 
@@ -91,11 +97,19 @@ def _first_kickoff(lineup: list) -> str | None:
     return min(dates).date().isoformat() if dates else None
 
 
+# The designations under which ESPN zeroes a player's season row (`projected_total_points` 0 with points banked) on the
+# day of the pull: IR and Out, the 2026 probe (D19) found; Questionable and Doubtful leave the total alone, and a
+# no-total body under them is one ESPN never projected (a backup, a fill-in QB: the D13 body).
+TOTAL_ZEROED_STATUSES = ("INJURY_RESERVE", "OUT")
+
+
 def _universe_row(p) -> dict:
     """One player of the universe pull, as the replay keeps him. `p` is an espn-api Player from `espn.player_universe`
     (or anything with the same attributes): `stats[period]` carries `projected_points` (ESPN's number before that
     period's kickoff, the box score's) and `points` (the final) for every period the season has played; period 0 is
-    the season row, whose `projected_points` is the static preseason total the live scan fades (`proj_season`)."""
+    the season row, whose `projected_points` is the static preseason total the live scan fades (`proj_season`), zero
+    for a player ESPN never projected and, on the pull day, for one it lists on IR or Out (`total_zeroed`: the
+    total he had is not in the archive, so the prior tables set him aside rather than read him as the D13 body)."""
     weeks = {}
     for per, st in (p.stats or {}).items():
         if int(per) < 1:
@@ -110,6 +124,7 @@ def _universe_row(p) -> dict:
     return {"espn_id": int(p.playerId), "name": p.name, "pos": p.position, "team": getattr(p, "proTeam", None),
             "eligible": [s for s in p.eligibleSlots if s not in espn.NON_STARTER],
             "proj_season": round(float(getattr(p, "projected_total_points", 0) or 0.0), 2),
+            "total_zeroed": not float(getattr(p, "projected_total_points", 0) or 0.0) and str(getattr(p, "injuryStatus", None) or "").upper() in TOTAL_ZEROED_STATUSES,
             "bye_weeks": espn.bye_weeks(p), "weeks": weeks}
 
 
@@ -879,9 +894,11 @@ def prior_prices(p: PlayerProj) -> dict[str, float]:
 
 def prior_week(rep: dict, week: int, through: int) -> list[dict]:
     """Every body priced in week `week`, rostered (`WeekInputs.everyone`) and wire (`pool`), with his price under each
-    prior (`prices`, from `prior_prices`), whether ESPN gave him a preseason total, and for a wire body whether he is `near` a starter
-    (within `PRIOR_NEAR_PPW` of the weakest rest-of-season starter he could displace on any roster). Not yet scored.
-    Nothing here reads an actual from week `week` on (`WeekInputs`)."""
+    prior (`prices`, from `prior_prices`), whether ESPN gave him a preseason total (`total`) and whether it zeroed the
+    one he had on the pull day (`zeroed`, the universe's `total_zeroed`: a body on IR or Out today, the one leak from
+    today the archive carries), and for a wire body whether he is `near` a starter (within `PRIOR_NEAR_PPW` of the
+    weakest rest-of-season starter he could displace on any roster). Not yet scored. Nothing here reads an actual
+    from week `week` on (`WeekInputs`)."""
     inp = WeekInputs(rep, week, through)
     lineups = [_team_lineups(mine, inp.slots)[0] for mine in inp.rosters.values()]
 
@@ -893,6 +910,7 @@ def prior_week(rep: dict, week: int, through: int) -> list[dict]:
         for p in ps:
             out.append({"week": week, "espn_id": p.espn_id, "name": p.name, "pos": p.pos, "kind": kind,
                         "near": kind == "wire" and near(p), "total": p.sources.get("prior_src") == "season",
+                        "zeroed": bool((rep["players"].get(p.espn_id) or {}).get("total_zeroed")),
                         "bye_weeks": list(p.bye_weeks), "price": p.mu_ros_active, "prices": prior_prices(p)})
     return out
 
@@ -927,7 +945,10 @@ def prior_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
     """The prior replay of one league: every regular-season week with a later replayed week (`weeks` narrows it),
     `prior_week` then `score_prior`, into tables (`prior_table`) for the rostered bodies, the wire, and the wire bodies
     near a starter, each split by whether ESPN gave him a preseason total (`total`, the D17 body; `no_total`, the D13
-    body) and again to the rows where he scored in some graded week (`on_field`)."""
+    body; `zeroed`, the body whose total ESPN zeroed on the pull day because he is on IR or Out today, D19: priced as
+    the D13 body but a known-hurt one, so he is read apart) and again to the rows where he scored in some graded week
+    (`on_field`). `zeroed_known` is False on a file pulled before the flag existed: its `no_total` rows then still
+    carry the zeroed bodies, and `ff replay-pull` again is the fix."""
     reg = rep["settings"].get("reg_season_weeks")
     played = [w["week"] for w in rep["weeks"] if reg is None or w["week"] <= reg]
     through = max(played) + 1 if played else 0
@@ -939,9 +960,11 @@ def prior_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
 
     def split(rs: list[dict]) -> dict:
         return {prior: {"every": prior_table(sub), "on_field": prior_table([r for r in sub if not r["dark"]])}
-                for prior, sub in (("total", [r for r in rs if r["total"]]), ("no_total", [r for r in rs if not r["total"]]))}
+                for prior, sub in (("total", [r for r in rs if r["total"]]), ("no_total", [r for r in rs if not r["total"] and not r["zeroed"]]),
+                                   ("zeroed", [r for r in rs if r["zeroed"]]))}
 
     return {"league": rep.get("league"), "season": rep.get("season"), "weeks": scored, "through": through - 1 if scored else None,
             "rows": len(rows), "variants": PRIOR_VARIANTS, "fades": {"stays": PRIOR_FADE_GAMES, "faster": PRIOR_FAST_FADE},
+            "zeroed_known": any("total_zeroed" in u for u in rep["players"].values()),
             "rostered": split([r for r in rows if r["kind"] == "rostered"]), "wire": split([r for r in rows if r["kind"] == "wire"]),
             "near": split([r for r in rows if r["near"]])}
