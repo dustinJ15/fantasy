@@ -306,6 +306,40 @@ def accuracy(week: int | None = typer.Option(None, "--week", help="Score the wee
     rprint(t)
 
 
+@app.command("fit-opportunity")
+def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season of the training sample"),
+                    end: int = typer.Option(2025, "--to", help="Last season (the live season is partial; leave it out)")):
+    """Fit OPPORTUNITY_WEIGHT and OPPORTUNITY_RATIO_CLIP (model/projections.py) and XFP_PER_ATTEMPT (model/usage.py) to
+    nflverse weekly stats of past seasons, leave-one-season-out, and print them next to the constants (writes nothing;
+    docs/plans/fitted-projection.md says how to adopt a row). Needs the network, no cookies."""
+    from . import opfit
+    out = opfit.run(range(start, end + 1))
+    a = out["attempt"]
+    rprint(f"[dim]{out['rows']} training rows over {start}-{end}: a player at a week, his season so far on one side (≥ "
+           f"{opfit.projections.OPPORTUNITY_MIN_GAMES} games, ≥ {opfit.FIT_MIN_PPG} PPR a game) and his points a game over the rest of "
+           f"it on the other (≥ {opfit.FIT_MIN_GAMES_AFTER} games); the model is `opportunity_mult`'s, scored leave-one-season-out[/]")
+    rng = f"{min(a['by_season'].values())}-{max(a['by_season'].values())} by season" if a["by_season"] else "no QB rows"
+    rprint(f"XFP_PER_ATTEMPT now {opfit.usage.XFP_PER_ATTEMPT}; fit {a['per_attempt']} on {a['n']} QB weeks ({rng}; "
+           f"attempts and carries both free: {a['joint']})")
+    for pos, v in out["values"].items():
+        rprint(f"[dim]{pos} per-opportunity refit (information only): target {v['per_target']}, carry {v['per_carry']}, "
+               f"air yard {v['per_air_yard']} on {v['n']} weeks[/]")
+    clip, table = out["clip"], out["clip_table"]
+    prior = opfit.projections.OPPORTUNITY_RATIO_CLIP
+    rprint(f"OPPORTUNITY_RATIO_CLIP now {prior} (pooled rmse {table[prior]}); fit {clip} (pooled rmse {table[clip]}); "
+           f"no clip at all {table[opfit.NO_CLIP]}")
+    t = Table("pos", "n", "WEIGHT now", "fit", "rmse w=0", "rmse now", "rmse fit", "folds", "verdict")
+    for r in out["weights"]:
+        folds = f"{min(r['w_folds'])}-{max(r['w_folds'])}" if r["w_folds"] else "—"
+        verdict = "fit" if r["fitted"] else ("keep prior" if r["n"] >= r["min_n"] else f"keep prior (n < {r['min_n']})")
+        t.add_row(r["pos"], str(r["n"]), str(r["w_prior"]), "—" if r["w_fit"] is None else str(r["w_fit"]),
+                  str(r["rmse_none"]), str(r["rmse_prior"]), str(r["rmse_fit"]), folds, verdict)
+    rprint(t)
+    for r in out["weights"]:
+        if r["w_by_games"]:
+            rprint(f"[dim]{r['pos']} weight by games played: " + ", ".join(f"{k}: {v[0]} (n {v[1]})" for k, v in r["w_by_games"].items() if v[0] is not None) + "[/]")
+
+
 @app.command("replay-pull")
 def replay_pull(season: int = typer.Option(..., "--season", help="The season to archive (a past one, or the current one up to last week)"),
                 league: str | None = LeagueOpt):

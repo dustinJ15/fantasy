@@ -50,15 +50,16 @@ NFL_GAMES = 17
 PRIOR_FADE_GAMES = 6
 
 # What his opportunity says he should have scored, against what he did (D1). `model/usage.py` prices a season's
-# targets, carries and air yards at league-average PPR values (`xfp_lite`); its ratio to his actual PPR points is
-# unitless, so it scales ESPN's league-scoring points per game without a scoring table. The public xFP work
-# (ffopportunity, the PFF and Fantasy Points expected-points pieces) agrees that points over expected regress hard
-# from one stretch to the next while opportunity persists, so a season-to-date read that is half opportunity and
-# half production is the prior here; the backtest (`docs/plans/backtest.md`, TODO D12) is where a fitted weight would come from. QB, K and
-# D/ST read 1.0: the proxy prices no pass attempt and nflverse has no kicks. The ratio is clipped, since a two-game
-# sample or a nflverse row that disagrees with ESPN's game count can say 2x, and nothing says 2x.
-OPPORTUNITY_WEIGHT = {"RB": 0.5, "WR": 0.5, "TE": 0.5}
-OPPORTUNITY_RATIO_CLIP = (0.7, 1.4)
+# targets, carries, air yards and pass attempts at league-average PPR values (`xfp_lite`); its ratio to his actual PPR
+# points is unitless, so it scales ESPN's league-scoring points per game without a scoring table. The weight and the
+# clip are fitted (D10 step 1, 2026-10-21, `opfit.py`, `ff fit-opportunity`): 23,096 player-weeks of 2016-2025, the
+# rest-of-season points per game against `ppg * (1 - w + w * ratio)`, leave-one-season-out; the fold weights sit within
+# 0.03 of these. The 0.5 prior of 2026-10-20 (RB, WR, TE; QB read 1.0 with no attempt term) scored 4.18 pooled rmse,
+# these 4.16; the plan has the table and what the fit could not see (`docs/plans/fitted-projection.md`). K and D/ST
+# read 1.0: nflverse has no kicks. The clip is a guard on a bad row (a nflverse game count that disagrees with ESPN's),
+# not a fitted number: inside the data no clip at all scored the same, so it sits outside the ratios the data holds.
+OPPORTUNITY_WEIGHT = {"QB": 0.57, "RB": 0.64, "WR": 0.58, "TE": 0.67}   # was 0.5 (RB, WR, TE), QB 0; fitted 2026-10-21
+OPPORTUNITY_RATIO_CLIP = (0.3, 2.0)   # was (0.7, 1.4); fitted 2026-10-21
 OPPORTUNITY_MIN_GAMES = 2
 
 
@@ -179,8 +180,9 @@ def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None) -> float
 def opportunity_mult(pos: str, usage: dict | None) -> float:
     """The multiplier on a player's season-to-date points per game that moves it toward what his opportunity says
     (`usage.signals`: `xfp_pg` over `ppg`, both nflverse PPR, over `games`): 1.0 for a position the proxy does not
-    price, a sample under OPPORTUNITY_MIN_GAMES games or a missing number; otherwise `1 - w + w * ratio` with the
-    ratio clipped to OPPORTUNITY_RATIO_CLIP, so a receiver scoring 20% over his targets reads 10% under his average."""
+    price (K, D/ST), a sample under OPPORTUNITY_MIN_GAMES games or a missing number; otherwise `1 - w + w * ratio`
+    with the fitted `w` of OPPORTUNITY_WEIGHT and the ratio clipped to OPPORTUNITY_RATIO_CLIP, so a receiver scoring
+    20% over his targets reads about 11% under his average."""
     w = OPPORTUNITY_WEIGHT.get(pos, 0.0)
     if not w or not usage:
         return 1.0
