@@ -166,7 +166,12 @@ def test_player_universe_asks_for_the_whole_list_with_every_period_and_parses_th
                                                   {"seasonId": 2026, "scoringPeriodId": 3, "statSplitTypeId": 1, "statSourceId": 0, "appliedTotal": 2.4},
                                                   {"seasonId": 2025, "scoringPeriodId": 3, "statSplitTypeId": 1, "statSourceId": 0, "appliedTotal": 99.0}]}}]}
 
-    lg = SimpleNamespace(espn_request=SimpleNamespace(league_get=league_get), year=2026, _get_pro_schedule=lambda w: {})
+    # The all-weeks schedule shape espn-api's Player reads ({team: {period: [game]}}); the one-week shape
+    # `_get_pro_schedule` returns ({team: (opp, date)}) is BoxPlayer's and raised TypeError on the first real pull.
+    game = {"awayProTeamId": 25, "homeProTeamId": 1, "date": 1_760_000_000_000}
+    sched = {25: {str(w): [game] for w in range(1, 19) if w != 14}}
+    lg = SimpleNamespace(espn_request=SimpleNamespace(league_get=league_get), year=2026, _get_all_pro_schedule=lambda: sched,
+                         _get_pro_schedule=lambda w: {25: (1, game["date"])})
     players = espn.player_universe(lg, 7)
     assert seen["params"] == {"view": "kona_player_info", "scoringPeriodId": 7}
     f = seen["filter"]
@@ -175,6 +180,7 @@ def test_player_universe_asks_for_the_whole_list_with_every_period_and_parses_th
     assert f["sortPercOwned"] == {"sortPriority": 1, "sortAsc": False}
     (p,) = players
     assert (p.playerId, p.name, p.position, p.proTeam, p.projected_total_points) == (7, "Wire Guy", "RB", "SF", 88.5)
+    assert espn.bye_weeks(p) == [14]   # the schedule parsed: the universe row's bye_weeks reads it
     assert p.stats[3] == {"projected_points": 6.1, "projected_breakdown": {}, "projected_points_breakdown": {}, "projected_avg_points": 0,
                           "points": 2.4, "breakdown": {}, "points_breakdown": {}, "avg_points": 0}   # last season's row is dropped
 

@@ -256,7 +256,7 @@ def player_universe(league: League, week: int, size: int = UNIVERSE_LIMIT) -> li
                            "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "STANDARD"}}}
     data = league.espn_request.league_get(params={"view": "kona_player_info", "scoringPeriodId": week},
                                           headers={"x-fantasy-filter": _json.dumps(filters)})
-    schedule = league._get_pro_schedule(week)
+    schedule = league._get_all_pro_schedule()   # the all-weeks shape Player reads (bye_weeks); _get_pro_schedule's is BoxPlayer's
     return [Player(e, league.year, schedule) for e in data.get("players", [])]
 
 
