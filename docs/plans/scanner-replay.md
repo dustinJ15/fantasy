@@ -5,9 +5,9 @@ found"), `claim_hits` ("What step 4 found") and the first real tables, read in `
 2026-10-21). The harness this extends: `docs/plans/backtest.md`.
 Written: 2026-10-20 (a session without `leagues.toml`) against `main` at 4a67182; the probe's findings against 4230107, the
 universe pull against eafbcf0, `scan_hits` against 01610b6, `claim_hits` against 9dbd49b, the real tables against 6c5bc32.
-TODO ids: D13 (the wire body with no preseason total, what the first claim tables found); D14, D15, D16 (the three
-constants, re-read at the end of the regular season).
-Still open: none in this plan; what the tables said is D13-D16 in TODO.md. Refresh the tables with a re-pull
+TODO ids: D13 (the wire body with no preseason total, what the first claim tables found; done 2026-10-21); D14, D15, D16
+(the three constants, re-read at the end of the regular season).
+Still open: none in this plan; what the tables said is D14-D16 in TODO.md. Refresh the tables with a re-pull
 (`ff replay-pull --season 2026` on the three leagues, the cookies; `ff backtest --scan` is minutes per league, `--claims`
 seconds).
 

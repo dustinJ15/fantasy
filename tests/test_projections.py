@@ -136,7 +136,8 @@ def test_rival_app_view_uses_espn_numbers_only_and_is_not_inflated():
     p = blend(r, None, None, 5, None, week=13, sleeper_pts=20.0)
     assert p.sources["espn_pg"] == pytest.approx(0.5 * (15.0 * 4 / 6 + 10.0 * 2 / 6) + 0.5 * 10.0, abs=0.05)
     assert p.mu_ros_active > p.sources["espn_pg"]  # Sleeper's 20 reaches my number, not his
-    assert blend(row(proj_season=0.0, proj_week=10.0), None, None, 5, None).sources["espn_pg"] is None
+    # no preseason total: his app reads this week's number as the stand-in prior (D13), the same as `his_view` fell back to
+    assert blend(row(proj_season=0.0, proj_week=10.0), None, None, 5, None).sources["espn_pg"] == 10.0
 
 
 def test_this_weeks_matchup_stays_out_of_the_rest_of_season_number():
@@ -318,3 +319,25 @@ def test_a_soft_defense_lifts_this_week_only_and_the_rival_still_sees_espn(monke
     assert tough.mu == pytest.approx(flat.mu * 0.9, abs=0.01) and "def:x0.90" in tough.flags
     small = blend(r, None, None, 13, None, week=5, opponent={"factor": 1.05, "games": 6})
     assert small.sources["def_mult"] == 1.01 and not any(f.startswith("def:") for f in small.flags)   # under the flag's 3%
+
+
+def test_a_body_with_no_preseason_total_fades_this_weeks_number_not_his_last_game():
+    """D13: ESPN gave him no preseason total (a kicker, a backup who became a starter). His rest-of-season level used to
+    be his own games alone, so one 25-point game read 19.5 a game; now this week's matchup-neutral number stands in for
+    the missing prior and fades over PRIOR_FADE_GAMES like a real one (14.9 after that game, against 11.2 for the same
+    games with a prior of five a game). The rival's view (`espn_pg`) reads the same way on ESPN's weekly number; a body
+    projected at zero this week has no stand-in and keeps his own games; before his first game he is this week's number
+    either way."""
+    hot = blend(row(pos="RB", proj_week=14.0, proj_season=0.0, actual_season=25.0, games_played=1), None, None, 10, None)
+    assert hot.sources["prior_pg"] is None and hot.sources["prior_src"] == "week"
+    assert hot.mu_ros_active == pytest.approx(14.92, abs=0.01)         # 0.5 * (5/6 * 14 + 1/6 * 25) + 0.5 * 14
+    assert hot.sources["espn_pg"] == pytest.approx(14.92, abs=0.01)
+    with_prior = blend(row(pos="RB", proj_week=14.0, proj_season=85.0, actual_season=25.0, games_played=1), None, None, 10, None)
+    assert with_prior.sources["prior_src"] == "season" and with_prior.mu_ros_active == pytest.approx(11.17, abs=0.01)
+    # the matchup stays out of the stand-in: a 30-point implied total lifts this week, not the rest of the season
+    shoot = blend(row(pos="RB", proj_week=14.0, proj_season=0.0, actual_season=25.0, games_played=1), None, None, 10, None, implied_total=30.0)
+    assert shoot.mu > hot.mu and shoot.mu_ros_active == hot.mu_ros_active
+    out = blend(row(pos="RB", proj_week=0.0, proj_season=0.0, actual_season=25.0, games_played=1), None, None, 10, None)
+    assert out.sources["prior_src"] is None and out.mu_ros_active == 25.0
+    fresh = blend(row(pos="RB", proj_week=9.0, proj_season=0.0, actual_season=0.0, games_played=0), None, None, 10, None)
+    assert fresh.sources["prior_src"] == "week" and fresh.mu_ros_active == 9.0

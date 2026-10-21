@@ -5,8 +5,8 @@ run 2026-10-20 (D11) on 2026 weeks 1-6, the tables in `docs/accuracy.md`; 2025 c
 season's scores, not its lineups: "What the first run found"). The numbers in the synthetic-check section are synthetic.
 Written: 2026-10-20 against `main` at 5d705c1; D11 findings added the same day.
 TODO ids: D8 (the harness); D11 (the live replay, the first real numbers); D12 (the scanner replay); D13 (the wire body with
-no preseason total, the scanner replay's first finding).
-Still open: D13.
+no preseason total, the scanner replay's first finding; done 2026-10-21, `docs/accuracy.md` "The claim ranking").
+Still open: none.
 
 For an agent running or extending the backtest, or reading its tables before changing a constant in `model/lineup.py`
 or `model/projections.py`. ROADMAP item 8 in one line: replay a season with the same code and measure, so a model

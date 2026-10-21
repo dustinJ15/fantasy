@@ -659,17 +659,20 @@ def _dark_replay() -> dict:
     return rep
 
 
-def test_a_wire_body_with_no_preseason_total_is_priced_on_his_last_game_and_the_tables_read_him_apart_once_dark():
-    """D13: ESPN gave U6 no preseason total, so `season_pg` has no prior to fade and his rest-of-season price after one
-    25-point game is that game (U7, the same games with a prior, prices eight points lower); his claim row carries
-    `no_prior`, and once he scores zero in every graded week `score_claims` marks him `claimed_dark` and `claim_hits`
-    reads the rows on him apart from the rows where both bodies stayed on the field."""
+def test_a_wire_body_with_no_preseason_total_is_priced_on_this_weeks_number_and_the_tables_read_him_apart_once_dark():
+    """D13: ESPN gave U6 no preseason total, so `season_pg` fades this week's number (14) in its place and his
+    rest-of-season price after one 25-point game is 14.9, not the 19.5 that game alone read (U7, the same games with a
+    prior of five a game, prices 11.2); his claim row still carries `no_prior`, and once he scores zero in every graded
+    week `score_claims` marks him `claimed_dark` and `claim_hits` reads the rows on him apart from the rows where both
+    bodies stayed on the field."""
     rep = _dark_replay()
     uni = rep["players"]
     hot = bt.replay_proj(bt.pool_row(uni[6], 2), uni, 2, 2)
     prior = bt.replay_proj(bt.pool_row(uni[7], 2), uni, 2, 2)
     assert hot.sources["prior_pg"] is None and prior.sources["prior_pg"] == 5.0
-    assert hot.mu_ros_active == pytest.approx(19.5) and prior.mu_ros_active == pytest.approx(11.17, abs=0.01)   # 0.5 * 25 + 0.5 * 14 against the faded prior
+    assert (hot.sources["prior_src"], prior.sources["prior_src"]) == ("week", "season")
+    # 0.5 * (5/6 * 14 + 1/6 * 25) + 0.5 * 14 against 0.5 * (5/6 * 5 + 1/6 * 25) + 0.5 * 14
+    assert hot.mu_ros_active == pytest.approx(14.92, abs=0.01) and prior.mu_ros_active == pytest.approx(11.17, abs=0.01)
     week1 = bt.claim_week(rep, 1, 4)
     assert [(c["team"], c["espn_id"]) for c in week1] == [(1, 8), (2, 8)]   # week 1: only U8 is near a starter; U6 and U7 project 2
     rows = bt.claim_week(rep, 2, 4)
@@ -694,7 +697,8 @@ def test_a_wire_body_with_no_preseason_total_is_priced_on_his_last_game_and_the_
     assert (nop["n"], nop["bodies"], nop["realized_mean"]) == (2, 1, -16.0)           # U6 alone
     top = res["top1"]                                             # the card's first claim: U8 in week 1 for both teams, U6 in week 2
     assert (top["every"]["n"], top["went_dark"]["n"], top["dark_no_prior"]["n"], top["nobody_dark"]["n"]) == (4, 2, 2, 2)
-    assert top["dark_no_prior"]["realized_mean"] == -16.0 and top["dark_no_prior"]["pred_mean"] > 10 and top["nobody_dark"]["realized_mean"] == 2.75
+    # U6 promised 6.3 over U1 (11 before the floor) and realized sixteen under
+    assert top["dark_no_prior"]["realized_mean"] == -16.0 and top["dark_no_prior"]["pred_mean"] == pytest.approx(6.29, abs=0.01) and top["nobody_dark"]["realized_mean"] == 2.75
 
 
 def test_claim_table_bins_on_the_promise_and_reads_the_start_now_rows_apart():
