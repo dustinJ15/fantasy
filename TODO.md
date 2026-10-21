@@ -57,7 +57,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D12 (L, steps 1-3 done). The scanner replay.** Plan: `docs/plans/scanner-replay.md` (2026-10-20): every
+- [ ] **D12 (L, steps 1-4 done). The scanner replay.** Plan: `docs/plans/scanner-replay.md` (2026-10-20): every
   team-week of a replayed season, every package `model/trades.py` `scan` proposes and every claim `model/waivers.py`
   `rank_free_agents` ranks, graded against the weeks that followed; the sample the trade and waiver hit rates need while
   the outcome log has one executed trade. Live season only (D11: a completed season has no lineups). The probe ran
@@ -65,10 +65,11 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   the version-1 files under `data/replay/` are refused until `ff replay-pull --season 2026` is re-run on the three
   leagues, which needs the cookies); `scan_hits` (`ff backtest --scan`) since 2026-10-20 ("What step 3 found" in the
   plan: the wire sits in both realized lineups, the synthetic rosters persist, the promise is selected on its own
-  noise). Two steps left, one PR each, in order: 4. `claim_hits` (`--claims`: `rank_free_agents` per team-week with
-  `starters_ros` and the week lineup, `realized_over_starter` and `realized_week`, plus the managers' actual adds;
-  `scan_week` is the shape to copy, `score_packages` the scorer); 5. the first real tables in `docs/accuracy.md` (the
-  re-pull first, with the cookies; `ff backtest --scan` takes minutes per league). Market values have no archive: the
+  noise); `claim_hits` (`ff backtest --claims`) since 2026-10-21 ("What step 4 found": no sim so seconds per league,
+  the managers' adds priced as claim rows, the shuffled world's position structure). One step left: 5. the first real
+  tables in `docs/accuracy.md` (the re-pull first, with the cookies; `ff backtest --scan` takes minutes per league,
+  `--claims` seconds), read the way the plan says; what they say about `MUST_TRY_PPW`, `SEND_MIN_PPW` and
+  `CLAIM_WORTHY_PPW` is a TODO line each, not a constant change in the same PR. Market values have no archive: the
   chart is off in the replay and the tables say so.
 - [ ] **D10 (L, after D12). The fitted projection model.** ROADMAP item 1's historical half: train on nflverse
   play-by-play 2016-2025, per-player weekly points ~ f(opportunity share, team implied total, opponent

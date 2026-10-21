@@ -132,5 +132,5 @@ are in `docs/accuracy.md`. The three things this plan could not know:
 
 - **D12**, the scanner replay (on the live season: a completed season has no lineups, above): planned 2026-10-20 in
   `docs/plans/scanner-replay.md` (the player universe as the pool, the chart off, `scan_hits` and `claim_hits`, five steps);
-  the probe of ESPN's past-period player list (`scripts/probe_replay_pool.py`) and the universe pull (replay version 2,
-  above) are done; the two scorers and the first tables are open.
+  the probe of ESPN's past-period player list (`scripts/probe_replay_pool.py`), the universe pull (replay version 2,
+  above) and the two scorers (`ff backtest --scan`, `ff backtest --claims`) are done; the first real tables are open.

@@ -42,7 +42,8 @@ from .model.projections import PlayerProj, blend
 from .model.season import SeasonCtx, greedy_lineup
 from .model.sim import simulate
 from .model.trades import lineup_strength, scan
-from .model.vbd import replacement_levels
+from .model.vbd import own_starter_value, replacement_levels
+from .model.waivers import CLAIM_WORTHY_PPW, rank_free_agents
 from .sources import espn
 
 REPLAY_DIR = DATA_DIR / "replay"
@@ -460,24 +461,37 @@ def playoff_odds(rep: dict, week: int, rosters: dict[int, list[PlayerProj]], sim
     return {t: float(o["playoff_pct"]) for t, o in odds.items()}
 
 
+class WeekInputs:
+    """A replayed week priced as the live packet prices it, the inputs the scan and the claim ranking share: every
+    team's roster as `PlayerProj` (`rosters`), the wire (`pool`: the universe minus everyone rostered that week, anyone
+    with a rest-of-season number), `repl` over both, and the `SeasonCtx` over the weeks to `through` (exclusive) with
+    the wire as the fallback body. Nothing here reads an actual from week `week` on: the season to date stops at
+    `week - 1`, the lineups and the wire are priced on the week's projections."""
+
+    def __init__(self, rep: dict, week: int, through: int):
+        s = rep["settings"]
+        self.slots: dict[str, int] = s["lineup_slots"]
+        self.week, self.W = week, max(through - week, 1)
+        self.reg: int | None = s.get("reg_season_weeks")
+        wk = next(w for w in rep["weeks"] if w["week"] == week)
+        uni = rep["players"]
+        self.rosters: dict[int, list[PlayerProj]] = {tid: [replay_proj(r, uni, week, self.W, tid) for r in rows] for tid, rows in _week_rosters(wk).items()}
+        rostered = {p.espn_id for ps in self.rosters.values() for p in ps}
+        pool = [replay_proj(pool_row(pl, week), uni, week, self.W) for pid, pl in uni.items() if pid not in rostered]
+        self.pool: list[PlayerProj] = [p for p in pool if p.mu_ros > 0]
+        self.everyone: list[PlayerProj] = [p for ps in self.rosters.values() for p in ps]
+        self.repl: dict[str, float] = replacement_levels(self.everyone + self.pool, self.slots, s["team_count"])
+        self.ctx = SeasonCtx.build(week, self.W, self.reg, None, fas=self.pool, playoff_weeks=s.get("playoff_weeks"))
+
+
 def scan_week(rep: dict, week: int, through: int, sims: int = SCAN_SIMS) -> list[dict]:
     """Every package `trades.scan` would have proposed in week `week`, for every team with a roster that week as
     `my_id`, priced and not yet scored. `through` is one past the last week the pricing covers (`weeks_remaining` is
-    `through - week`). Nothing here reads an actual from week `week` on: the record and the season to date stop at
-    `week - 1`, the lineups and the wire are priced on the week's projections."""
+    `through - week`). Nothing here reads an actual from week `week` on (`WeekInputs`); the record the sim and the
+    acceptance score read stops at `week - 1` too."""
     s = rep["settings"]
-    slots = s["lineup_slots"]
-    wk = next(w for w in rep["weeks"] if w["week"] == week)
-    W = max(through - week, 1)
-    uni = rep["players"]
-    rosters = {tid: [replay_proj(r, uni, week, W, tid) for r in rows] for tid, rows in _week_rosters(wk).items()}
-    rostered = {p.espn_id for ps in rosters.values() for p in ps}
-    pool = [replay_proj(pool_row(pl, week), uni, week, W) for pid, pl in uni.items() if pid not in rostered]
-    pool = [p for p in pool if p.mu_ros > 0]
-    everyone = [p for ps in rosters.values() for p in ps]
-    repl = replacement_levels(everyone + pool, slots, s["team_count"])
-    reg = s.get("reg_season_weeks")
-    ctx = SeasonCtx.build(week, W, reg, None, fas=pool, playoff_weeks=s.get("playoff_weeks"))
+    inp = WeekInputs(rep, week, through)
+    slots, reg, rosters, everyone, repl, ctx = inp.slots, inp.reg, inp.rosters, inp.everyone, inp.repl, inp.ctx
     odds = playoff_odds(rep, week, rosters, sims)
     standings = standings_at(rep, week)
     team_meta = {t: {"wins": standings.get(t, (0, 0, 0.0))[0], "losses": standings.get(t, (0, 0, 0.0))[1], "name": f"team {t}"} for t in rosters}
@@ -620,3 +634,192 @@ def scan_hits(rep: dict, sims: int = SCAN_SIMS, weeks: list[int] | None = None) 
     return {"league": rep.get("league"), "season": rep.get("season"), "weeks": scored, "through": through - 1 if scored else None,
             "team_weeks": len({(c["week"], c["team"]) for c in cands}), "candidates": len(cands), "sims": sims, "chart": CHART_OFF,
             "all": split(cands), "top3": split(top)}
+
+
+# ---------- the claim rows: every free agent the ranking would have listed, graded (TODO D12 step 4) ----------
+# Each replayed regular-season week w, each team as me: `waivers.rank_free_agents` over the week-w wire against the
+# team's rest-of-season starters (the packet's `my_lineup`: the highest-points lineup of everyone's `ros()` view) and
+# its week-w highest-points lineup (`week_lineup`), as the live packet calls it, with no trending (Sleeper keeps no
+# archive) and no budget (the three leagues run priority, which the replay cannot price: `priority_cost` is off).
+# A row makes two claims the weeks after can grade: `delta_over_starter`, the claimed body over the weakest starter
+# he displaces at `slot` for the rest of the season, and `delta_week`, his edge over the weakest week-w starter at
+# `week_slot` this week, which the card prints as START NOW at `START_NOW_PPW`.
+
+# The START NOW bar `rank_free_agents` and the card (`report._waiver_items`) print at: a one-week edge under it is not
+# a row the manager would have acted on this week.
+START_NOW_PPW = 1.5
+# The reliability bins over a claim's promised `delta_over_starter`: the rows under zero are bench adds (a body worth
+# holding, not a starter), `CLAIM_WORTHY_PPW` (1) is the upgrade row's bar, the rest as `SCAN_BINS`.
+CLAIM_BINS = ((None, 0.0), (0.0, 1.0), (1.0, 2.0), (2.0, 4.0), (4.0, None))
+TRENDING_OFF = ("Sleeper keeps no archive of adds and ESPN none of the waiver order: the ranking ran with no trending signal and "
+                "the priority a claim spends was not priced; the grade is what the claim bought, not whether the priority was worth it")
+
+
+def _weakest(starters: list[PlayerProj], key: str) -> int | None:
+    return min(starters, key=lambda s: getattr(s, key)).espn_id if starters else None
+
+
+def _week_edge(p: PlayerProj, week_lineup: dict[str, list[PlayerProj]], slots: dict[str, int]) -> tuple[float, str, int | None]:
+    """`rank_free_agents`'s one-week read of `p` again, with the body it displaces: (delta_week, week_slot, the weakest
+    week starter's id, None when the seat he fills is empty and scores zero). Nothing is locked in a replay."""
+    best: tuple[float, str, int | None] = (0.0, "", None)
+    for ws, starters in week_lineup.items():
+        if ws not in p.eligible:
+            continue
+        seats = slots.get(ws, len(starters))
+        if len(starters) < seats:
+            d, sid = p.ev, None
+        else:
+            weakest = min(starters, key=lambda s: s.ev)
+            d, sid = p.ev - weakest.ev, weakest.espn_id
+        if d > best[0]:
+            best = (round(d, 2), ws, sid)
+    return best
+
+
+def _claim_row(p: PlayerProj, r: dict, my_lineup: dict[str, list[PlayerProj]], week_lineup: dict[str, list[PlayerProj]],
+               slots: dict[str, int], week: int, team: int, rank: int | None) -> dict:
+    """One claim row as the replay keeps it: what `rank_free_agents` said (`r`) plus the two bodies it displaces."""
+    d_week, week_slot, week_sid = _week_edge(p, week_lineup, slots)
+    starter_id = _weakest(my_lineup.get(r["slot"]) or [], "mu_ros") if r["slot"] else None
+    starter_zero = any(s.espn_id == starter_id and s.p_zero >= 1.0 and not s.bye for ps in my_lineup.values() for s in ps)
+    return {"week": week, "team": team, "rank": rank, "espn_id": p.espn_id, "name": p.name, "pos": p.pos,
+            "delta_over_starter": r["delta_over_starter"], "slot": r["slot"], "starter_id": starter_id,
+            "delta_week": r["delta_week"], "week_slot": r["week_slot"], "week_starter_id": week_sid if r["week_slot"] == week_slot else None,
+            "streamer": r["streamer"], "score": r["score"], "mu_ros": p.mu_ros,
+            "claim_worthy": (not r["streamer"]) and r["delta_over_starter"] >= CLAIM_WORTHY_PPW,
+            "start_now": r["delta_week"] >= START_NOW_PPW,
+            "touches_zero": (p.p_zero >= 1.0 and not p.bye) or starter_zero}
+
+
+def _team_lineups(mine: list[PlayerProj], slots: dict[str, int]) -> tuple[dict, list[PlayerProj], dict]:
+    """(my_lineup, my_bench, week_lineup) as the packet hands them to `rank_free_agents`: the rest-of-season starters
+    from everyone's `ros()` view, the bench without an IR occupant, and the week's highest-points lineup."""
+    ros_lu = optimize([p.ros() for p in mine], slots, objective="ev")
+    week_lu = optimize(mine, slots, objective="ev")
+    return ros_lu.assignment, [p for p in ros_lu.bench if p.slot != "IR"], week_lu.assignment
+
+
+def claim_week(rep: dict, week: int, through: int) -> list[dict]:
+    """Every free agent `rank_free_agents` would have listed in week `week`, for every team with a roster that week,
+    priced and not yet scored (`_claim_row`); `rank` is the ranking's order, the skill rows first as the card prints
+    them. `through` as in `scan_week`. Nothing here reads an actual from week `week` on (`WeekInputs`)."""
+    inp = WeekInputs(rep, week, through)
+    out = []
+    for tid, mine in inp.rosters.items():
+        my_lineup, my_bench, week_lineup = _team_lineups(mine, inp.slots)
+        rows = rank_free_agents(inp.pool, my_lineup, my_bench, inp.repl, inp.W, 0, {}, top=10**6, week_lineup=week_lineup, lineup_slots=inp.slots)
+        by_id = {p.espn_id: p for p in inp.pool}
+        for rank, r in enumerate(rows, 1):
+            out.append(_claim_row(by_id[r["espn_id"]], r, my_lineup, week_lineup, inp.slots, week, tid, rank))
+    return out
+
+
+def adds_week(rep: dict, week: int, through: int) -> tuple[list[dict], int]:
+    """The adds the managers actually made between week `week` and the next replayed week (a player on no week-w roster
+    and on one in week w+1), each priced at week w for the team that added him exactly as a claim row is, so the
+    card's rows and the managers' moves grade on one scale. Returns the rows and how many adds could not be priced
+    (the player is not in the universe, or has no rest-of-season number: nothing to say about him)."""
+    weeks = [w["week"] for w in rep["weeks"]]
+    if week not in weeks or weeks.index(week) + 1 >= len(weeks):
+        return [], 0
+    nxt = rep["weeks"][weeks.index(week) + 1]
+    inp = WeekInputs(rep, week, through)
+    rostered = {p.espn_id for p in inp.everyone}
+    by_id = {p.espn_id: p for p in inp.pool}
+    out, unpriced = [], 0
+    for tid, rows in _week_rosters(nxt).items():
+        mine = inp.rosters.get(tid)
+        if mine is None:
+            continue
+        added = [r for r in rows if r["espn_id"] not in rostered]
+        if not added:
+            continue
+        my_lineup, _, week_lineup = _team_lineups(mine, inp.slots)
+        for r in added:
+            p = by_id.get(r["espn_id"])
+            if p is None:
+                unpriced += 1
+                continue
+            d_start, slot = own_starter_value(p, my_lineup)
+            d_week, week_slot, _ = _week_edge(p, week_lineup, inp.slots)
+            fake = {"delta_over_starter": d_start, "slot": slot, "delta_week": d_week, "week_slot": week_slot,
+                    "streamer": p.pos in ("K", "D/ST"), "score": None}
+            out.append(_claim_row(p, fake, my_lineup, week_lineup, inp.slots, week, tid, None))
+    return out, unpriced
+
+
+def score_claims(rep: dict, rows: list[dict], through: int | None = None) -> list[dict]:
+    """Each claim row (or manager's add) against what happened, two ways. `realized_over_starter`: over the weeks after
+    its own, `through` exclusive (default: one past the last replayed week), the claimed player's actual minus the
+    displaced starter's (`starter_id`, fixed at week w), averaged; a week either has no actual for is `missing`, not
+    zero; `hit` is its sign against `delta_over_starter`. `realized_week`: the claimed player's week-w actual minus the
+    displaced week starter's (zero for an empty seat), `hit_week` its sign against `delta_week`; both None for a row
+    the card would not have printed as START NOW (`start_now`). The week-w actual is read here and nowhere else."""
+    through = through or (max(w["week"] for w in rep["weeks"]) + 1 if rep["weeks"] else 0)
+    _, actual = by_week(rep)
+    for c in rows:
+        mine, theirs = actual.get(c["espn_id"], {}), actual.get(c["starter_id"], {}) if c["starter_id"] is not None else None
+        deltas, missing = [], 0
+        for t in range(c["week"] + 1, through):
+            if theirs is None or t not in mine or t not in theirs:
+                missing += 1
+                continue
+            deltas.append(mine[t] - theirs[t])
+        realized = round(sum(deltas) / len(deltas), 2) if deltas else None
+        c.update(weeks=len(deltas), missing=missing, realized_over_starter=realized,
+                 hit=None if realized is None else (realized > 0) == (c["delta_over_starter"] > 0), realized_week=None, hit_week=None)
+        if c["start_now"] and c["week"] in mine:
+            base = actual.get(c["week_starter_id"], {}).get(c["week"], 0.0) if c["week_starter_id"] is not None else 0.0
+            c["realized_week"] = round(mine[c["week"]] - base, 2)
+            c["hit_week"] = c["realized_week"] > 0
+    return rows
+
+
+def claim_table(rows: list[dict]) -> dict[str, Any]:
+    """n, the hit rate, the promised mean against the realized mean, and the reliability rows by promised
+    `delta_over_starter` (`CLAIM_BINS`), over the scored rows. `week` is the same read of the START NOW rows on their
+    one-week promise (`delta_week` against `realized_week`)."""
+    sc = [c for c in rows if c["realized_over_starter"] is not None]
+    bins = []
+    for lo, hi in CLAIM_BINS:
+        inb = [c for c in sc if (lo is None or c["delta_over_starter"] >= lo) and (hi is None or c["delta_over_starter"] < hi)]
+        bins.append({"lo": lo, "hi": hi, "n": len(inb), "hit": _rate([float(c["hit"]) for c in inb]),
+                     "pred_mean": _mean([c["delta_over_starter"] for c in inb]), "realized_mean": _mean([c["realized_over_starter"] for c in inb])})
+    wk = [c for c in rows if c["realized_week"] is not None]
+    return {"n": len(sc), "unscored": len(rows) - len(sc), "hit": _rate([float(c["hit"]) for c in sc]),
+            "pred_mean": _mean([c["delta_over_starter"] for c in sc]), "realized_mean": _mean([c["realized_over_starter"] for c in sc]),
+            "bins": bins,
+            "week": {"n": len(wk), "hit": _rate([float(c["hit_week"]) for c in wk]),
+                     "pred_mean": _mean([c["delta_week"] for c in wk]), "realized_mean": _mean([c["realized_week"] for c in wk])}}
+
+
+def claim_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
+    """The claim replay of one league: every regular-season week with a later replayed week (`weeks` narrows it),
+    every team as me, `claim_week` then `score_claims`, into the tables (`claim_table`) over every row, the card's
+    first claim per team-week (`top1`), the claim-worthy rows (`delta_over_starter` at or over `CLAIM_WORTHY_PPW`, the
+    rows `priority_cost` prices live), each split by `touches_zero`; and the managers' actual adds (`adds`) scored the
+    same way, the comparison that says whether the wire read or the ranking has the edge."""
+    reg = rep["settings"].get("reg_season_weeks")
+    played = [w["week"] for w in rep["weeks"] if reg is None or w["week"] <= reg]
+    through = max(played) + 1 if played else 0
+    scored = [w for w in played if w + 1 < through and (not weeks or w in weeks)]
+    rows: list[dict] = []
+    adds: list[dict] = []
+    unpriced = 0
+    for w in scored:
+        rows += claim_week(rep, w, through)
+        a, u = adds_week(rep, w, through)
+        adds += a
+        unpriced += u
+    score_claims(rep, rows, through)
+    score_claims(rep, adds, through)
+
+    def split(cs: list[dict]) -> dict:
+        return {"every": claim_table(cs), "clean": claim_table([c for c in cs if not c["touches_zero"]]),
+                "touches_zero": claim_table([c for c in cs if c["touches_zero"]])}
+
+    return {"league": rep.get("league"), "season": rep.get("season"), "weeks": scored, "through": through - 1 if scored else None,
+            "team_weeks": len({(c["week"], c["team"]) for c in rows}), "rows": len(rows), "trending": TRENDING_OFF,
+            "all": split(rows), "top1": split([c for c in rows if c["rank"] == 1]), "claim_worthy": split([c for c in rows if c["claim_worthy"]]),
+            "adds": {**claim_table(adds), "unpriced": unpriced}}

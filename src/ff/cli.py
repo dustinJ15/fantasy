@@ -329,15 +329,24 @@ def replay_pull(season: int = typer.Option(..., "--season", help="The season to 
 def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay file(s) from `ff replay-pull`; default: every file under data/replay/"),
              trades: bool = typer.Option(False, "--trades", help="Score the offers ESPN executed (data/projlog/offer_outcomes.json) against the replays instead"),
              scan: bool = typer.Option(False, "--scan", help="The scanner replay: every package the trade scan would have proposed each week, for every team, graded against the weeks after"),
+             claims: bool = typer.Option(False, "--claims", help="The claim replay: every free agent the waiver ranking would have listed each week, for every team, graded against the weeks after, next to the adds the managers made"),
              sims: int = typer.Option(None, "--sims", help="Draws per week for the playoff odds behind --scan"),
              as_json: bool = typer.Option(False, "--json", help="Print the result as JSON")):
     """Replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set
-    (default), the trades I made against what the players then scored (--trades), or every package the scan would
-    have proposed against the weeks that followed (--scan). Offline, from the replay files."""
+    (default), the trades I made against what the players then scored (--trades), every package the scan would
+    have proposed against the weeks that followed (--scan), or every claim the waiver ranking would have listed
+    (--claims). Offline, from the replay files."""
     from . import backtest as bt
     paths = [bt.load_replay(p) for p in (replay or sorted(str(p) for p in bt.REPLAY_DIR.glob("*.json")))]
     if not paths:
         rprint(f"no replay files under {bt.REPLAY_DIR}; run `ff replay-pull --season 2025` first"); raise typer.Exit(1)
+    if claims:
+        results = [bt.claim_hits(r) for r in paths]
+        if as_json:
+            print(json.dumps(results, indent=1)); return
+        for res in results:
+            _print_claims(res)
+        return
     if scan:
         results = [bt.scan_hits(r, sims=sims or bt.SCAN_SIMS) for r in paths]
         if as_json:
@@ -409,6 +418,45 @@ def _print_scan(res: dict) -> None:
         for b in res[sample]["every"]["bins"]:
             hi = "+" if b["hi"] is None else f"-{b['hi']:.0f}"
             t.add_row(f"{b['lo']:.0f}{hi}", label, str(b["n"]), rate(b["hit"]), fmt(b["pred_mean"]), fmt(b["realized_mean"]))
+    rprint(t)
+
+
+def _print_claims(res: dict) -> None:
+    """The claim replay's tables: one row per sample (every row the ranking listed, the card's first claim per
+    team-week, the claim-worthy rows, each with and without a zero touched, then the managers' actual adds) on the
+    rest-of-season promise; the same samples' START NOW rows on their one-week promise; then the reliability rows by
+    promised upgrade."""
+    fmt = lambda x: "—" if x is None else f"{x:+.2f}"
+    rate = lambda x: "—" if x is None else f"{x:.2f}"
+    if not res["weeks"]:
+        rprint(f"\n[bold]{res['league']} {res['season']}[/]: no regular-season week with a later one to grade"); return
+    rprint(f"\n[bold]{res['league']} {res['season']}[/] claims ranked in weeks {res['weeks'][0]}-{res['weeks'][-1]}, graded through week "
+           f"{res['through']}: {res['team_weeks']} team-weeks, {res['rows']} rows, {res['adds']['n']} adds the managers made"
+           + (f" ({res['adds']['unpriced']} more not in the universe)" if res["adds"]["unpriced"] else ""))
+    rprint(f"  [dim]{res['trending']}[/]")
+    samples = (("all", "every row"), ("top1", "the card's first claim"), ("claim_worthy", "claim-worthy"))
+    rows = []
+    for sample, label in samples:
+        for split, word in (("every", ""), ("clean", ", nobody at zero"), ("touches_zero", ", touching a zero")):
+            if split == "every" or res[sample]["touches_zero"]["n"]:
+                rows.append((label + word, res[sample][split]))
+    rows.append(("the managers' adds", res["adds"]))
+    t = Table("sample", "n", "hit", "promised /wk over the starter", "realized /wk")
+    for label, x in rows:
+        t.add_row(label, str(x["n"]), rate(x["hit"]), fmt(x["pred_mean"]), fmt(x["realized_mean"]))
+    rprint(t)
+    t = Table("START NOW rows", "n", "hit", "promised this week", "realized")
+    for label, x in rows:
+        w = x["week"]
+        t.add_row(label, str(w["n"]), rate(w["hit"]), fmt(w["pred_mean"]), fmt(w["realized_mean"]))
+    rprint(t)
+    t = Table("promised /wk", "sample", "n", "hit", "promised", "realized /wk")
+    for sample, label in samples + (("adds", "the managers' adds"),):
+        bins = res[sample]["bins"] if sample == "adds" else res[sample]["every"]["bins"]
+        for b in bins:
+            lo = "" if b["lo"] is None else f"{b['lo']:.0f}"
+            hi = "+" if b["hi"] is None else (f"-{b['hi']:.0f}" if b["lo"] is not None else f"under {b['hi']:.0f}")
+            t.add_row(lo + hi, label, str(b["n"]), rate(b["hit"]), fmt(b["pred_mean"]), fmt(b["realized_mean"]))
     rprint(t)
 
 
