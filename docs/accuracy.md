@@ -292,7 +292,10 @@ ranking is worse than the league. It is not that simple, and the rows say why.
   and the rest-of-season price is his last game or two. The same number reaches the live ranking through
   `projected_total_points`, so this is the live card's shape too, less the signals the replay lacks (the designation,
   Sleeper's trend, FantasyPros' rest-of-season rank, Claude's read of why he was on the wire). A new TODO line (D13)
-  is that floor; the replay shows the size of the hole, not the fix.
+  is that floor; the replay shows the size of the hole, not the fix. Since 2026-10-21 the hand count is a printed row:
+  `ff backtest --claims` splits every sample by whether the claimed body or the displaced starter went dark after the
+  row (`both on the field after`, `a body dark after`, `dark, no preseason total`) with the distinct bodies behind each
+  n, so the next pull reads the clean rows and the hole without a hand count.
 - **Where the body stayed on the field the ranking has edge.** The claim-worthy rows with neither the claimed player
   nor the displaced starter dark: L1 n 10, hit 0.90, promised +1.7, realized +4.7; L2 n 29, hit 0.76, promised +1.5,
   realized +3.7; L3 n 6, hit 0.67, promised +1.4, realized +1.6 (the same hand count). Under-promised, not over: the
