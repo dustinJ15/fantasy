@@ -46,7 +46,19 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier C — operations
 
-(none open)
+- [ ] **C7 (M). The email goes out over HTTPS: an Apps Script relay in place of SMTP.** C5/C6 made `ff email`
+  (`src/ff/mail.py`, Gmail SMTP on port 465) the send path, and the 2026-10-21 check from a fresh `fantasy` session
+  showed why it never sends there: the cloud container's egress is a web proxy that carries HTTP and HTTPS only, so
+  `smtplib.SMTP_SSL("smtp.gmail.com", 465)` times out after 60 s with Network access on Full, and the skill falls back
+  to the connector paste every morning (the credentials were removed from the environment the same night). The fix is
+  a relay the proxy can reach: a Google Apps Script web app in Dustin's account (`scripts/gmail_send_relay.gs`, setup
+  in `scripts/gmail_send_relay.md`, next to the doorbell's `gmail_trade_doorbell.gs`) that takes a POST of
+  `{token, subject, to, markdown, html}` and calls `GmailApp.sendEmail` with the HTML body and the markdown as the
+  plain part; `mail.send` POSTs to `FF_MAIL_RELAY_URL` with `FF_MAIL_RELAY_TOKEN` when both are set, falls back to
+  SMTP when only `GMAIL_USER`/`GMAIL_APP_PASSWORD` are, and `mail.status()` / `ff doctor` name which path. Byte for
+  byte stays: the test holds the relay payload's html and markdown to the files. The `.gs` gets a Node test like
+  `scripts/gmail_trade_doorbell.test.js` (a bad token is a 403, a missing field is a 400, one send per request).
+  Both skills keep their fallback wording; `docs/operations.md` lists the two new env vars and the deploy steps.
 
 ## Tier D — where real edge would come from (after Tier A)
 
