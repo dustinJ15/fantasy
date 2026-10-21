@@ -72,6 +72,13 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   this week's number fixing the in-range wire body (-1.6 to -0.2) at +1.2 on every rostered body; it takes over if it
   lowers the rostered body's error too, or the in-range wire bias passes two points with the rostered one within half a
   point of zero.
+- [ ] **D21 (XS, end of the regular season). Re-read the blend question** on the full-season replay and the projlog
+  (`ff backtest --fit`, `docs/plans/fitted-projection.md` step 5): the ruling of 2026-10-21 is the fitted weekly number
+  stays a rest-of-season read, not a third source of `blend` (mixed with ESPN at ~0.47 it beat ESPN alone held out by
+  0.2-0.3 at RB and WR, tied TE, lost QB, while reading 1.2-4 points low; the projlog's league-keyed rows were 10-21 a
+  position, under `projlog.FIT_MIN_N`). It enters `blend` only once its bias is taken out on the training weeks and the
+  three-source mix (ESPN, Sleeper, fitted) beats the live blend held out on the projlog's table at `FIT_MIN_N`. Read
+  `OPPONENT_K` RB on the same run: the opponent on top of ESPN's number cost RB 0.07-0.10 in every sample.
 - [ ] **D15 (XS, end of the regular season). Re-read `MUST_TRY_PPW` (2.0)** on the full-season scan replay
   (`ff backtest --scan`, minutes per league): the ruling of 2026-10-21 is stays, the 2-4 bin realizing +2.4 to +3.6 in
   all three leagues on five weeks; the bar moves down only if the 1-2 bin realizes its promise at a hit rate over 0.55 in
@@ -80,25 +87,6 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   in every league (hit 0.47-0.57, realized -0.3 to +2.0) and the 1-2 bin realized +0.78 in L2 at a coin flip; 1.5 is the
   case if the 1-2 bin realizes under a point in two leagues over the season, and a ruling on it is one line here, not a
   constant change without the table.
-- [ ] **D10 (L, planned). The fitted projection model.** Plan: `docs/plans/fitted-projection.md` (2026-10-21). ROADMAP
-  item 1's historical half, on nflverse weekly stats 2016-2025 (`opfit.py`, `ff fit-opportunity`; the network, no
-  cookies), each term fitted leave-one-season-out in the live arithmetic's own shape and adopted only when it beats the
-  prior out of sample; the backtest harness (`docs/plans/backtest.md`) and the projlog score what the fit cannot. Step 1
-  done 2026-10-21: `OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP` fitted (QB 0.57, RB 0.64, WR 0.58, TE 0.67; the
-  clip off inside the data) and `XFP_PER_ATTEMPT` (0.415), so QB reads his attempts. Step 2 done 2026-10-21: the opponent
-  factor (`usage.opponent_factors`, each defense's points allowed a game at the position over what those offenses score
-  elsewhere, through last week; `OPPONENT_K` fitted QB 0.20, RB 0.25, WR 0.09, TE 0.19 on 26,670 player-weeks, worth
-  0.3% of the weekly error; the ±10% cap kept) multiplies this week's `mu` in `blend` beside `VEGAS_K`
-  (`sources.def_factor`, `def_mult`, the `def:x1.08` flag). Step 3 done 2026-10-21: the implied total (`opfit.fit_vegas` on
-  nflverse `schedules` closing lines, fitted on the opportunity-moved level times the opponent multiplier: on raw `ppg` a
-  hot start and his line rise together and the fit reads zero) took `VEGAS_K` QB 0.41 (was 0.35); RB, WR and TE tie their
-  hand numbers and keep them. Step 4 done 2026-10-21: the recent-usage trend
-  (`TREND_K` QB 0.33, RB 0.16, WR 0.10, TE 0.15 on the last three games' xFP-lite a game against the season's, a second
-  term on the rest-of-season level read by `projections.trend_mult` inside `opportunity_mult`; 0.1-0.7% of the error).
-  Left, one PR: 5. the blend with consensus by out-of-sample error (the
-  historical model's weekly number against ESPN's in the 2026 replay and the projlog; needs the replay files and the
-  cookies; it also says whether `OPPONENT_K` on top of ESPN's number double counts the matchup its analysts priced).
-  Each step's done-when and what it must not read are in the plan.
 - [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
   (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
   the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only

@@ -411,17 +411,28 @@ def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay fil
              scan: bool = typer.Option(False, "--scan", help="The scanner replay: every package the trade scan would have proposed each week, for every team, graded against the weeks after"),
              claims: bool = typer.Option(False, "--claims", help="The claim replay: every free agent the waiver ranking would have listed each week, for every team, graded against the weeks after, next to the adds the managers made"),
              prior: bool = typer.Option(False, "--prior", help="The prior replay: every body's rest-of-season price each week, rostered and wire apart, against his points a game after it, under the preseason-total prior and its alternatives"),
+             fit: bool = typer.Option(False, "--fit", help="The blend question (D10 step 5): the fitted weekly number against ESPN's, each player-week, MAE and the inverse-error mixing weight per position; reads nflverse (the network)"),
              sims: int = typer.Option(None, "--sims", help="Draws per week for the playoff odds behind --scan"),
              as_json: bool = typer.Option(False, "--json", help="Print the result as JSON")):
     """Replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set
     (default), the trades I made against what the players then scored (--trades), every package the scan would
     have proposed against the weeks that followed (--scan), every claim the waiver ranking would have listed
-    (--claims), or every body's rest-of-season price against what he scored after (--prior). Offline, from the
-    replay files."""
+    (--claims), every body's rest-of-season price against what he scored after (--prior), or the fitted weekly number
+    against ESPN's (--fit). Offline, from the replay files, except --fit, which reads nflverse."""
     from . import backtest as bt
     paths = [bt.load_replay(p) for p in (replay or sorted(str(p) for p in bt.REPLAY_DIR.glob("*.json")))]
     if not paths:
         rprint(f"no replay files under {bt.REPLAY_DIR}; run `ff replay-pull --season 2025` first"); raise typer.Exit(1)
+    if fit:
+        seasons = sorted({r["season"] for r in paths})
+        inp = {s: bt.fit_inputs(s, sorted({w["week"] for r in paths if r["season"] == s for w in r["weeks"]}),
+                                {pid for r in paths if r["season"] == s for pid in r["players"]}) for s in seasons}
+        last = {s: max(w["week"] for r in paths if r["season"] == s for w in r["weeks"]) for s in seasons}
+        logged = {k: v for s in seasons for k, v in bt.projlog_sources(s, last[s] + 1).items()}
+        res = bt.fit_hits(paths, inp, logged)
+        if as_json:
+            print(json.dumps(res, indent=1)); return
+        _print_fit(res); return
     if prior:
         results = [bt.prior_hits(r) for r in paths]
         if as_json:
@@ -582,6 +593,31 @@ def _print_prior(res: dict) -> None:
                 if x["n"]:
                     t.add_row(f"{label}, {pw}{sw}", str(x["n"]), str(x["bodies"]), *(fmt(x[v]) for v in res["variants"]))
     rprint(t)
+
+
+def _print_fit(res: dict) -> None:
+    """The blend question's tables: per sample, a row per position with each source's mean absolute error / bias
+    (forecast minus actual, points), the inverse-error weight on each mixed source and the mix scored
+    leave-one-week-out; a position under the minimum sample says so."""
+    cell = lambda v: "—" if v["mae"] is None else f"{v['mae']:.2f} / {v['bias']:+.2f}"
+    rprint(f"\n[bold]the fitted weekly number against ESPN's[/] {', '.join(str(s) for s in res['seasons'])} "
+           f"{', '.join(res['leagues'])}, weeks {res['weeks'][0] if res['weeks'] else '—'}-{res['weeks'][-1] if res['weeks'] else '—'}; "
+           f"each cell is mean absolute error / bias, points a week; rows with ESPN at {res['min_proj']:.0f}+")
+    samples = (("replay", "every player-week"), ("both", f"the fitted number at {res['min_proj']:.0f}+ too"),
+               ("rostered", "rostered that week"), ("projlog", "the projlog's rows (Sleeper and the live blend)"))
+    for key, label in samples:
+        if key not in res:
+            continue
+        rows = res[key]
+        srcs = [k for k, v in rows[0].items() if isinstance(v, dict) and "mae" in v and k != "mix"]
+        mixed = list((next((r["weights"] for r in rows if r["weights"]), None) or {}).keys())
+        name = {"espn_vegas": "espn+line", "espn_matchup": "espn+line+def"}
+        t = Table("pos", "n", *(name.get(s, s) for s in srcs), *(f"w {m}" for m in mixed), "mix, held out", title=label)
+        for r in rows:
+            w = r["weights"] or {}
+            t.add_row(r["pos"], str(r["n"]) + ("" if r["counts"] else f" (under {r['min_n']})"), *(cell(r[s]) for s in srcs),
+                      *(f"{w[m]:.2f}" if m in w else "—" for m in mixed), cell(r["mix"]))
+        rprint(t)
 
 
 @app.command()
