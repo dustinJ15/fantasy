@@ -42,22 +42,7 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 
 ## Tier B — checklist and ledger bugs
 
-- [ ] **B20 (M). The card is blind to the claims I already placed.** The 2026-10-20 evening card (a manual run, Week 7)
-  proposed claims Dustin had already submitted in the app, and the ledger spent the drop those claims already spend.
-  `espn.waiver_run_ts` reads `mPendingTransactions`, takes the `processDate` off every `WAIVER` record and throws the
-  claims away; nothing in the snapshot says which bodies I have a claim in on, the bid, or the drop. Fix: an
-  `espn.pending_claims(league, my_team_id)` that keeps my own `WAIVER` records (add player id, drop player id, bid,
-  `processDate`, status) as `pending_claims` in the snapshot (`clocks_error` covers a failed read; a read-only
-  `scripts/probe_pending_claims.py` prints the raw record first so the item names are not guessed, like the probes
-  before it); `packet.build` carries them on the league block and marks the matching waiver row `claimed` with the
-  bid and the drop; `ledger.Spots` treats a pending claim's drop as spent and its add as held before any row prints,
-  so no row names either again; `_waiver_items` prints a claimed body as "claim in: X ($N, drop Y), lands Wed 1:00 AM"
-  with no verb and no new drop, and when the card prefers a different body at the same slot the row says "you have a
-  claim in on Z; this one is +N over him, your call" for Claude to rule in reads.json; `_lineup_item` reads the
-  pending claim's add like a claim row's (lands on waiver day); `card_lint` flags a row that adds a body I already
-  have a claim in on or spends a drop a pending claim spends. Tests: a parser test on the captured `WAIVER` shape,
-  `test_ledger.py`, `test_card.py` (claimed row, the competing-body row, the lint), the demo with one pending claim.
-  One row in the CLAUDE.md failure table.
+(none open)
 
 ## Tier C — operations
 

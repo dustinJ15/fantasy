@@ -267,7 +267,8 @@ def test_the_packet_carries_the_leagues_clocks_and_a_claim_says_when_it_lands(mo
     snap = make_snapshot()
     snap["settings"].update({"waiver_hours": 24, "waiver_process_days": ["MONDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"],
                              "trade_revision_hours": 24, "veto_votes": 4})
-    claimable = next(r for r in snap["free_agents"] if r["pos"] in ("RB", "WR"))
+    claimed = snap["pending_claims"][0]["add_id"]   # the demo's claim in lands on ESPN's stamp, not the computed run
+    claimable = next(r for r in snap["free_agents"] if r["pos"] in ("RB", "WR") and r["espn_id"] != claimed)
     claimable["waiver_status"] = "WAIVERS"
     now = datetime(2026, 9, 15, 14, 0, tzinfo=UTC)   # a Tuesday
     blk = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=100, now=now)
@@ -275,7 +276,7 @@ def test_the_packet_carries_the_leagues_clocks_and_a_claim_says_when_it_lands(mo
     assert d["waiver_run_source"] == "default" and d["waiver_run_word"] == "Wed 1:00 AM"
     assert d["offer_executes_word"] == "Wed 8:00 AM" and d["trade_review_hours"] == 24
     assert blk["settings"]["trade_revision_hours"] == 24 and blk["settings"]["waiver_process_days"][0] == "MONDAY"
-    ws = [w for w in blk["waivers"] if w.get("on_waivers")]
+    ws = [w for w in blk["waivers"] if w.get("on_waivers") and not w.get("claimed")]   # a claim I have in lands on ESPN's own stamp
     assert ws and all(w["lands"] == "Wed 1:00 AM" for w in ws)
     assert blk["incoming_trades"][0]["executes"] == "Wed 8:00 AM"
     md = "\n".join(report._detail_matchup(blk))
@@ -330,3 +331,47 @@ def test_the_opponent_factor_reaches_this_weeks_number_through_the_scoreboards_o
     rb = next((p for p in blk["roster"] if p["team"] == qb["team"] and p["pos"] == "RB"), None)
     if rb is not None:
         assert rb["sources"]["def_mult"] == 0.9
+
+
+def test_the_claims_i_have_in_mark_the_wire_and_ride_the_block(monkeypatch):
+    """B20: `espn.pending_claims` ids come in on the snapshot; `packet.pending_claims` names them, marks (or adds) the
+    waiver row with ESPN's own landing clock, keeps the claimed bodies out of the open-spot adds, and the card prints
+    each claim once with nothing else naming the body or the drop."""
+    monkeypatch.setattr("ff.packet.fantasycalc.by_espn_id", lambda **kw: {})
+    snap = make_snapshot()
+    snap.pop("pending_claims")
+    base = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=50)
+    ranked = base["waivers"][0]
+    unranked = next(fa for fa in snap["free_agents"] if fa["espn_id"] not in {w["espn_id"] for w in base["waivers"]})
+    run = int(datetime(2026, 10, 7, 7, 0, tzinfo=UTC).timestamp() * 1000)   # Wed 03:00 ET
+    snap["pending_claims"] = [
+        {"id": "c1", "add_id": ranked["espn_id"], "drop_id": 104, "bid": 9, "process_ts": run, "proposed_ts": run - 3600_000, "status": "PENDING", "scoring_period": 5},
+        {"id": "c2", "add_id": unranked["espn_id"], "drop_id": None, "bid": 3, "process_ts": run, "proposed_ts": run - 3600_000, "status": "PENDING", "scoring_period": 5},
+    ]
+    blk = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=50)
+    claims = blk["pending_claims"]
+    assert [c["add"] for c in claims] == [ranked["name"], unranked["name"]]
+    assert claims[0]["drop"] == "Malik Okafor" and claims[0]["bid"] == 9 and claims[0]["lands"] == "Wed 1:00 AM" and claims[0]["lands_ts"] == run
+    assert claims[1]["drop"] is None and claims[1]["add_pos"] == unranked["pos"]
+    w1 = next(w for w in blk["waivers"] if w["name"] == ranked["name"])
+    assert w1["claimed"] == {"id": "c1", "bid": 9, "drop": "Malik Okafor", "drop_id": 104, "status": "PENDING"}
+    assert w1["on_waivers"] is True and w1["lands"] == "Wed 1:00 AM" and w1["delta_week"] == ranked["delta_week"]
+    w2 = next(w for w in blk["waivers"] if w["name"] == unranked["name"])
+    assert w2["claimed"]["drop"] is None and w2["delta_week"] == 0.0 and w2["mu_ros"] is not None and w2["on_waivers"] is True
+    # the claim into the one open spot has it: no open-spot add, and neither claimed body is anyone's depth
+    assert base["open_spots"] == 1 and len(base["open_spot_adds"]) == 1
+    assert blk["open_spots"] == 1 and blk["open_spot_adds"] == []
+    rows = report.todos(blk)
+    claim_rows = [x for x in rows if x.get("claimed")]
+    assert [x["add"]["name"] for x in claim_rows] == [ranked["name"], unranked["name"]]
+    assert all(x["label"] == "Waiver (claim in)" and x["text"].startswith("claim in: ") for x in claim_rows)
+    for name in (ranked["name"], unranked["name"], "Malik Okafor"):
+        assert [x["id"] for x in rows if name in report.row_adds(x) or x.get("drop") == name] == [f"waiver:{report.slug(x['add']['name'])}" for x in claim_rows if x["add"]["name"] == name or x.get("drop") == name]
+    assert report.card_lint(blk) == []
+    # a claimed body below the wire pull's depth keeps the name the snapshot gave him
+    snap["pending_claims"] = [{"id": "c3", "add_id": 999999, "add_name": "Nobody Famous", "add_pos": "WR", "add_team": "GB", "drop_id": None,
+                              "bid": 1, "process_ts": run, "proposed_ts": run, "status": "PENDING", "scoring_period": 5}]
+    blk3 = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=50)
+    assert blk3["pending_claims"][0]["add"] == "Nobody Famous"
+    row = next(x for x in report.todos(blk3) if x.get("claimed"))
+    assert row["text"] == "claim in: Nobody Famous (WR) ($1), lands Wed 1:00 AM"

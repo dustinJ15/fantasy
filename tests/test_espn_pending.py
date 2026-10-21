@@ -212,3 +212,48 @@ def test_the_pending_view_carries_espns_own_waiver_run_and_the_history_the_last_
             def league_get(params=None, headers=None):
                 return {}
     assert waiver_run_ts(Empty()) is None and recent_drops(Empty()) == {}
+
+
+# ---- the claims I already have in (captured 2026-10-21, a Tuesday with one claim placed in each league) ----
+# A WAIVER record is one claim: `teamId` the claimant, `bidAmount` the FAAB bid (0 in a priority league), the ADD
+# item the body claimed (`fromTeamId` 0: the wire), the DROP item the body it cuts, `processDate` the run it lands on.
+CLAIMS = {"pendingTransactions": [
+    {"bidAmount": 0, "executionType": "EXECUTE", "id": "eaa40d3f", "isPending": True, "memberId": "{ME}",
+     "items": [{"acquisitionBudget": 0, "fromLineupSlotId": -1, "fromTeamId": 0, "playerId": 8439, "toLineupSlotId": -1, "toTeamId": 3, "type": "ADD"},
+               {"acquisitionBudget": 0, "fromLineupSlotId": 17, "fromTeamId": 3, "playerId": 4259619, "toLineupSlotId": -1, "toTeamId": 0, "type": "DROP"}],
+     "processDate": 1792566000000, "proposedDate": 1792552578400, "rating": 0, "scoringPeriodId": 7, "status": "PENDING", "teamId": 3, "type": "WAIVER"},
+    # a rival's claim with a bid and no drop (into an open spot): not mine
+    {"bidAmount": 12, "executionType": "EXECUTE", "id": "rival", "isPending": True,
+     "items": [{"fromTeamId": 0, "playerId": 17372, "toTeamId": 7, "type": "ADD"}],
+     "processDate": 1792566000000, "scoringPeriodId": 7, "status": "PENDING", "teamId": 7, "type": "WAIVER"},
+    # my second claim, a FAAB bid into an open spot
+    {"bidAmount": 7, "executionType": "EXECUTE", "id": "open", "isPending": True,
+     "items": [{"fromTeamId": 0, "playerId": -16020, "toTeamId": 3, "type": "ADD"}],
+     "processDate": 1792566000000, "proposedDate": 1792505119837, "scoringPeriodId": 7, "status": "PENDING", "teamId": 3, "type": "WAIVER"},
+    # a claim I cancelled in the app, and a trade proposal: neither is a claim in
+    {"bidAmount": 0, "executionType": "CANCEL", "id": "gone", "status": "CANCELED", "teamId": 3, "type": "WAIVER",
+     "items": [{"fromTeamId": 0, "playerId": 99, "toTeamId": 3, "type": "ADD"}], "processDate": 1792566000000},
+    {"id": "t", "type": "TRADE_PROPOSAL", "status": "PENDING", "teamId": 3, "processDate": 1791986732413, "items": []},
+]}
+
+
+class ClaimsLeague:
+    class espn_request:
+        @staticmethod
+        def league_get(params=None, headers=None):
+            assert params == {"view": "mPendingTransactions"}
+            return CLAIMS
+
+
+def test_pending_claims_keeps_my_waiver_records_with_the_add_the_drop_the_bid_and_the_clock():
+    from ff.sources.espn import pending_claims, waiver_run_ts
+    mine = pending_claims(ClaimsLeague(), 3)
+    assert [c["id"] for c in mine] == ["eaa40d3f", "open"]
+    assert mine[0] == {"id": "eaa40d3f", "add_id": 8439, "drop_id": 4259619, "bid": 0, "process_ts": 1792566000000,
+                       "proposed_ts": 1792552578400, "status": "PENDING", "scoring_period": 7}
+    assert mine[1]["add_id"] == -16020 and mine[1]["drop_id"] is None and mine[1]["bid"] == 7
+    # the rival's claim is his, an unknown team has none, and the run clock still reads off every claim in the league
+    assert [c["add_id"] for c in pending_claims(ClaimsLeague(), 7)] == [17372]
+    assert pending_claims(ClaimsLeague(), None) == []
+    assert waiver_run_ts(ClaimsLeague()) == 1792566000000
+

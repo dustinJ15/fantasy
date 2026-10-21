@@ -396,9 +396,12 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
     after every other row."""
     spots = spots or Spots(lg, lg.get("open_spots") or 0, set())
     drop_rows = {r["name"]: r for r in lg.get("injuries") or [] if r["verdict"] == "drop"}
+    # A hurt player a claim I already have in drops is that claim's drop, not an IR move or a Drop row: the claim-in
+    # row names him (`_claimed_item`, with the verdict he had), and nothing below does (B20).
+    claimed_drops = {c["drop"] for c in lg.get("pending_claims") or [] if c.get("drop")}
     # An IR move frees a bench spot (a swap with the occupant frees nothing): credit it before any row draws one.
     for r in lg.get("injuries") or []:
-        if r["verdict"] == "ir" and not r.get("ir_occupant"):
+        if r["verdict"] == "ir" and not r.get("ir_occupant") and r["name"] not in claimed_drops:
             spots.free(r["name"])
     # Every activation draws its spot before any row prints. `injuries.decide` orders rows by `mu_ros_active`, so the
     # Drop row an activation folds in can come first; folding on the fly then printed "drop Dart" on both rows.
@@ -406,7 +409,7 @@ def _injury_items(lg: dict, spots: Spots | None = None) -> list[dict]:
     folded = {drop for drop, _ in taken.values() if drop in drop_rows}
     out = []
     for r in lg.get("injuries") or []:
-        if r["name"] in folded:
+        if r["name"] in folded or (r["name"] in claimed_drops and r["verdict"] in ("ir", "drop")):
             continue
         who, v = f"{r['name']} ({r['pos']})", r["verdict"]
         if v == "hold" and r["weeks_out"] < 2:
@@ -534,16 +537,81 @@ def _lineup_item(lg: dict, above: list[dict] = ()) -> dict:
     return {"kind": "lineup", "id": "lineup", "label": "Lineup", "text": "leave as is" if ph == "pre" else "nothing left to change", "moves": []}
 
 
+def _claimed_item(lg: dict, w: dict) -> dict:
+    """The row for a claim I already have in: "claim in: X (WR) ($12, drop Y), lands Wed 1:00 AM". No verb and no
+    new drop: the click was made in the app, the drop is spent on the ledger and the add held (B20). The row carries
+    `add` like any waiver row so the lineup row reads him as a claim (he fills an empty slot once the claim lands)."""
+    c = w["claimed"]
+    inside = ", ".join(x for x in (f"${c['bid']}" if c.get("bid") else "", f"drop {c['drop']}" if c.get("drop") else "") if x)
+    detail = ["placed in the app; nothing to click, cancel it there if the research says so"]
+    if (w.get("delta_week") or 0.0) >= 1.5:
+        detail.append(f"+{w['delta_week']:.0f} pts this week at {w['week_slot']}{due_note(w.get('kickoff_day'))}")
+    if (w.get("delta_over_starter") or 0.0) > 0:
+        detail.append(f"+{w['delta_over_starter']:.1f}/wk over your {w['slot']}")
+    if not c.get("drop"):
+        detail.append("into an open bench spot")
+    r = next((r for r in lg.get("injuries") or [] if r["name"] == c.get("drop")), None)
+    if r is not None and r.get("verdict") in ("ir", "hold"):
+        back = f", back wk {r['return_week']}" if r.get("return_week") else ""
+        detail.append(f"{r['name']} had an {INJURY_LABEL[r['verdict']].upper()} verdict (out {weeks_word(r)}{back}): the claim cuts him instead, your call")
+    return {"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (claim in)",
+            "text": f"claim in: {w['name']} ({w['pos']}){f' ({inside})' if inside else ''}, lands {w.get('lands') or 'on waiver day'}",
+            "detail": detail, "add": w, "drop": c.get("drop"), "claimed": True}
+
+
+# A wire body at a slot a claim I already have in fills is a row only when he beats the claimed one by this much
+# (points this week for a START NOW row, points a week for an upgrade); under it the claim stands and he is not a row.
+COMPETING_GAIN = 1.0
+
+
+def _competing(lg: dict, w: dict, key: str) -> tuple[dict, float] | None:
+    """(the claimed body at this row's slot, how far `w` is above him by `key`), or None when no claim I have in
+    fills the slot. The slot is this week's (`delta_week`) or the season's (`delta_over_starter`), else the position."""
+    slot_key = "week_slot" if key == "delta_week" else "slot"
+    slot = w.get(slot_key) or w["pos"]
+    rivals = [c for c in lg["waivers"] if c.get("claimed") and c is not w
+              and ((c.get(slot_key) or c["pos"]) == slot or c["pos"] == w["pos"])]
+    if not rivals:
+        return None
+    c = max(rivals, key=lambda c: c.get(key) or 0.0)
+    return c, (w.get(key) or 0.0) - (c.get(key) or 0.0)
+
+
+def _competing_note(lg: dict, w: dict, key: str) -> str:
+    """"; you have a claim in on Z; this one is +2.0 over him, your call" when a claim I already have in brings a body
+    in at the slot this row fills. Claude rules on it in reads.json: the card does not cancel a claim, and does not
+    pretend the one it prefers is the only one."""
+    hit = _competing(lg, w, key)
+    if hit is None:
+        return ""
+    c, gap = hit
+    return f"; you have a claim in on {c['name']}; this one is +{gap:.1f} over him, your call"
+
+
+def _clear_of_claims(lg: dict, ws: list[dict], key: str) -> list[dict]:
+    """The rows worth printing next to the claims I have in: a body at a slot no claim fills, or one at least
+    `COMPETING_GAIN` better than the claimed body there (the 2026-10-21 card offered a second QB claim +0.2 over the
+    one already in)."""
+    return [w for w in ws if (hit := _competing(lg, w, key)) is None or hit[1] >= COMPETING_GAIN]
+
+
 def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
-    """At most one pickup who starts this week and one who upgrades a slot for the season; each spends a spot on the
-    ledger and goes into `added` so no row below brings him in again. A claim in a rolling-priority league also says
-    whether the priority it spends is worth it (`_priority_note`). The wire moves between the sync and the click
-    (Oct 10: the pickup was on another roster by noon), so each row names the next body on the list as the fallback.
-    Every row carries the body it adds as `add`; the lineup row folds a free agent who starts this week in as a
-    move, and names any add at a slot the lineup left empty (`_lineup_item`)."""
+    """The claims I already have in first, one row each with no verb (`_claimed_item`); then at most one pickup who
+    starts this week and one who upgrades a slot for the season; each spends a spot on the ledger and goes into
+    `added` so no row below brings him in again. A claim in a rolling-priority league also says whether the priority
+    it spends is worth it (`_priority_note`); a row at a slot a claim I have in already fills says so and leaves the
+    call to Claude (`_competing_note`). The wire moves between the sync and the click (Oct 10: the pickup was on
+    another roster by noon), so each row names the next body on the list as the fallback. Every row carries the body
+    it adds as `add`; the lineup row folds a free agent who starts this week in as a move, and names any add at a
+    slot the lineup left empty (`_lineup_item`)."""
+    out = []
+    for w in lg["waivers"]:
+        if w.get("claimed") and w["name"] not in added:
+            added.add(w["name"])
+            out.append(_claimed_item(lg, w))
     starts = [w for w in lg["waivers"] if not w["streamer"] and w.get("delta_week", 0) >= 1.5 and w["name"] not in added]
     ups = [w for w in lg["waivers"] if not w["streamer"] and w["delta_over_starter"] >= waivers_model.CLAIM_WORTHY_PPW and w not in starts and w["name"] not in added]
-    out = []
+    starts, ups = _clear_of_claims(lg, starts, "delta_week"), _clear_of_claims(lg, ups, "delta_over_starter")
     for w in starts[:1]:
         drop, suffix = spots.take(adding=w["pos"], lands_ts=w.get("lands_ts"))
         click, spot = _spot_words(drop, suffix)
@@ -553,7 +621,7 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         if nxt:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_week']:.0f} this week)")
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
-                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']}{click}",
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']}{click}{_competing_note(lg, w, 'delta_week')}",
                     "detail": detail, "add": w, "drop": drop})
     for w in ups[:1]:
         drop, suffix = spots.take(adding=w["pos"], lands_ts=w.get("lands_ts"))
@@ -564,7 +632,8 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         if nxt:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_over_starter']:.1f}/wk)")
         out.append({"kind": "waiver_up", "id": f"waiver:{slug(w['name'])}", "label": "Waiver (upgrade)",
-                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}){click}", "detail": detail, "add": w, "drop": drop})
+                    "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}){click}{_competing_note(lg, w, 'delta_over_starter')}",
+                    "detail": detail, "add": w, "drop": drop})
     return out
 
 
@@ -1164,24 +1233,40 @@ def card_lint(lg: dict, rows: list[dict] | None = None) -> list[str]:
     3. no recommended starter scores 0 this week while a bench or wire body eligible for the slot would score (Grupe
        seated at K: the optimizer never seats a zero since B15, so a seated one is a stale packet);
     4. the Stream and Cover rows never bring a body in at the same position;
-    5. every trade candidate in the detail says whether it is a row and, when not, why (`row_word`).
+    5. every trade candidate in the detail says whether it is a row and, when not, why (`row_word`);
+    6. no row adds a body I already have a claim in on, or spends the drop that claim spends (B20).
 
     `ff render-email` prints each warning next to `read_lint`'s. The fix for a warning is a `skip` on the extra row in
     reads.json today, and a TODO line for the builder that let it through; a note under the other row is not a ruling.
     """
     rows = [x for x in (todos(lg) if rows is None else rows) if x.get("ruling") != "skip"]
     out: list[str] = []
+    # 6. (B20) no row adds a body I already have a claim in on, or spends the drop that claim spends; the claim-in
+    #    rows are records of clicks made in the app, so they are not adds here and never cut a healthy body
+    claims = lg.get("pending_claims") or []
+    claimed_adds = {c["add"] for c in claims if c.get("add")}
+    claimed_drops = {c["drop"]: c["add"] for c in claims if c.get("drop")}
+    for x in rows:
+        if x.get("claimed"):
+            continue
+        for n in row_adds(x):
+            if n in claimed_adds:
+                out.append(f"{x['id']} adds {n}, who you already have a claim in on: skip it")
+        if x.get("drop") in claimed_drops:
+            out.append(f"{x['id']} drops {x['drop']}, the drop your claim on {claimed_drops[x['drop']]} already spends: skip it or amend the drop")
     seen: dict[str, str] = {}
     for x in rows:
+        if x.get("claimed"):
+            continue
         for n in row_adds(x):
             if n in seen:
                 out.append(f"{n} is added by two rows ({seen[n]} and {x['id']}): skip one")
             else:
                 seen[n] = x["id"]
-    free, spent = free_drops(lg), set()
+    free, spent = free_drops(lg), set(claimed_drops)
     for x in rows:
         d = x.get("drop")
-        if not d:
+        if not d or x.get("claimed"):
             continue
         left = [n for n in free if n not in spent and n != d]
         if d not in free and left:

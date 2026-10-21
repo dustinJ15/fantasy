@@ -69,3 +69,30 @@ def test_todos_is_the_order_over_the_builders_and_one_shared_ledger():
     assert "into the spot Hurt RB's IR move frees" in report.detail_line(next(x for x in rows if x["id"] == "waiver:later-guy"))
     assert [x["id"] for x in rows if x["kind"] == "trade"] == ["trade:kai", "trade:star"]
     assert [t.get("must_try", False) for t in lg["trades"]] == [True, False]
+
+
+def claim(add="Claimed RB", drop="Bench A", bid=12, pos="RB"):
+    """One entry of the league block's `pending_claims` (B20): a claim Dustin placed in the app."""
+    return {"id": "c1", "add": add, "add_id": 9, "add_pos": pos, "drop": drop, "drop_id": 2, "bid": bid,
+            "lands": "Wed 1:00 AM", "lands_ts": 1792566000000, "status": "PENDING"}
+
+
+def test_a_claim_i_already_have_in_spends_its_drop_and_holds_its_add_before_any_row_prints():
+    """B20: the 2026-10-20 card spent Grupe on a new claim when the claim Dustin had placed already dropped him. The
+    ledger starts with the claim's drop spent and the add counted, so the next row that needs a spot names the next
+    cheapest body, and a claim with no drop takes the open spot it will land in."""
+    lg = league(roster=[player("Starter WR", slot="WR"), player("Bench A", ros=3.0), player("Bench B", ros=5.0)],
+                settings={"lineup_slots": {"WR": 2}, "position_limits": {"RB": 6, "WR": 6}}, pending_claims=[claim()])
+    spots = ledger.Spots(lg, 0, set())
+    assert spots.dropped == ["Bench A"] and spots.counts["RB"] == 1 and spots.counts["WR"] == 2
+    assert spots.take(adding="TE") == ("Bench B", "; drop Bench B")
+    # the same claim bidding into the one open spot: the spot is his, the next add names the cheapest drop
+    lg2 = copy.deepcopy(lg)
+    lg2["pending_claims"] = [claim(drop=None)]
+    spots2 = ledger.Spots(lg2, 1, set())
+    assert spots2.open == 0 and spots2.dropped == [] and spots2.counts["RB"] == 1
+    assert spots2.take(adding="TE")[0] == "Bench A"
+    # a league block without the field (an older packet) is the ledger as before
+    lg3 = copy.deepcopy(lg)
+    del lg3["pending_claims"]
+    assert ledger.Spots(lg3, 0, set()).dropped == []

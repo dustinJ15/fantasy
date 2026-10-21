@@ -18,7 +18,7 @@ from .model.projections import PlayerProj, blend
 from .model.season import TITLE_RUN_MULT, SeasonCtx
 from .model.sim import simulate
 from .model.trades import apply_title_delta, drop_already_offered, evaluate, lineup_strength, needs, scan
-from .model.vbd import replacement_levels
+from .model.vbd import own_starter_value, replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
 from .rulings import drop_recently_skipped, history, ir_memory, load_ir_moves, load_outcomes, load_pushes, load_skips, mark_pushed, note_ir_roster, record_outcomes, save_ir_moves
 from .sources import espn, fantasycalc, sleeper, vegas, weather
@@ -130,6 +130,41 @@ def apply_accepted_trades(by_team: dict, pending: list[dict], my_id: int | None)
         if ins or outs:
             moves.append({"id": tx.get("id"), "in": ins, "out": outs, "process_ts": tx.get("process_ts")})
     return moves
+
+
+def pending_claims(raw: list[dict], waivers: list[dict], fas: list[PlayerProj], mine: list[PlayerProj],
+                   my_lineup: dict[str, list[PlayerProj]]) -> list[dict]:
+    """The claims I already have in (`espn.pending_claims`), with names: each one's add becomes (or marks) a row in
+    `waivers` with `claimed` = {id, bid, drop, drop_id, status} and ESPN's own `processDate` as its landing clock, so
+    every builder that reads the wire sees the claim; the list returned rides the league block as `pending_claims`
+    for the ledger (the drop is spent, the add held, before any row prints) and `report.card_lint`. A claimed body the
+    ranker left off the table gets a plain row (his value over my starters, no this-week number) so the card can
+    still print him; one not in the pool at all keeps the name ESPN gave the snapshot (B20: the 2026-10-20 card
+    proposed the claims Dustin had placed that morning and spent the drops they spend)."""
+    fa_by_id = {p.espn_id: p for p in fas}
+    mine_by_id = {p.espn_id: p for p in mine}
+    out = []
+    for c in raw or []:
+        add, drop = fa_by_id.get(c.get("add_id")), mine_by_id.get(c.get("drop_id"))
+        lands = datetime.fromtimestamp(c["process_ts"] / 1000, UTC) if c.get("process_ts") else None
+        w = next((w for w in waivers if w.get("espn_id") == c.get("add_id")), None)
+        if w is None:
+            name = add.name if add else c.get("add_name") or f"ESPN #{c.get('add_id')}"
+            pos = add.pos if add else c.get("add_pos") or "?"
+            d_start, slot = own_starter_value(add, my_lineup) if add else (0.0, "")
+            w = {"espn_id": c.get("add_id"), "name": name, "pos": pos, "team": add.team if add else c.get("add_team"),
+                 "mu_week": round(add.mu, 2) if add else None, "mu_ros": round(add.mu_ros, 2) if add else None,
+                 "delta_over_starter": d_start, "slot": slot, "delta_week": 0.0, "week_slot": "", "vorp": 0.0, "bid": c.get("bid") or 0,
+                 "score": 0.0, "streamer": pos in ("K", "D/ST"), "why": [], "percent_owned": None, "on_waivers": True}
+            waivers.append(w)
+        w["on_waivers"] = True   # a claim lands on waiver day whatever his waiver status reads now
+        w["lands"], w["lands_ts"] = deadlines.word(lands), deadlines.ms(lands)
+        w["claimed"] = {"id": c.get("id"), "bid": c.get("bid") or 0, "drop": drop.name if drop else None,
+                        "drop_id": c.get("drop_id"), "status": c.get("status")}
+        out.append({"id": c.get("id"), "add": w["name"], "add_id": c.get("add_id"), "add_pos": w["pos"],
+                    "drop": drop.name if drop else None, "drop_id": c.get("drop_id"), "bid": c.get("bid") or 0,
+                    "lands": w["lands"], "lands_ts": w["lands_ts"], "status": c.get("status")})
+    return out
 
 
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
@@ -251,6 +286,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         if lands is None and dl.get("waiver_run_ts"):
             lands = datetime.fromtimestamp(dl["waiver_run_ts"] / 1000, UTC)
         w["lands"], w["lands_ts"] = deadlines.word(lands), deadlines.ms(lands)
+    # the claims I already have in: a marked (or added) waiver row each, and the pair for the ledger and the lint
+    claims = pending_claims(snap.get("pending_claims") or [], waivers, fas, mine, my_lineup) if my_id else []
     my_rbs = [p for p in my_lineup.get("RB", [])]
     cuffs = handcuffs(my_rbs, pool)
     lineup_after = _lineup_after(mine, fas, waivers, win_lu, slots, opp_mu, opp_var)
@@ -313,10 +350,11 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     open_after = max(roster_max - bodies_after, 0) if has_bench else 0
     open_spots = max(min(roster_max - (bodies_after + n_out - n_in), open_after), 0) if has_bench else 0
     spots_after = open_after - open_spots
-    used: set[str] = set()
+    used: set[str] = {c["add"] for c in claims}
     held = Counter(p.pos for p in mine)
+    held.update(c["add_pos"] for c in claims)
     open_adds, after_adds = [], []
-    for _ in range(open_spots):
+    for _ in range(open_spots - sum(1 for c in claims if not c.get("drop"))):   # a claim into an open spot has it
         a = fill_spot(None, None, waivers, cuffs, used, held)
         if not a:
             break
@@ -391,7 +429,7 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
         "waivers": waivers, "handcuffs": cuffs, "trades": trades, "injuries": injuries,
         "open_spots": open_spots, "open_spot_adds": open_adds, "ir_events": ir_events,
         "pending_moves": pending_moves, "trade_spots_after": spots_after, "trade_adds_after": after_adds,
-        "deadlines": dl, "clocks_error": snap.get("clocks_error"),
+        "pending_claims": claims, "deadlines": dl, "clocks_error": snap.get("clocks_error"),
         "incoming_trades": incoming, "outgoing_trades": outgoing,
         "pending_trades_error": snap.get("pending_trades_error"),
         "trade_resolutions": snap.get("trade_resolutions") or {}, "trade_resolutions_error": snap.get("trade_resolutions_error"),
