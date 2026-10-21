@@ -19,7 +19,7 @@
     "4241416": "Chuba Hubbard",
     "-16011": "Colts D/ST",
     "4239934": "AJ Dillon",
-    "4259619": "Blake Grupe"
+    "8439": "Aaron Rodgers"
    },
    "ir": [
     "4430834"
@@ -35,7 +35,6 @@
     "4426348": "Jayden Daniels",
     "4431452": "Drake Maye",
     "4430027": "Sam LaPorta",
-    "4373678": "Khalil Shakir",
     "4432620": "Parker Washington",
     "16737": "Mike Evans",
     "4241416": "Chuba Hubbard",
@@ -44,7 +43,8 @@
     "4034949": "Eddy Pineiro",
     "4695883": "Jalen Coker",
     "4239934": "AJ Dillon",
-    "-16030": "Jaguars D/ST"
+    "-16030": "Jaguars D/ST",
+    "-16020": "Jets D/ST"
    },
    "ir": []
   },
@@ -68,9 +68,7 @@
     "4259619": "Blake Grupe",
     "4428718": "Tre Tucker"
    },
-   "ir": [
-    "4428331"
-   ]
+   "ir": []
   }
  },
  "moves": {
@@ -83,7 +81,8 @@
    "name": "Rashee Rice",
    "league": "L3",
    "stashed": "2026-10-21",
-   "added": []
+   "added": [],
+   "left": "2026-10-21"
   }
  }
 }
