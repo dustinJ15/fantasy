@@ -701,6 +701,30 @@ def test_a_wire_body_with_no_preseason_total_is_priced_on_this_weeks_number_and_
     assert top["dark_no_prior"]["realized_mean"] == -16.0 and top["dark_no_prior"]["pred_mean"] == pytest.approx(6.29, abs=0.01) and top["nobody_dark"]["realized_mean"] == 2.75
 
 
+def test_the_claim_tables_read_a_body_whose_total_espn_zeroed_apart_from_the_no_prior_body():
+    """D20: the claim tables' `no_prior` and `dark_no_prior` held the bodies ESPN zeroed on the pull day (on IR or Out
+    today, D19), so a known-hurt body read as the D13 one. With U6 on IR on the pull day his rows leave both for
+    `zeroed` and `dark_zeroed`; the rows with a total and the dark totals do not move. A file pulled before the flag
+    reads `zeroed_known` False and every no-total row stays in `no_prior`."""
+    rep = _dark_replay()
+    before = bt.claim_hits(rep)
+    assert before["zeroed_known"] is False
+    assert (before["all"]["no_prior"]["n"], before["all"]["dark_no_prior"]["n"], before["all"]["zeroed"]["n"], before["all"]["dark_zeroed"]["n"]) == (2, 2, 0, 0)
+    rep["players"][6]["total_zeroed"] = True                                                # U6 is on IR on the pull day
+    rows = {(c["team"], c["espn_id"]): c for c in bt.claim_week(rep, 2, 4)}
+    assert rows[(1, 6)]["zeroed"] and rows[(1, 6)]["no_prior"] and not rows[(1, 7)]["zeroed"] and not rows[(1, 8)]["zeroed"]
+    res = bt.claim_hits(rep)
+    assert res["zeroed_known"] is True
+    a = res["all"]
+    assert (a["no_prior"]["n"], a["dark_no_prior"]["n"]) == (0, 0)                          # out of the D13 rows
+    assert (a["zeroed"]["n"], a["zeroed"]["bodies"], a["zeroed"]["realized_mean"]) == (2, 1, -16.0)
+    assert a["dark_zeroed"] == before["all"]["dark_no_prior"]                               # the same two rows, now named for what they are
+    assert a["went_dark"] == before["all"]["went_dark"] and a["every"] == before["all"]["every"]
+    assert res["top1"]["dark_zeroed"]["n"] == 2 and res["top1"]["dark_no_prior"]["n"] == 0
+    adds, _ = bt.adds_week(rep, 1, 4)
+    assert all(c["zeroed"] is False for c in adds)                                          # U4, the managers' add, has his total
+
+
 def test_claim_table_bins_on_the_promise_and_reads_the_start_now_rows_apart():
     rows = [{"delta_over_starter": -1.0, "realized_over_starter": -2.0, "hit": True, "delta_week": 2.0, "realized_week": 3.0, "hit_week": True, "espn_id": 1},
             {"delta_over_starter": 0.5, "realized_over_starter": 1.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None, "espn_id": 1},

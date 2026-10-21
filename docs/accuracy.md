@@ -311,7 +311,7 @@ ranking is worse than the league. It is not that simple, and the rows say why.
   26 of L3's 50 scored zero in every week after the claim, and those 96 rows are 5, 7 and 5 distinct players (Carson
   Wentz in week 2 is the first claim for seven to nine teams in every league; David Njoku, Demarcus Robinson, Mack
   Hollins, Tyquan Thornton, Marcus Mariota the rest): a fill-in starter whose starter came back, a body hurt the next
-  week. Every one of the 96 has `proj_season` 0: ESPN gave him no preseason total, so `season_pg` has no prior to fade
+  week. Every one of the 96 has `proj_season` 0 (most of them because ESPN zeroed it on the pull day, a body hurt after the row: "The claim tables with the zeroed bodies apart" below, D20): ESPN gave him no preseason total, so `season_pg` has no prior to fade
   and the rest-of-season price is his last game or two. The same number reaches the live ranking through
   `projected_total_points`, so this is the live card's shape too, less the signals the replay lacks (the designation,
   Sleeper's trend, FantasyPros' rest-of-season rank, Claude's read of why he was on the wire). Since 2026-10-21 the hand
@@ -446,4 +446,51 @@ three leagues (+0.3, -0.8, -0.4; the kickers alone were +0.3, -0.4 and -0.6 befo
 same bodies: +1.1 to +1.6 in the table above, +0.1 to +0.6 with them apart, and there `none` reads 0.05 to 0.15 better
 in error, while on the rostered no-total body it reads 0.3 worse in two leagues; the D13 prior stays (it was adopted to
 keep a one-game kicker off the top of the claim ranking, which the error alone does not price) and is re-read with D18.
-The claim tables' `no_prior` and `dark_no_prior` splits hold the same zeroed bodies and are not yet read apart (TODO D20).
+
+**The claim tables with the zeroed bodies apart (D20, 2026-10-21).** `ff backtest --claims` now reads the claimed body's
+missing total two ways, as the prior tables do: `no preseason total` (ESPN never projected him, the D13 body) and `total
+zeroed on the pull day` (`zeroed` on the claim row, the universe's `total_zeroed`: on IR or Out today), each dark share
+apart (`dark, no preseason total`, `dark, total zeroed on the pull day`); a file pulled before the flag prints a warning
+and keeps every no-total row in `no_prior`. Re-pulled 2026-10-21, ranked weeks 1-5, graded through week 6:
+
+| league | sample | n | bodies | hit | promised | realized |
+|---|---|---|---|---|---|---|
+| L1 | the card's first claim, a body dark after | 31 | 4 | 0.61 | -0.01 | -8.33 |
+| L1 | the card's first claim, dark, no preseason total | 7 | 1 | 0.14 | +1.85 | -10.97 |
+| L1 | the card's first claim, dark, total zeroed on the pull day | 23 | 2 | 0.74 | -0.64 | -8.86 |
+| L1 | claim-worthy, no preseason total | 8 | 2 | 0.00 | +2.20 | -10.94 |
+| L1 | claim-worthy, total zeroed on the pull day | 4 | 3 | 0.00 | +1.36 | -4.82 |
+| L2 | the card's first claim, a body dark after | 29 | 6 | 0.24 | +0.96 | -9.57 |
+| L2 | the card's first claim, dark, no preseason total | 5 | 2 | 0.00 | +1.87 | -17.04 |
+| L2 | the card's first claim, dark, total zeroed on the pull day | 24 | 4 | 0.29 | +0.77 | -8.02 |
+| L2 | claim-worthy, no preseason total | 5 | 3 | 0.00 | +1.97 | -16.93 |
+| L2 | claim-worthy, total zeroed on the pull day | 19 | 5 | 0.05 | +1.80 | -5.60 |
+| L3 | the card's first claim, a body dark after | 26 | 5 | 0.61 | -0.25 | -14.63 |
+| L3 | the card's first claim, dark, no preseason total | 10 | 2 | 0.30 | +1.16 | -17.58 |
+| L3 | the card's first claim, dark, total zeroed on the pull day | 16 | 3 | 0.81 | -1.14 | -12.78 |
+| L3 | claim-worthy, no preseason total | 8 | 3 | 0.00 | +1.91 | -19.67 |
+| L3 | claim-worthy, total zeroed on the pull day | 3 | 2 | 0.00 | +1.71 | -8.40 |
+
+Read:
+
+- **The dark first claims were two holes, and the larger one is the leak.** Of the dark first claims 23 of 31, 24 of 29
+  and 16 of 26 are bodies ESPN zeroed on the pull day: Mack Hollins (week 4), Tyquan Thornton (week 5), Terrance
+  Ferguson (week 3, L2), Jayden Reed (week 2, L3), Roman Wilson: receivers who were healthy on the wire at week w and
+  got hurt after it. The live card priced each with his preseason total that week; the replay priced him on the D13
+  floor because his total was gone by the pull, and then graded him on the injury it already knew of. Those rows say
+  nothing about the ranking. The rest, 7, 5 and 10, are the fill-in QBs (Carson Wentz in week 2, Marcus Mariota in
+  week 4): the D13 body, priced at ESPN's weekly number, dark when the starter came back.
+- **Every claim-worthy row on a no-total body is a fill-in QB, and every one went dark.** 8, 5 and 8 rows (Wentz, Drew
+  Lock, Mariota), hit 0.00, realized -11 to -20; none stayed on the field. The floor prices his week right; the loss is
+  the starter's return, which no prior sees and the designation, Sleeper's trend and Claude's read of why he was on the
+  wire are what can. D13's ruling stands; the claim tables add nothing for the prior to fix.
+- **The no-total bodies that stayed on the field are streamers and bench bodies, not claims.** K and D/ST: n 55, 32 and
+  49, promised +1.6 to +1.8 over the kicker or defense they displace, realized -0.4, -0.3 and +0.2 (streamers, never
+  claim-worthy, so no claim row prices the gap); the skill bodies: promised -2.4 to -3.0, under any claim bar.
+- **D13's "+0.5 to +0.9" is the prior tables' number**, the wire body near a starter's price against his points after;
+  with the zeroed bodies apart it reads +0.1 to +0.6 (D19, above), and the claim tables agree: the genuine no-total
+  body's claim-worthy rows are the fill-in QB alone.
+- **The claim-worthy rows without the zeroed bodies** (a replay-pull artifact, not a live row): L1 n 18, hit 0.56,
+  promised +2.0, realized -0.9 (both on the field: n 9, +5.6); L2 n 33, 0.67, +1.5, +0.8 (n 27, +4.0); L3 n 14, 0.29,
+  +1.7, -10.6 (n 6, +1.6; the fill-in QBs are 8 of the 14). The D14 re-read of `CLAIM_WORTHY_PPW` reads its rows without
+  the zeroed claimed bodies.

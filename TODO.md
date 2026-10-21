@@ -64,18 +64,14 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
 - [ ] **D14 (XS, end of the regular season). Re-read `CLAIM_WORTHY_PPW` (1.0)** on the full-season claim replay
   (`ff replay-pull --season 2026`, `ff backtest --claims`; the D13 floor is in since 2026-10-21): the ruling of 2026-10-21
   is stays, on clean claim-worthy rows of n 10, 30 and 7 realizing +4.4, +3.6 and +1.3 against a promise of +1.5; the bar
-  moves only if the 1-2 bin's clean rows realize under a point in all three leagues over the season.
+  moves only if the 1-2 bin's clean rows realize under a point in all three leagues over the season. Read it without the
+  claimed bodies ESPN zeroed on the pull day (`total zeroed on the pull day`, D20): they are a replay-pull artifact, priced
+  on the floor where the live card had their total.
 - [ ] **D18 (XS, end of the regular season). Re-read the rest-of-season prior** on the full-season replay (`ff backtest
   --prior`, `docs/accuracy.md` "The rest-of-season prior"): the ruling of 2026-10-21 is stays, the larger of the total and
   this week's number fixing the in-range wire body (-1.6 to -0.2) at +1.2 on every rostered body; it takes over if it
   lowers the rostered body's error too, or the in-range wire bias passes two points with the rostered one within half a
   point of zero.
-- [ ] **D20 (XS, needs the replay files). Read the claim replay's `no_prior` split with the zeroed bodies apart.** D19
-  (2026-10-21) found ESPN zeroes the season row of a player on IR or Out on the pull day, so a mid-season replay's
-  "no preseason total" is half "hurt today" (`total_zeroed` on the universe row, `docs/accuracy.md` "The rostered body
-  with no total"); the prior tables read them apart, the claim tables (`ff backtest --claims`: `no_prior`,
-  `dark_no_prior`, and the D13 sample in `model/projections.py`'s comment) do not yet. Split them the same way and
-  re-read D13's "+0.5 to +0.9": with the prior tables' split the wire body near a starter reads +0.1 to +0.6.
 - [ ] **D15 (XS, end of the regular season). Re-read `MUST_TRY_PPW` (2.0)** on the full-season scan replay
   (`ff backtest --scan`, minutes per league): the ruling of 2026-10-21 is stays, the 2-4 bin realizing +2.4 to +3.6 in
   all three leagues on five weeks; the bar moves down only if the 1-2 bin realizes its promise at a hit rate over 0.55 in

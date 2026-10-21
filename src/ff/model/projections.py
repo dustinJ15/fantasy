@@ -55,7 +55,9 @@ NFL_GAMES = 17
 # the prior read worse than no prior on every row set and needs a second pricing pass. That sample held the bodies whose
 # total ESPN zeroed on the pull day because they are on IR or Out today (D19, 2026-10-21, `backtest.TOTAL_ZEROED_STATUSES`);
 # with them apart the same wire body reads +0.1 to +0.6 (3.5-3.7) against -0.3 to +0.3 (3.4-3.6) with no prior, and the
-# rostered no-total body +0.3 to -0.8 either way; the prior stays, re-read with D18 (TODO D20 splits the claim tables). The prior itself was re-read on
+# rostered no-total body +0.3 to -0.8 either way; the prior stays, re-read with D18. The claim tables read the same way (D20, 2026-10-21): every claim-worthy row
+# on a no-total body is a fill-in QB (Wentz, Lock, Mariota) who went dark when his starter came back, a loss no prior
+# sees; the dark first claims ESPN had zeroed (Hollins, Thornton, Ferguson: hurt after the row) are the pull-day leak. The prior itself was re-read on
 # everyone (D17, 2026-10-21, `ff backtest --prior`, docs/accuracy.md "The rest-of-season prior"): the in-range wire body
 # *with* a total reads 1.3 to 1.8 a game under what he scores after (his total is a backup's), and the larger of the total
 # and this week's number is the one prior that fixes him, but it reads every rostered body +1.2 to +1.3 over (this week's
