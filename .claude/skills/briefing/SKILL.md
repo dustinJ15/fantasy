@@ -117,11 +117,14 @@ Follow these steps exactly. Do not invent numbers; every figure comes from `ff` 
 7. `uv run ff render-email --packet <packet path from step 5> --reads reads.json --out briefing.html --md briefing.md`
    (seconds, no sims). Then send it:
    `uv run ff email briefing.md --html briefing.html --subject "FF briefing — Week <N> — <YYYY-MM-DD>"`
-   (`src/ff/mail.py`: Gmail SMTP with `GMAIL_USER`/`GMAIL_APP_PASSWORD` from the cloud env, to `BRIEFING_TO`; the two
-   files go on the wire as they are on disk, nothing to assemble). It prints `sent '<subject>' to <address>`; that is
-   the send, do not send again. Code owns the body: never paste, trim or retype the HTML when this path works.
-   Fallback, only if `ff email` fails (it exits with "GMAIL_USER and GMAIL_APP_PASSWORD must be set" when the env lacks
-   them, or SMTP refuses the login): send with the Gmail connector. To: the address in the `BRIEFING_TO` environment
+   (`src/ff/mail.py`: an HTTPS POST to the Apps Script relay with `FF_MAIL_RELAY_URL`/`FF_MAIL_RELAY_TOKEN` from the
+   cloud env, to `BRIEFING_TO`; Gmail SMTP with `GMAIL_USER`/`GMAIL_APP_PASSWORD` only when the relay variables are
+   absent, and SMTP cannot leave the cloud container; the two files go on the wire as they are on disk, nothing to
+   assemble). It prints `sent '<subject>' to <address>`; that is the send, do not send again. Code owns the body:
+   never paste, trim or retype the HTML when this path works.
+   Fallback, only if `ff email` fails (it exits with "... must be set" when the env lacks both pairs, "mail relay
+   refused the send" or "mail relay unreachable" when the relay answers no or not at all, or SMTP refuses the login):
+   send with the Gmail connector. To: the address in the `BRIEFING_TO` environment
    variable (`printenv BRIEFING_TO`, or the `BRIEFING_TO=` line in `.env`). Subject as above. Pass the full contents of
    briefing.html as `htmlBody` and briefing.md as `body` (plain-text fallback). briefing.html is the action cards only
    (well under 20 KB, one tag per line); the full detail tables are in briefing.md. There is no attachment or FILE:

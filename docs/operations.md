@@ -7,10 +7,18 @@ every session needs. Trigger ids, the env id, routine URLs and the recipient add
 
 - Routine "FF daily briefing": cron `CRON_TZ=America/Denver 59 5 * * *` (5:59 AM Denver year-round; it was `0 12 * * *` UTC
   until 2026-10-08, which drifts an hour at each DST change), cloud env `fantasy` (network Full, env vars
-  ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/GMAIL_USER/GMAIL_APP_PASSWORD/LEAGUES_TOML), model `claude-opus-5`.
+  ESPN_S2/SWID/SEASON/HEALTHCHECK_URL/BRIEFING_TO/FF_MAIL_RELAY_URL/FF_MAIL_RELAY_TOKEN/LEAGUES_TOML), model `claude-opus-5`.
   `scripts/cloud_setup.sh` writes `.env` and `leagues.toml` from those env vars. The briefing is emailed to `$BRIEFING_TO` by
-  `ff email` (Gmail SMTP, `src/ff/mail.py`, the app password from Google account > Security > App passwords; `ff doctor`
-  prints which path the run will take); the briefing and trade-offer skills paste the files into the Gmail connector only when that fails (C5, C6). A second routine, "FF Sunday lineup check"
+  `ff email` (`src/ff/mail.py`): an HTTPS POST of the two rendered files to a Google Apps Script web app in Dustin's
+  account (`scripts/gmail_send_relay.gs`, deploy steps and the token in `scripts/gmail_send_relay.md`; `FF_MAIL_RELAY_URL`
+  is its `/exec` URL, `FF_MAIL_RELAY_TOKEN` the shared secret, also a Script Property there) that sends with `GmailApp`.
+  Gmail SMTP (`GMAIL_USER`/`GMAIL_APP_PASSWORD`, the app password from Google account > Security > App passwords) is the
+  path only when the relay variables are absent, and never works from the cloud container: its egress is a web proxy
+  that carries HTTP and HTTPS only, so port 465 hangs for 60 s and the skill pasted the email into the Gmail connector
+  every morning until the relay (C7, 2026-10-21). `ff doctor` prints `mail.status()`, which path the run will take; the
+  briefing and trade-offer skills paste the files into the Gmail connector only when `ff email` fails (C5, C6). After
+  editing the `.gs`: `node scripts/gmail_send_relay.test.js`, paste it in, and **Deploy > Manage deployments > New
+  version** (the `/exec` URL serves the deployed version, not the editor's). A second routine, "FF Sunday lineup check"
   (`CRON_TZ=America/Denver 45 9 * * 0`, same env and prompt with a preface: inactives are out, research only my questionable
   starters, email the final lineups as `FF Sunday check — Week N — <date>`, skip waivers, trades and the MLB step 0), runs
   after the 11:30 ET inactives. The routines UI stores a plain cron in UTC; a timezone needs the **Custom** trigger with the

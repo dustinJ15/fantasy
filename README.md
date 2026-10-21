@@ -170,7 +170,7 @@ uv run ff sync && uv run ff briefing
 | `ff accuracy [--week N] [--fit]` | MAE and bias by source and position over scored weeks; `--fit` prints a fitted sigma per position next to the prior |
 | `ff replay-pull --season 2025` | archive a season's box scores (both lineups as set, ESPN's pre-kickoff projection and the actual per player) into `data/replay/` |
 | `ff backtest [--replay f] [--trades]` | replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set; `--trades` scores the offers ESPN executed against what the players then scored |
-| `ff email` / `ff heartbeat` | send a rendered briefing over Gmail SMTP; ping the healthchecks.io switch |
+| `ff email` / `ff heartbeat` | send a rendered briefing (an HTTPS POST to an Apps Script relay in my Gmail, or SMTP where port 465 is open); ping the healthchecks.io switch |
 
 All commands that read a league take `--league <name>`; `briefing`, `packet` and `incoming` take `--demo`.
 
@@ -181,8 +181,8 @@ tables. `uv run pytest` runs a few hundred tests over the synthetic league and s
 whatever `uv run pytest --collect-only -q` says today; `tests/test_readme.py` checks that every path and command this
 file names exists), so the whole pipeline is exercised with no network and no credentials. CI
 (`.github/workflows/ci.yml`) runs ruff, the tests and the demo briefing on every push to main and every pull request.
-The Gmail doorbell is Apps Script, so pytest cannot see it; `node scripts/gmail_trade_doorbell.test.js` runs it
-against a stubbed runtime. The email is hand-rolled table HTML because email clients are where CSS goes to die.
+The Gmail doorbell and the send relay are Apps Script, so pytest cannot see them; `node scripts/gmail_trade_doorbell.test.js`
+and `node scripts/gmail_send_relay.test.js` run them against a stubbed runtime. The email is hand-rolled table HTML because email clients are where CSS goes to die.
 
 ## Honest limits
 
