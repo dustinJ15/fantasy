@@ -61,25 +61,20 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   date in the comment and the old value kept, and only then revisit `MIN_WIN_GAIN` in `model/lineup.py` (1.5pp): the
   early fits read wider than the priors (RB 10.8 vs 6.5, WR 12.2 vs 6.5), so the floor comes down only if a real fit
   says sigma is smaller, and in proportion. Code owns the numbers: take what the fitter prints or leave the prior.
-- [ ] **D13 (S, needs the replay files). The floor prior for the wire body with no preseason total.** The first claim
-  replay (`docs/accuracy.md`, "The claim ranking", 2026-10-21): the card's first claim per team-week realized 4.5-7.6 a
-  week under the starter it displaces, and every one of the 96 first-claim rows whose body scored zero in every later
-  week (five to seven distinct players per league, Carson Wentz in week 2 the first claim for most of every league) has
-  `proj_season` 0: ESPN gave him no preseason total, `season_pg` in `model/projections.py` has no prior to fade, and his
-  rest-of-season price is his last game or two (`tests/test_backtest.py`, the `_dark_replay` test: 19.5 a game after
-  one 25-point game, 11.2 for the same games with a prior). The live ranking reads the same `projected_total_points`.
-  Done 2026-10-21 (a session without `leagues.toml`, so no replay to decide on): `score_claims` marks `claimed_dark` /
-  `starter_dark`, `claim_hits` splits every sample into `nobody_dark`, `went_dark` and `dark_no_prior` with the
-  distinct `bodies` behind each n, `blend` records `prior_pg` in `sources` and each claim row carries `no_prior`;
-  `ff backtest --claims` prints them. Left: the floor itself (the position's replacement level, or ESPN's weekly
-  number alone until he has a month of games), decided on those printed rows: pull the replay (`ff replay-pull
-  --season 2026`, the cookies), read the `dark, no preseason total` and `both on the field after` rows, build the
-  floor in `blend` (replacement level needs a second pass: `replacement_levels` runs after everyone is priced), and
-  print the tables again. Not a `CLAIM_WORTHY_PPW` change: the clean claim-worthy rows realize more than they promise.
-- [ ] **D14 (XS, end of the regular season). Re-read `CLAIM_WORTHY_PPW` (1.0)** on the full-season claim replay after
-  D13 (`ff replay-pull --season 2026`, `ff backtest --claims`): the ruling of 2026-10-21 is stays, on clean claim-worthy
-  rows of n 10, 29 and 6 realizing +4.7, +3.7 and +1.6 against a promise of +1.5; the bar moves only if the 1-2 bin's
-  clean rows realize under a point in all three leagues over the season.
+- [ ] **D14 (XS, end of the regular season). Re-read `CLAIM_WORTHY_PPW` (1.0)** on the full-season claim replay
+  (`ff replay-pull --season 2026`, `ff backtest --claims`; the D13 floor is in since 2026-10-21): the ruling of 2026-10-21
+  is stays, on clean claim-worthy rows of n 10, 30 and 7 realizing +4.4, +3.6 and +1.3 against a promise of +1.5; the bar
+  moves only if the 1-2 bin's clean rows realize under a point in all three leagues over the season.
+- [ ] **D17 (S, needs the replay files). The preseason total under-prices the wire body who has one.** Found on the D13
+  floor's evaluation (2026-10-21, `docs/accuracy.md` "The claim ranking", the floor bullet): over the 2026 replay's weeks
+  1-5, the wire bodies within three points of a starter *with* a preseason total read 1.3, 1.2 and 1.1 a game under what
+  they scored after (3.4 mean absolute), because a wire body's preseason total is a backup's and `season_pg` fades it
+  over `PRIOR_FADE_GAMES` (6) games while he is already producing; this week's number as his prior instead read +0.3 and
+  3.2 in the same shape. Not a change to make on that number alone: it is the first five weeks of one season, this
+  week's number carries this week's matchup for a rostered starter too, and the rostered bodies (the hold, trade and
+  drop rows) were not scored. Score it on everyone (`WeekInputs.everyone` and `pool`, his price at week w against his
+  points a game after it, rostered and wire apart), then decide whether the prior fades faster, or is the larger of
+  the total and this week's number, or stays.
 - [ ] **D15 (XS, end of the regular season). Re-read `MUST_TRY_PPW` (2.0)** on the full-season scan replay
   (`ff backtest --scan`, minutes per league): the ruling of 2026-10-21 is stays, the 2-4 bin realizing +2.4 to +3.6 in
   all three leagues on five weeks; the bar moves down only if the 1-2 bin realizes its promise at a hit rate over 0.55 in

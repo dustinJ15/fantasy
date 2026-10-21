@@ -46,7 +46,13 @@ FLEX_LABELS = {"RB/WR/TE", "RB/WR", "WR/TE", "OP"}
 # weeks left in the fantasy season (that read 18.9 a game for a 14.5-a-game receiver in week 5 and grew every week).
 NFL_GAMES = 17
 # The preseason season total is a prior on a player's level that his own games replace: full weight before his first
-# game, gone after this many.
+# game, gone after this many. A body ESPN gave no preseason total (`proj_season` 0: a kicker, a D/ST, the backup who
+# became a starter) takes this week's matchup-neutral number as the prior instead (`level_prior`, D13): without one his
+# level was his last game or two (19.5 a game after one 25-point game, 11.2 for the same games with a prior), which put
+# a one-game kicker and a fill-in QB at the top of the claim ranking. The 2026 replay (weeks 1-5, the wire bodies within
+# three points of a starter): this week's number as the prior reads the no-prior body at +0.5 to +0.9 a game over what he
+# scored after, 3.3 mean absolute, against +0.6 to +1.0 and 3.35-3.5 with no prior; the position's replacement level as
+# the prior read worse than no prior on every row set and needs a second pricing pass.
 PRIOR_FADE_GAMES = 6
 
 # What his opportunity says he should have scored, against what he did (D1). `model/usage.py` prices a season's
@@ -325,10 +331,14 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     games = int(row.get("games_played") or 0)
     ytd_pg = float(row.get("actual_season") or 0) / games if games > 0 else None
     prior_pg = float(row.get("proj_season") or 0) / NFL_GAMES or None
+    # the prior `season_pg` fades: ESPN's preseason total per game, else this week's matchup-neutral number (D13), else
+    # nothing (a body with no total projected at zero this week: his own games alone, as before)
+    level_prior = prior_pg or (mu_neutral if mu_neutral > 0 else None)
+    espn_prior = prior_pg or (espn_pts if espn_pts > 0 else None)
     plays = inj_p0 < 0.5 and not row.get("bye")
     opp_mult = opportunity_mult(pos, usage) if ytd_pg is not None else 1.0
-    level = season_pg(ytd_pg * opp_mult if ytd_pg is not None else None, games, prior_pg)
-    espn_level = season_pg(ytd_pg, games, prior_pg)
+    level = season_pg(ytd_pg * opp_mult if ytd_pg is not None else None, games, level_prior)
+    espn_level = season_pg(ytd_pg, games, espn_prior)
     mu_ros_active = per_game(level, mu_neutral, plays)
     espn_pg = per_game(espn_level, espn_pts, plays) if espn_level is not None else None
     if abs(opp_mult - 1.0) >= 0.05:
@@ -369,9 +379,10 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,
-                 # ESPN's preseason total per NFL game, the prior `season_pg` fades; None when ESPN gave him no total,
-                 # so his rest-of-season level is his own games alone (TODO D13: the wire body with no preseason total)
+                 # ESPN's preseason total per NFL game; None when ESPN gave him no total. `prior_src` says what
+                 # `season_pg` faded: that total (`season`), this week's number in its place (`week`, D13), or nothing
                  "prior_pg": round(prior_pg, 2) if prior_pg else None,
+                 "prior_src": "season" if prior_pg else ("week" if level_prior else None),
                  # the opportunity read on his season so far: xFP-lite over actual, weighted (1.0 when it has no say)
                  "opp_mult": round(opp_mult, 3),
                  "actual_prev": row.get("actual_prev_week"),   # ESPN's final for last week: the accuracy log's truth
