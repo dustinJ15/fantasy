@@ -1,6 +1,7 @@
-"""The opportunity-weight fitter (TODO D10, step 1): fits `projections.OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP`
-per position, and `usage.XFP_PER_ATTEMPT`, to nflverse weekly stats of past seasons. Prints, never writes: the constants
-are copied by hand with the sample and the date in the comment (`docs/plans/fitted-projection.md`).
+"""The projection-constant fitter (TODO D10): step 1 fits `projections.OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP`
+per position, and `usage.XFP_PER_ATTEMPT`; step 2 fits `projections.OPPONENT_K`, this week's opponent factor; all to
+nflverse weekly stats of past seasons. Prints, never writes: the constants are copied by hand with the sample and the
+date in the comment (`docs/plans/fitted-projection.md`).
 
 The question it answers is the one `opportunity_mult` makes a prior on: a player's season so far reads `ppg` points a
 game and his targets, carries and attempts were worth `xfp_pg`; how far toward `xfp_pg` should his rest-of-season level
@@ -36,6 +37,11 @@ W_BOUNDS = (0.0, 1.0)
 FIT_MIN_N = 1000
 # The weight by games played so far, for the reader: the fit says it falls with the sample (the plan says what that buys).
 GAMES_BUCKETS = ((2, 3), (4, 6), (7, 10), (11, 17))
+# Step 2: `k` is how much of the opponent factor's deviation this week's number takes; held to [0, 1] (a negative `k`
+# would score a player up against a defense that allows less, past 1 would move him further than the factor says).
+K_BOUNDS = (0.0, 1.0)
+# ...and `k` by the defense's games played when the factor was read, for the reader (a young factor is mostly noise).
+DEF_GAMES_BUCKETS = ((3, 5), (6, 9), (10, 17))
 
 
 def weekly(seasons: Iterable[int] = FIT_SEASONS) -> pl.DataFrame:
@@ -49,18 +55,22 @@ def with_xfp(w: pl.DataFrame, per_attempt: float | None = None) -> pl.DataFrame:
     return w.with_columns(usage.xfp_lite_expr(per_attempt).alias("xfp"))
 
 
-def training_frame(w: pl.DataFrame, min_games: int = projections.OPPORTUNITY_MIN_GAMES, min_after: int = FIT_MIN_GAMES_AFTER,
-                   min_ppg: float = FIT_MIN_PPG) -> pl.DataFrame:
-    """A row per player-game of a season at which the live read would have run: `games`, `ppg` and `xfp_pg` over his
-    games before that week (the inputs `opportunity_mult` reads, the same game count as `usage.season_summary`: a week
-    with a stat row), and `future_ppg` over his games from that week on (the truth). Rows under `min_games` before,
-    `min_after` after or `min_ppg` so far are dropped."""
+def season_rows(w: pl.DataFrame) -> pl.DataFrame:
+    """One row per player-game of a season (FIT_POSITIONS), sorted, with his season so far on it: `games` before that
+    week, `pts_before` and `xfp_before` over them (the row's own game subtracted from the prefix, so nothing on the row
+    is read before its week), `fpts` and `xfp` that game, `opp` the defense he faced, and the season's totals."""
+    agg = [pl.col("fpts_ppr").fill_null(0.0).sum().alias("fpts")]
+    if "xfp" in w.columns:
+        agg.append(pl.col("xfp").fill_null(0.0).sum().alias("xfp"))
+    if "opp" in w.columns:
+        agg.append(pl.col("opp").drop_nulls().first().alias("opp"))
     g = (w.filter(pl.col("pos").is_in(FIT_POSITIONS))
-          .group_by(["season", "gsis_id", "pos", "week"])
-          .agg([pl.col("fpts_ppr").fill_null(0.0).sum().alias("fpts"), pl.col("xfp").fill_null(0.0).sum().alias("xfp")])
+          .group_by(["season", "gsis_id", "pos", "week"]).agg(agg)
           .sort(["season", "gsis_id", "week"]))
+    if "xfp" not in g.columns:
+        g = g.with_columns(pl.lit(0.0).alias("xfp"))
     over = ["season", "gsis_id"]
-    g = g.with_columns([
+    return g.with_columns([
         (pl.col("fpts").cum_sum().over(over) - pl.col("fpts")).alias("pts_before"),
         (pl.col("xfp").cum_sum().over(over) - pl.col("xfp")).alias("xfp_before"),
         (pl.col("week").rank("ordinal").over(over) - 1).cast(pl.Int64).alias("games"),
@@ -68,7 +78,16 @@ def training_frame(w: pl.DataFrame, min_games: int = projections.OPPORTUNITY_MIN
         pl.len().over(over).cast(pl.Int64).alias("games_total"),
     ]).with_columns([
         (pl.col("games_total") - pl.col("games")).alias("games_after"),
-    ]).filter((pl.col("games") >= min_games) & (pl.col("games_after") >= min_after)).with_columns([
+    ])
+
+
+def training_frame(w: pl.DataFrame, min_games: int = projections.OPPORTUNITY_MIN_GAMES, min_after: int = FIT_MIN_GAMES_AFTER,
+                   min_ppg: float = FIT_MIN_PPG) -> pl.DataFrame:
+    """A row per player-game of a season at which the live read would have run: `games`, `ppg` and `xfp_pg` over his
+    games before that week (the inputs `opportunity_mult` reads, the same game count as `usage.season_summary`: a week
+    with a stat row), and `future_ppg` over his games from that week on (the truth). Rows under `min_games` before,
+    `min_after` after or `min_ppg` so far are dropped."""
+    g = season_rows(w).filter((pl.col("games") >= min_games) & (pl.col("games_after") >= min_after)).with_columns([
         (pl.col("pts_before") / pl.col("games")).alias("ppg"),
         (pl.col("xfp_before") / pl.col("games")).alias("xfp_pg"),
         ((pl.col("pts_total") - pl.col("pts_before")) / pl.col("games_after")).alias("future_ppg"),
@@ -186,6 +205,141 @@ def fit_weights(df: pl.DataFrame) -> dict:
     return {"clip": clip, "clip_table": table, "weights": [fit_position(samples[pos], pos, clip) for pos in FIT_POSITIONS]}
 
 
+# ---------- step 2: the opponent factor ----------
+
+def factors_by_week(tg: pl.DataFrame) -> pl.DataFrame:
+    """Every defense's factor as it stood before each week of each season: `usage.opponent_factors` through week
+    w - 1, labelled `week` w, so a row at week w joins the factor the live read would have had on the morning of it."""
+    out = []
+    for yr in tg["season"].unique().sort().to_list():
+        t = tg.filter(pl.col("season") == yr)
+        for wk in range(2, int(t["week"].max()) + 1):
+            f = usage.opponent_factors(t, through_week=wk - 1)
+            if not f.is_empty():
+                out.append(f.with_columns(pl.lit(wk).cast(pl.Int64).alias("week")))
+    cols = ["season", "team", "pos", "games", "allowed_pg", "expected_pg", "raw", "factor", "week"]
+    return pl.concat(out, how="vertical_relaxed") if out else pl.DataFrame({c: [] for c in cols})
+
+
+def opponent_frame(w: pl.DataFrame, min_games: int = projections.OPPORTUNITY_MIN_GAMES, min_ppg: float = FIT_MIN_PPG,
+                   min_def_games: int = projections.OPPONENT_MIN_GAMES) -> pl.DataFrame:
+    """A row per player-game at which the live read would have priced his week: `ppg` over his games before it
+    (`min_games` or more, `min_ppg` or more), the defense he faced that week with its `factor` and `raw` as they stood
+    through the week before (`def_games` games, `min_def_games` or more), and `pts`, what he scored that week (the
+    truth). The row's own game is in neither input."""
+    tg = usage.team_games(w)
+    f = factors_by_week(tg).rename({"team": "opp", "games": "def_games"}).select(["season", "opp", "pos", "week", "def_games", "raw", "factor"])
+    g = (season_rows(w).filter((pl.col("games") >= min_games) & pl.col("opp").is_not_null())
+           .with_columns((pl.col("pts_before") / pl.col("games")).alias("ppg"))
+           .filter(pl.col("ppg") >= min_ppg)
+           .join(f, on=["season", "opp", "pos", "week"], how="inner")
+           .filter(pl.col("def_games") >= min_def_games))
+    return g.select(["season", "gsis_id", "pos", "week", "games", "ppg", "opp", "def_games", "raw", "factor", pl.col("fpts").alias("pts")])
+
+
+@dataclass
+class OppSample:
+    """One position's opponent rows as arrays: `season` for the folds, `def_games` the defense's sample, `ppg` his
+    level so far, `factor` (and `raw`, the unadjusted one) the defense's, `y` his points that week."""
+    season: np.ndarray
+    def_games: np.ndarray
+    ppg: np.ndarray
+    factor: np.ndarray
+    raw: np.ndarray
+    y: np.ndarray
+
+    @classmethod
+    def of(cls, df: pl.DataFrame, pos: str) -> OppSample:
+        d = df.filter(pl.col("pos") == pos)
+        return cls(d["season"].to_numpy(), d["def_games"].to_numpy().astype(int), d["ppg"].to_numpy().astype(float),
+                   d["factor"].to_numpy().astype(float), d["raw"].to_numpy().astype(float), d["pts"].to_numpy().astype(float))
+
+    @property
+    def n(self) -> int:
+        return int(self.y.size)
+
+
+def _fx(s: OppSample, raw: bool = False) -> np.ndarray:
+    """The regressor: `ppg * (factor - 1)`, so the model `ppg * (1 + k * (factor - 1))` is `ppg + k * x`."""
+    return s.ppg * ((s.raw if raw else s.factor) - 1.0)
+
+
+def fit_k(s: OppSample, mask: np.ndarray | None = None, raw: bool = False) -> float:
+    """The least-squares `k`, closed form, held to K_BOUNDS (the cap is left off the fit and put on the score, as the
+    live multiplier is: `fit_opponent_position` says how often it binds). `mask` picks the training rows."""
+    x = _fx(s, raw)
+    y = s.y - s.ppg
+    if mask is not None:
+        x, y = x[mask], y[mask]
+    den = float((x * x).sum())
+    if den <= 0:
+        return 0.0
+    return float(np.clip((x * y).sum() / den, *K_BOUNDS))
+
+
+def _opp_pred(s: OppSample, k: float, cap: float | None, raw: bool = False) -> np.ndarray:
+    m = 1.0 + k * ((s.raw if raw else s.factor) - 1.0)
+    if cap is not None:
+        m = np.clip(m, 1.0 - cap, 1.0 + cap)
+    return s.ppg * m
+
+
+def opp_rmse(s: OppSample, k: float, cap: float | None, mask: np.ndarray | None = None, raw: bool = False) -> float:
+    err = _opp_pred(s, k, cap, raw) - s.y
+    if mask is not None:
+        err = err[mask]
+    return float(np.sqrt(np.mean(err**2))) if err.size else float("nan")
+
+
+def oos_k(s: OppSample, cap: float | None, raw: bool = False) -> tuple[float, int, list[float]]:
+    """Leave-one-season-out: `k` fitted on the other seasons, scored (with the cap) on the held-out one; the summed
+    squared error and count over every held-out row, and the per-fold `k`s."""
+    sse, n, ks = 0.0, 0, []
+    for yr in np.unique(s.season):
+        test = s.season == yr
+        if test.all():
+            continue
+        k = fit_k(s, ~test, raw)
+        ks.append(k)
+        err = (_opp_pred(s, k, cap, raw) - s.y)[test]
+        sse += float((err**2).sum()); n += int(err.size)
+    return sse, n, ks
+
+
+def fit_opponent_position(s: OppSample, pos: str, cap: float = projections.OPPONENT_MULT_CAP, min_n: int = FIT_MIN_N) -> dict:
+    """One position's row: the sample, the prior `k` and its out-of-sample error, no factor at all (k = 0), the `k`
+    fitted on every season, the per-fold `k`s, the same fit on the unadjusted factor (`k_raw`, `rmse_raw`: whether the
+    schedule adjustment earns its place), the error without the cap and the share of rows the cap binds on, `k` by the
+    defense's games played, and the verdict: `fit` when the fitted `k` beats the prior out of sample on `min_n` rows or
+    more, else `keep prior`."""
+    prior_k = projections.OPPONENT_K.get(pos, 0.0)
+    row = {"pos": pos, "n": s.n, "seasons": int(np.unique(s.season).size), "k_prior": prior_k, "cap": cap,
+           "rmse_none": None, "rmse_prior": None, "k_fit": None, "rmse_fit": None, "rmse_nocap": None, "cap_binds": None,
+           "k_raw": None, "rmse_raw": None, "k_folds": [], "k_by_def_games": {}, "fitted": False, "min_n": min_n}
+    if not s.n:
+        return row
+    sse, n, ks = oos_k(s, cap)
+    sse_nc, n_nc, _ = oos_k(s, None)
+    sse_raw, n_raw, _ = oos_k(s, cap, raw=True)
+    k = fit_k(s)
+    m = 1.0 + k * (s.factor - 1.0)
+    row.update(rmse_none=round(opp_rmse(s, 0.0, cap), 4), rmse_prior=round(opp_rmse(s, prior_k, cap), 4),
+               k_fit=round(k, 3), rmse_fit=_rmse(sse, n), rmse_nocap=_rmse(sse_nc, n_nc),
+               cap_binds=round(float(((m < 1.0 - cap) | (m > 1.0 + cap)).mean()), 3),
+               k_raw=round(fit_k(s, raw=True), 3), rmse_raw=_rmse(sse_raw, n_raw), k_folds=[round(x, 3) for x in ks])
+    for lo, hi in DEF_GAMES_BUCKETS:
+        msk = (s.def_games >= lo) & (s.def_games <= hi)
+        row["k_by_def_games"][f"{lo}-{hi}"] = (round(fit_k(s, msk), 3), int(msk.sum())) if msk.any() else (None, 0)
+    row["fitted"] = s.n >= min_n and row["rmse_fit"] is not None and row["rmse_fit"] < row["rmse_prior"] - 1e-9
+    return row
+
+
+def fit_opponent(w: pl.DataFrame) -> dict:
+    """Step 2 over FIT_POSITIONS: the opponent frame and `fit_opponent_position` for each."""
+    df = opponent_frame(w)
+    return {"rows": len(df), "weeks": [fit_opponent_position(OppSample.of(df, pos), pos) for pos in FIT_POSITIONS]}
+
+
 def fit_attempt_value(w: pl.DataFrame, carry: float = usage.XFP_PER_CARRY) -> dict:
     """The PPR points a pass attempt is worth at the league average: QB weeks with an attempt, points less `carry` a
     carry, least squares through the origin on attempts (`per_attempt`, with its per-season range). `joint` is the
@@ -233,4 +387,4 @@ def run(seasons: Iterable[int] = FIT_SEASONS) -> dict:
     attempt = fit_attempt_value(w)
     df = training_frame(with_xfp(w, attempt["per_attempt"]))
     return {"seasons": [int(s) for s in seasons], "rows": len(df), "attempt": attempt, "values": refit_opportunity_values(w),
-            **fit_weights(df)}
+            **fit_weights(df), "opponent": fit_opponent(w)}

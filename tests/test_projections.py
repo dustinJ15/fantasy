@@ -288,3 +288,33 @@ def test_a_back_whose_carries_outrun_his_points_reads_up_and_a_blank_usage_chang
     # no games on ESPN's side: nothing to scale, the prior is the level
     fresh = blend(row(pos="RB", proj_week=12.0, proj_season=180.0), None, None, 13, None, week=1, usage=_usage(ppg=10.0, xfp_pg=13.0))
     assert fresh.sources["opp_mult"] == 1.0 and fresh.mu_ros_active == pytest.approx(0.5 * 180 / 17 + 0.5 * 12.0, abs=0.05)
+
+
+# ---------- D10 step 2: the opponent factor moves this week's number ----------
+
+def test_opponent_mult_takes_k_of_the_factor_held_to_the_cap_and_waits_for_the_defense(monkeypatch):
+    from ff.model import projections
+    monkeypatch.setattr(projections, "OPPONENT_K", {"QB": 0.2, "RB": 0.25, "WR": 0.1, "TE": 0.2})
+    assert projections.opponent_mult("QB", {"factor": 1.4, "games": 6}) == pytest.approx(1.08)
+    assert projections.opponent_mult("RB", {"factor": 0.5, "games": 6}) == pytest.approx(0.9)    # 0.875 held to the cap
+    assert projections.opponent_mult("RB", {"factor": 1.6, "games": 6}) == pytest.approx(1.1)
+    assert projections.opponent_mult("RB", {"factor": 1.6, "games": 2}) == 1.0    # under OPPONENT_MIN_GAMES
+    assert projections.opponent_mult("K", {"factor": 1.6, "games": 9}) == 1.0 == projections.opponent_mult("D/ST", {"factor": 0.5, "games": 9})
+    assert projections.opponent_mult("WR", None) == 1.0 == projections.opponent_mult("WR", {"factor": None, "games": 9})
+
+
+def test_a_soft_defense_lifts_this_week_only_and_the_rival_still_sees_espn(monkeypatch):
+    from ff.model import projections
+    monkeypatch.setattr(projections, "OPPONENT_K", {"QB": 0.2, "RB": 0.25, "WR": 0.1, "TE": 0.2})
+    r = row(pos="QB", eligible=["QB"], proj_week=20.0, proj_season=340.0, actual_season=88.0, games_played=4)
+    flat = blend(r, None, None, 13, None, week=5)
+    soft = blend(r, None, None, 13, None, week=5, opponent={"factor": 1.4, "games": 6, "raw": 1.3})
+    assert soft.mu == pytest.approx(flat.mu * 1.08, abs=0.01)
+    assert soft.mu_ros == flat.mu_ros and soft.mu_ros_active == flat.mu_ros_active   # a matchup, not a level
+    assert soft.sources["espn_pg"] == flat.sources["espn_pg"]
+    assert soft.sources["def_factor"] == 1.4 and soft.sources["def_mult"] == 1.08 and "def:x1.08" in soft.flags
+    assert flat.sources["def_factor"] is None and flat.sources["def_mult"] == 1.0 and not any(f.startswith("def:") for f in flat.flags)
+    tough = blend(r, None, None, 13, None, week=5, opponent={"factor": 0.4, "games": 6}, implied_total=23.0)
+    assert tough.mu == pytest.approx(flat.mu * 0.9, abs=0.01) and "def:x0.90" in tough.flags
+    small = blend(r, None, None, 13, None, week=5, opponent={"factor": 1.05, "games": 6})
+    assert small.sources["def_mult"] == 1.01 and not any(f.startswith("def:") for f in small.flags)   # under the flag's 3%

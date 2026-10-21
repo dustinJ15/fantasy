@@ -139,6 +139,20 @@ def _sigma(pos: str, mu: float, fp_sd: float | None) -> float:
 VEGAS_K = {"QB": 0.35, "RB": 0.3, "WR": 0.35, "TE": 0.3, "K": 0.4, "D/ST": 0.0}
 LEAGUE_AVG_IMPLIED = 23.0
 
+# This week's opponent (D10 step 2, ROADMAP item 5's open piece). `model/usage.py` `opponent_factors` reads each
+# defense's PPR points allowed a game to a position over the season through last week, over what those offenses scored
+# at the position in their other games (one pass of schedule adjustment): 1.2 is a defense giving up a fifth more than
+# the offenses it faced score elsewhere. The multiplier on this week's number is `1 + k * (factor - 1)`, held to
+# 1 ± OPPONENT_MULT_CAP, and a defense under OPPONENT_MIN_GAMES games reads 1.0. `k` is fitted (`opfit.fit_opponent`,
+# `ff fit-opportunity`, 2026-10-21): 26,670 player-weeks of 2016-2025, his points that week against `ppg` so far,
+# leave-one-season-out, against no factor at all (k = 0); the fold `k`s sit within 0.03 of these. The factor is worth
+# 0.3-0.4% of the weekly error at QB, RB and TE and nothing to speak of at WR (a young WR factor, under six games, fits
+# k = 0); the cap binds on 2-5% of rows and earns its place; the plan has the table and what the fit could not see
+# (`docs/plans/fitted-projection.md`). K and D/ST read 1.0 (nflverse has no kicks).
+OPPONENT_K = {"QB": 0.20, "RB": 0.25, "WR": 0.09, "TE": 0.19}   # was 0 (no factor); fitted 2026-10-21
+OPPONENT_MULT_CAP = 0.10   # ROADMAP item 5's ±10%; the fit says the cap helps (2026-10-21)
+OPPONENT_MIN_GAMES = 3
+
 # Wind at kickoff (`sources/weather.py`, Open-Meteo 10 m wind in mph) discounts this week's number for the players
 # the ball has to fly for. The public play-by-play studies (FiveThirtyEight's and 4for4's wind pieces, the Fantasy
 # Points weather reviews) agree on the shape and roughly on the size: passing yards, completion rate and field-goal
@@ -164,6 +178,19 @@ def wind_mult(pos: str, weather: dict | None) -> float:
         return 1.0
     frac = min((wind - WIND_MPH_START) / (WIND_MPH_CAP - WIND_MPH_START), 1.0)
     return 1.0 - pen * frac
+
+
+def opponent_mult(pos: str, opponent: dict | None) -> float:
+    """This week's multiplier for the defense he faces (`usage.opponent_factor_index` row: `factor`, `games`): 1.0 for a
+    position the factor does not price (K, D/ST), a missing opponent or one under OPPONENT_MIN_GAMES games; otherwise
+    `1 + k * (factor - 1)` with OPPONENT_K's `k`, held to 1 ± OPPONENT_MULT_CAP."""
+    k = OPPONENT_K.get(pos, 0.0)
+    if not k or not opponent:
+        return 1.0
+    f, games = _num(opponent.get("factor")), int(opponent.get("games") or 0)
+    if f is None or f <= 0 or games < OPPONENT_MIN_GAMES:
+        return 1.0
+    return float(np.clip(1.0 + k * (f - 1.0), 1.0 - OPPONENT_MULT_CAP, 1.0 + OPPONENT_MULT_CAP))
 
 
 def season_pg(ytd_pg: float | None, games: int, prior_pg: float | None) -> float | None:
@@ -218,7 +245,8 @@ def _num(x) -> float | None:
 
 def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int, overrides: dict | None = None,
           sleeper_pts: float | None = None, implied_total: float | None = None, week: int | None = None,
-          weekday: int | None = None, weather: dict | None = None, usage: dict | None = None) -> PlayerProj:
+          weekday: int | None = None, weather: dict | None = None, usage: dict | None = None,
+          opponent: dict | None = None) -> PlayerProj:
     """
     row: PlayerRow dict from sources.espn. fp: matched fp_latest_weekly row. sleeper: injury_table row.
     sleeper_pts: Sleeper/Rotowire stat projection in this league's scoring. implied_total: Vegas implied team total.
@@ -227,6 +255,9 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     (`sources.weather.forecast`), None when unknown; only its wind moves a number (`wind_mult`), this week only.
     usage: his season-to-date opportunity (`model/usage.py` `signals`), None when nflverse has nothing on him; it
     moves the rest-of-season level only (`opportunity_mult`), never this week and never the rival's `espn_pg`.
+    opponent: the defense he faces this week, its points-allowed factor at his position through last week
+    (`usage.opponent_factor_index`), None when unknown; it moves this week's number only (`opponent_mult`), beside the
+    implied total, never the rest-of-season level and never the rival's `espn_pg`.
 
     Overrides (Claude's parameters, never decisions): `p_zero` and `mu_mult` are this week only; `weeks_out` (a number,
     or "season") and `ros_mult` are the rest of the season. Code owns the arithmetic between them.
@@ -253,6 +284,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     mu_neutral = mu   # the blend before this week's matchup (Vegas, the opponent) is applied: the rest of the season's input
     if implied_total and mu and VEGAS_K.get(pos, 0):
         mu *= 1 + VEGAS_K[pos] * (implied_total / LEAGUE_AVG_IMPLIED - 1)
+    def_mult = opponent_mult(pos, opponent)
+    mu *= def_mult
     wx_mult = wind_mult(pos, weather)
     mu *= wx_mult
 
@@ -277,6 +310,8 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
     wind_mph = _num((weather or {}).get("wind_mph"))
     if wx_mult < 1.0:
         flags.append(f"wind:{wind_mph:.0f}mph x{wx_mult:.2f}")
+    if abs(def_mult - 1.0) >= 0.03:
+        flags.append(f"def:x{def_mult:.2f}")
 
     sl_roster = (sleeper or {}).get("roster_status") or ""
     designated = (status not in ACTIVE_STATUSES or sl_status not in ACTIVE_STATUSES or sl_roster in SLEEPER_ROSTER_MULTI_WEEK
@@ -328,6 +363,9 @@ def blend(row: dict, fp: dict | None, sleeper: dict | None, weeks_remaining: int
         sources={"fp_pts": fp_pts, "espn_pts": espn_pts, "sleeper_pts": sleeper_pts, "implied_total": implied_total,
                  # kickoff wind and the this-week multiplier it earned (1.0 for a dome, calm air or no forecast)
                  "wind_mph": wind_mph, "weather_mult": round(wx_mult, 3),
+                 # the defense he faces this week: its schedule-adjusted points-allowed factor at his position through
+                 # last week (None when unknown) and the this-week multiplier it earned (1.0 when it has no say)
+                 "def_factor": _num((opponent or {}).get("factor")), "def_mult": round(def_mult, 3),
                  # ESPN's own rest-of-season number per game: what a rival's app shows him, injury docking included
                  "espn_pg": round(espn_pg, 2) if espn_pg is not None else None,
                  "ytd_pg": round(ytd_pg, 2) if ytd_pg is not None else None, "games_played": games,

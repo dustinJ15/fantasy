@@ -1,7 +1,8 @@
 # Plan: the fitted projection model (TODO D10)
 
 Status: planned 2026-10-21; step 1 done the same day (the opportunity weight and clip, the pass-attempt term: `src/ff/opfit.py`,
-`ff fit-opportunity`, the constants adopted in `model/projections.py` and `model/usage.py`). Steps 2-5 are in TODO.md under D10.
+`ff fit-opportunity`, the constants adopted in `model/projections.py` and `model/usage.py`); step 2 done 2026-10-21 (the opponent
+factor: `usage.opponent_factors`, `opfit.fit_opponent`, `OPPONENT_K` adopted, `blend` reads it this week). Steps 3-5 are in TODO.md under D10.
 Written: 2026-10-21 against `main` at 3db45b8 (a session with the network and no cookies: nflverse reachable, ESPN not).
 TODO ids: D10 (steps 2-5); D2 is the variance fit the same way, on the projlog; D13 the floor prior for a wire body.
 Still open: D10.
@@ -116,17 +117,80 @@ from the constants; the plan's worked example in `docs/plans/in-season-projectio
   the whole grid, so the choice is not a tuned number but a reading that the clip does nothing; the bounds adopted are
   the grid's edge, which is why the plan says "off inside the data" and not "fitted to 0.3 and 2.0".
 
-## Steps 2-5 (one PR each, in order; the done-when of each)
+## Step 2: the opponent factor (done 2026-10-21)
 
-2. **The opponent factor** (ROADMAP item 5's open piece: the schedule-adjusted points-allowed factor, capped at ±10%).
-   From the same weekly stats: PPR points allowed to each position by each defense over the season so far, divided by
-   what the offenses it faced score elsewhere (one pass of adjustment), as a multiplier on *this week's* number.
-   Training row: a player at a week, `ppg` so far and his opponent's factor so far, truth his points that week; model
-   `points ≈ ppg * (1 + k * (factor - 1))`, closed form in `k`, capped, leave-one-season-out, per position. Done when
-   `fit_opponent` prints `k` per position against no factor and the cap, and the factor is wired into `blend` as a
-   this-week multiplier beside `VEGAS_K` with its own `sources` field and flag. What it must not read: the week's own
-   box score in the factor (through week w-1 only), and the factor is applied to the matchup-neutral number, never to
-   ESPN's (whose analysts already look at the matchup; whether it double counts is step 5's question).
+ROADMAP item 5's open piece: the schedule-adjusted points-allowed factor, capped at ±10%, as a multiplier on *this
+week's* number. What it must not read: the week's own box score in the factor (through week w-1 only), and the
+rest-of-season level and the rival's `espn_pg` never see it (whether it double counts what ESPN's analysts already
+priced in the matchup is step 5's question).
+
+### The factor
+
+`usage.team_games` over the weekly rows: one row per team-game and position, `pts` the PPR points the offense's players
+at that position scored in it (0 when none had a stat row; a bye is no game). `usage.opponent_factors` through a week:
+each defense's `allowed_pg` at the position, `raw` (that over the league's average team-game) and `factor`, the
+schedule-adjusted one: `allowed_pg` over what those offenses scored a game at the position in their *other* games (one
+pass; an offense with no other game reads the league average). The live read is `usage.opponent_factor_index(season,
+week - 1)`, keyed by nflverse team (`usage.nfl_team` maps ESPN's LAR and WSH) and position; `packet._projs` finds a
+player's opponent on the scoreboard line (`lines[team]["opp"]`), and `blend` multiplies this week's `mu` by
+`opponent_mult`: `1 + k * (factor - 1)` held to `1 ± OPPONENT_MULT_CAP`, 1.0 under `OPPONENT_MIN_GAMES` (3) defense
+games, K and D/ST, a missing line or a missing factor. The packet row carries `sources.def_factor` and `def_mult`, the
+flag `def:x1.08` from 3% either way.
+
+### The training row
+
+`opfit.opponent_frame`: a player at a week of a past season (the same `season_rows` pass as step 1: 2+ games before,
+5.0+ PPR a game so far), the defense he faced that week with its `factor` and `raw` as they stood through the week
+before (`opfit.factors_by_week`; 3+ defense games), and `pts`, his points that week, the truth. 26,670 rows 2016-2025:
+QB 4,111, RB 7,096, WR 11,277, TE 4,186.
+
+### The fit
+
+`points ≈ ppg * (1 + k * (factor - 1))` is `ppg + k * x` with `x = ppg * (factor - 1)`, so `k` is closed form
+(`fit_k`, held to [0, 1]: a negative `k` would score a player up against a defense that allows less). The cap is
+left off the fit and put on the score, as the live multiplier is; `fit_opponent_position` prints the error without it
+and the share of rows it binds on, the same fit on the unadjusted factor (`k_raw`), and `k` by the defense's games.
+
+### What it printed (2016-2025, 2026-10-21)
+
+| pos | n | k now | fit | rmse k=0 | rmse fit | no cap | cap binds | raw factor (k, rmse) | folds | k by defense games (3-5, 6-9, 10-17) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| QB | 4111 | 0 | 0.198 | 8.1202 | 8.0926 | 8.0956 | 2.3% | 0.246, 8.0820 | 0.161-0.216 | 0.14, 0.11, 0.39 |
+| RB | 7096 | 0 | 0.254 | 7.6259 | 7.5959 | 7.5989 | 4.7% | 0.312, 7.5911 | 0.233-0.265 | 0.25, 0.22, 0.30 |
+| WR | 11277 | 0 | 0.093 | 7.5273 | 7.5258 | 7.5258 | 0.0% | 0.124, 7.5247 | 0.070-0.115 | 0.00, 0.17, 0.26 |
+| TE | 4186 | 0 | 0.185 | 6.4650 | 6.4427 | 6.4458 | 5.1% | 0.206, 6.4435 | 0.159-0.220 | 0.19, 0.07, 0.31 |
+
+Adopted: `OPPONENT_K = {"QB": 0.20, "RB": 0.25, "WR": 0.09, "TE": 0.19}`, `OPPONENT_MULT_CAP = 0.10` (kept),
+`OPPONENT_MIN_GAMES = 3`. A re-run reads the fit against itself and says `keep prior` in every position.
+
+### What the fit found
+
+- **The factor is real and small.** Every position beats no factor out of sample in every fold, and the fold `k`s sit
+  within 0.03 of the whole-sample one; but the gain is 0.3-0.4% of the weekly error at QB, RB and TE and 0.02% at WR,
+  against the 6-7% the opportunity read took off the rest-of-season error in step 1. A week's points are mostly noise
+  around his level; the defense he faces moves the level by a few percent (a 1.4 factor, the top of the league, is
+  +8% at QB, +10% at RB, +4% at WR).
+- **The cap earns its place.** It binds on 2-5% of rows (a defense at 1.5+ or 0.6- after three to five games) and
+  scoring with it beats scoring without it in QB, RB and TE; those tails are the young factors that then regress.
+- **The adjustment does not.** The unadjusted factor fits a larger `k` and scores 0.001-0.011 better out of sample in
+  every position but TE (a tie). Dividing by what the offenses scored elsewhere adds the noise of those offenses'
+  other games, and over a season the schedules even out. Kept as the plan's shape (question 6).
+- **The factor is worth more as the season goes.** `k` by the defense's games runs 0.0-0.25 at three to five games
+  and 0.26-0.39 past ten in every position; a young WR factor says nothing at all. The opposite of step 1's weight,
+  which fell with the sample: a defense's identity takes most of a season to read. One constant stays (question 7).
+
+### What the fit could not see
+
+- **ESPN's number.** The training row prices the week from `ppg` so far, the only weekly number 2016-2025 has; the live
+  `mu` is the ESPN and Sleeper blend, whose analysts already look at the matchup, so the factor on top of it may
+  double count. Step 5 scores the fitted weekly number against ESPN's on the 2026 replay and says whether `k` on the
+  blend should be smaller than `k` on `ppg`.
+- **Scoring.** Both sides nflverse PPR; the factor is unitless, the error figures are PPR points.
+- **Nothing about the game script**: the implied total (step 3) and the spread are the other half of the matchup, fitted
+  on the same row next.
+
+## Steps 3-5 (one PR each, in order; the done-when of each)
+
 3. **The implied-total term.** `VEGAS_K` per position was set by hand (2026-09). nflverse `schedules` carries
    `spread_line` and `total_line` for every game since 1999, so the implied team total of every training game is
    `total / 2 ± spread / 2`. Same row as step 2 with the implied total in place of the factor, model
@@ -174,3 +238,12 @@ from the constants; the plan's worked example in `docs/plans/in-season-projectio
 5. **Train on play-by-play, as the item said?** Not for step 1: the weekly stats carry the opportunities the proxy
    prices (targets, carries, air yards, attempts) and the points, which is all the live read uses. Play-by-play is
    needed when a term reads a situation (red-zone share, down and distance), which is ROADMAP item 3, not this plan.
+6. **The unadjusted factor instead of the schedule-adjusted one?** No. It scores 0.001-0.011 of rmse better out of
+   sample in three positions and ties in the fourth, under what the clip grid moved in step 1 and a tie by the plan's
+   rule; the adjustment is what makes a week-4 factor against three weak offenses read right, which is when the card
+   reads a factor at its noisiest. `opponent_factor_index` carries `raw` beside `factor` so a later season can re-decide
+   on the printed row.
+7. **A `k` schedule by the defense's games instead of one constant?** No. `k` rises with the defense's sample (the
+   table above), but the whole term is worth 0.3% of the weekly error; a schedule would move a few hundredths of that.
+   Revisit with step 5 if the replay scores the early-season matchup read as the place the card is wrong, and then as
+   `OPPONENT_MIN_GAMES` per position first (WR at 3-5 games fits zero).

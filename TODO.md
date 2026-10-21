@@ -93,14 +93,18 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   cookies), each term fitted leave-one-season-out in the live arithmetic's own shape and adopted only when it beats the
   prior out of sample; the backtest harness (`docs/plans/backtest.md`) and the projlog score what the fit cannot. Step 1
   done 2026-10-21: `OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP` fitted (QB 0.57, RB 0.64, WR 0.58, TE 0.67; the
-  clip off inside the data) and `XFP_PER_ATTEMPT` (0.415), so QB reads his attempts. Left, one PR each, in order:
-  2. the opponent factor (`opfit.fit_opponent`: points allowed per position by each defense over the season so far,
-  adjusted for the offenses faced, as a capped multiplier on this week's number; ROADMAP item 5's open piece); 3. the
+  clip off inside the data) and `XFP_PER_ATTEMPT` (0.415), so QB reads his attempts. Step 2 done 2026-10-21: the opponent
+  factor (`usage.opponent_factors`, each defense's points allowed a game at the position over what those offenses score
+  elsewhere, through last week; `OPPONENT_K` fitted QB 0.20, RB 0.25, WR 0.09, TE 0.19 on 26,670 player-weeks, worth
+  0.3% of the weekly error; the ±10% cap kept) multiplies this week's `mu` in `blend` beside `VEGAS_K`
+  (`sources.def_factor`, `def_mult`, the `def:x1.08` flag). Left, one PR each, in order: 3. the
   implied-total term (`VEGAS_K` fitted on nflverse `schedules` `spread_line` / `total_line`, ROADMAP item 4's open
-  calibration); 4. the recent-usage trend (the last three games' share against the season's, a second term on the
+  calibration; the same row as step 2, `opfit.opponent_frame`, with the implied total in place of the factor); 4. the
+  recent-usage trend (the last three games' share against the season's, a second term on the
   rest-of-season level, the same closed form as step 1); 5. the blend with consensus by out-of-sample error (the
   historical model's weekly number against ESPN's in the 2026 replay and the projlog; needs the replay files and the
-  cookies). Each step's done-when and what it must not read are in the plan.
+  cookies; it also says whether `OPPONENT_K` on top of ESPN's number double counts the matchup its analysts priced).
+  Each step's done-when and what it must not read are in the plan.
 - [ ] **D9 (S). The variance sign on a trade's `my_gain`.** `docs/plans/trade-acceptance.md` question 4: a consolidation
   (fewer, bigger starters) gets +10% on `my_gain` when my playoff odds are under 40% and -10% when they are over 70%,
   the research's Skinner result (an underdog buys variance, a favorite buys floor); title odds as the objective only
