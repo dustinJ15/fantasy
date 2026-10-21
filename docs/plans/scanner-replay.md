@@ -1,12 +1,13 @@
 # Plan: the scanner replay (every trade row and every claim row of every replayed week, graded)
 
-Status: steps 1 and 2 done (TODO D12), the rest planned. Written 2026-10-20 in a session without `leagues.toml`; the probe
-(`scripts/probe_replay_pool.py`, the free-agent pool of a past week) ran later that day on all three leagues and its
-findings are under "What the probe found" below, with the one change they make to the pull. The harness this extends:
-`docs/plans/backtest.md` (D8, D11).
-Written: 2026-10-20 against `main` at 4a67182; the probe's findings added against 4230107, the universe pull against eafbcf0.
-TODO ids: D12 (steps 3-5, in order, in TODO.md).
-Still open: D12 steps 3-5.
+Status: steps 1-3 done (TODO D12): the probe (`scripts/probe_replay_pool.py`, "What the probe found" below, with the one
+change it made to the pull), the universe pull and `scan_hits` (`ff backtest --scan`, "What step 3 found" below); steps 4
+and 5 planned. Written 2026-10-20 in a session without `leagues.toml`. The harness this extends: `docs/plans/backtest.md`.
+Written: 2026-10-20 against `main` at 4a67182; the probe's findings added against 4230107, the universe pull against eafbcf0,
+`scan_hits` against 01610b6.
+TODO ids: D12 (steps 4-5, in order, in TODO.md).
+Still open: D12 steps 4-5; the re-pull of the three leagues (`ff replay-pull --season 2026`, the cookies) before the first
+real `ff backtest --scan`.
 
 For an agent building or reading the scanner replay: the part of the backtest that grades the trade scan (`model/trades.py`
 `scan`) and the waiver ranking (`model/waivers.py` `rank_free_agents`) rather than the lineup. ROADMAP item 8's second
@@ -142,9 +143,14 @@ projection shape, every player with a preseason total and actuals in every week.
 
 - Actuals drawn from the projections (the house sigma): the scan's hit rate over packages with `my_delta_ppw` over
   2 reads well above a coin flip and the realized mean tracks the predicted mean within the sampling error of the
-  bin; the claim rows likewise.
+  bin; the claim rows likewise. (Step 3: only with real fit trades on the rosters, `synthetic_replay(fit=5)`: a
+  surplus and a hole per team. A flat draw offers the scan nothing but packages selected on the pricing's own
+  noise, "What step 3 found".)
 - Actuals shuffled across players within a position (no information in the projections): hit rate at a coin flip,
-  realized means near zero in every bin. A harness that reads edge there is leaking.
+  nothing realized above half a point in any bin. A harness that reads edge there is leaking. (Step 3 found the
+  shuffled world has structure of its own: a 2-for-1 leaves fewer exchangeable bodies to draw a lineup from and a
+  swap can move the flex between positions, so the realized mean sits under zero rather than at it; the test holds
+  it to no edge, not to zero. The pricing leak the rule is about is what the third property catches exactly.)
 - A week-w candidate's inputs never read a week-w or later actual: a test that poisons every actual from week w on
   with a sentinel and checks the priced `my_delta_ppw` and `delta_over_starter` are unchanged.
 
@@ -167,8 +173,8 @@ projection shape, every player with a preseason total and actuals in every week.
    `universe_size` and `universe_missing` (a player with no `stats` block counts as missing), `load_replay` refusing
    version 1; the synthetic replay grows the universe. The re-pull of the three leagues (`ff replay-pull --season 2026`)
    needs the cookies and is the first thing step 3 does: the version-1 files under `data/replay/` are refused until then.
-3. **`scan_hits`** (M): `replay_proj`, `standings_at`, the pool, the sim, the scan per team-week, the two realized
-   scores, the tables, `ff backtest --scan`; the three synthetic properties as tests.
+3. **`scan_hits`** (M, done 2026-10-20): `replay_proj`, `standings_at`, the pool, the sim, the scan per team-week, the
+   two realized scores, the tables, `ff backtest --scan`; the three synthetic properties as tests. "What step 3 found".
 4. **`claim_hits`** (S): the claim rows per team-week, the two realized scores, the managers' actual adds, `ff
    backtest --claims`.
 5. **The first real tables** (XS, after the pull): `docs/accuracy.md` gets the scan and claim tables for 2026 to
@@ -216,3 +222,30 @@ What the scratch reads added, which change the pull and nothing else in the plan
 - The future weeks' projections are real weekly numbers (period 8 differs from period 9 on 392 of 661 players), not
   one figure copied; the scan does not read them (the rest-of-season price comes from `proj_season` and the fade),
   but the file keeps them because they come free.
+
+## What step 3 found
+
+Built 2026-10-20 (`backtest.scan_hits`, `ff backtest --scan [--sims N]`; `scan_week` prices a week, `score_packages`
+grades, `scan_table` tabulates). Four things the plan above did not say, each now in the code:
+
+- **The wire sits in both realized lineups.** `my_delta_ppw` is priced with `SeasonCtx.fa_pool` (the two best free
+  agents per position) as the fallback body for a lost slot, so the realized lineup delta seats the same week-w wire
+  bodies in the roster with and without the swap (`wire_ids` on each package); without them the grade is the full gap
+  a lost slot leaves, which the promise never claimed. The raw delta (`realized_ppw`, `score_trade`'s definition)
+  stays as it was; it counts bench points and reads well above the lineup number on any 2-for-1.
+- **The pull keeps three more settings** (`playoff_team_count`, `bench_slots`, `position_limits`), the sim's bracket and
+  the scan's `roster_max` and `limits`; a file without them runs with no odds and no caps. The version stays 2: no
+  version-2 file exists yet (the re-pull needs the cookies).
+- **The synthetic rosters persist across weeks** (`tests/test_backtest.py` `_team`): a fresh draw per team-week put
+  every other week's players on the week-w wire, so `fa_pool` was as strong as any starter and no package gained.
+  The calibration tests read the same.
+- **The promise is selected on its own noise.** On the synthetic season scored against the later weeks' projections
+  (no draw noise at all), packages promising 1.4 a week realize about 0.6 with a 70% hit rate: the scan keeps the
+  packages where both sides gain on a priced number that carries the week-w projection and a few games of season to
+  date, so the survivors are the ones whose estimation noise ran their way. The live scan has the same shape, which
+  is what the real tables will show; `tests/test_backtest.py` holds the synthetic season to a hit rate well above a
+  coin flip and a realized mean under the promise by less than a point, not to the promise itself. The ids and a
+  `rank` per team-week ride each package; the sim runs once per replayed week (`SCAN_SIMS`), the scan once per
+  team-week, about half a minute for six teams over seven weeks, so a 12-team league over 13 weeks is minutes per
+  league, not seconds.
+

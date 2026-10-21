@@ -1,10 +1,14 @@
 """The backtest harness (TODO D8): a synthetic season whose actuals come from the model's own distribution has to read
 as calibrated, one whose actuals are three times as wide has to read as over-confident, the optimizer's lineup has to
 out-score the one a lazy manager set, a trade is scored week by week against the replay, and the pull keeps the box
-score's shape (and skips a two-week matchup)."""
+score's shape (and skips a two-week matchup). The scanner replay (TODO D12, `docs/plans/scanner-replay.md`): on the
+model's own draw the scan's packages read edge and the realized mean tracks the promised one; with the actuals
+shuffled within a position they read none; and a week-w package never prices from a week-w or later actual."""
 from __future__ import annotations
 
+import copy
 import random
+from collections import defaultdict
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -15,26 +19,43 @@ import pytest
 from ff import backtest as bt
 from ff.config import LeagueRef, LeagueSettings
 from ff.model.lineup import optimize
-from ff.model.projections import _sigma
+from ff.model.projections import NFL_GAMES, _sigma
 
 SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}
 PLAN = (("QB", 2, 18), ("RB", 4, 12), ("WR", 4, 11), ("TE", 2, 7), ("K", 1, 8), ("D/ST", 1, 7))
 # The synthetic wire: this many free agents per position in the universe, projected a few points under the rostered
 # depth so a claim is sometimes, not always, an upgrade.
 WIRE_PER_POS = 24
+# The scan tests' league: team t has a surplus at one position and a hole at another (`fit` points on his first two
+# bodies there, the pairs rotating through this list), so real fit trades exist for the scan to find. Without them a
+# roster drawn flat offers the scan only packages where both sides gain by the pricing's own noise, and the grade of
+# those is the winner's curse, not a test of the harness (the plan's "What step 3 found").
+FIT_PAIRS = (("RB", "WR"), ("WR", "RB"), ("TE", "QB"), ("QB", "TE"), ("WR", "TE"), ("RB", "QB"))
 
 
-def _roster(rng: random.Random, draw, pid: int, lazy: bool, week: int) -> tuple[list[dict], int]:
-    """One team-week: projections by position with a bench, actuals from `draw(pos, mu)`, the lineup set as the
-    highest-points lineup (a careful manager); `lazy` swaps his best RB starter for a bench RB."""
-    rows = []
+def _team(rng: random.Random, pid: int, fit: float = 0.0, pair: tuple[str, str] = ("", "")) -> tuple[list[dict], int]:
+    """One team's roster for the season: a season level (`mu`) per player by position with a bench, his first two at
+    `pair[0]` up `fit` points and at `pair[1]` down. The roster persists across weeks (a week-w package has later
+    weeks of its own players to grade, and the wire at week w is the wire, not every other week's rosters)."""
+    tpl = []
     for pos, n, base in PLAN:
         for i in range(n):
-            mu = round(max(base + rng.gauss(0, 4) - 3 * i, 0.5), 1)
+            shift = (fit if pos == pair[0] else -fit if pos == pair[1] else 0.0) if i < 2 else 0.0
+            mu = round(max(base + shift + rng.gauss(0, 4) - 3 * i, 0.5), 1)
             elig = [pos] + (["RB/WR/TE"] if pos in ("RB", "WR", "TE") else [])
-            rows.append({"espn_id": pid, "name": f"P{pid}", "pos": pos, "team": "X", "eligible": elig, "slot": "BE",
-                         "proj": mu, "actual": round(draw(pos, mu), 2), "bye": False})
+            tpl.append({"espn_id": pid, "name": f"P{pid}", "pos": pos, "team": "X", "eligible": elig, "mu": mu})
             pid += 1
+    return tpl, pid
+
+
+def _roster(rng: random.Random, draw, tpl: list[dict], lazy: bool, week: int) -> list[dict]:
+    """One team-week: each player's projection drawn around his season level, his actual from `draw(pos, proj)`, the
+    lineup set as the highest-points lineup (a careful manager); `lazy` swaps his best RB starter for a bench RB."""
+    rows = []
+    for t in tpl:
+        proj = round(max(t["mu"] + rng.gauss(0, 1.5), 0.5), 1)
+        rows.append({"espn_id": t["espn_id"], "name": t["name"], "pos": t["pos"], "team": t["team"], "eligible": list(t["eligible"]),
+                     "slot": "BE", "proj": proj, "actual": round(draw(t["pos"], proj), 2), "bye": False})
     ev = optimize([bt.row_proj(r, week) for r in rows], SLOTS, objective="ev")
     seat = {p.espn_id: s for s, ps in ev.assignment.items() for p in ps}
     for r in rows:
@@ -43,12 +64,13 @@ def _roster(rng: random.Random, draw, pid: int, lazy: bool, week: int) -> tuple[
         best = max((r for r in rows if r["pos"] == "RB" and r["slot"] != "BE"), key=lambda r: r["proj"])
         sub = max((r for r in rows if r["pos"] == "RB" and r["slot"] == "BE"), key=lambda r: r["proj"])
         best["slot"], sub["slot"] = "BE", best["slot"]
-    return rows, pid
+    return rows
 
 
-def synthetic_replay(weeks: int = 60, teams: int = 12, sigma_mult: float = 1.0, lazy_every: int = 0, seed: int = 3) -> dict:
+def synthetic_replay(weeks: int = 60, teams: int = 12, sigma_mult: float = 1.0, lazy_every: int = 0, seed: int = 3, fit: float = 0.0) -> dict:
     """A replay whose actuals are drawn from the model's mixture (`p_zero` 0.02, the house sigma times
-    `sigma_mult`); `lazy_every` benches every n-th team's best RB."""
+    `sigma_mult`); `lazy_every` benches every n-th team's best RB; `fit` gives each team a surplus and a hole
+    (`FIT_PAIRS`) so the scan has real trades to find."""
     rng, nrng = random.Random(seed), np.random.default_rng(seed)
 
     def draw(pos, mu):
@@ -56,28 +78,32 @@ def synthetic_replay(weeks: int = 60, teams: int = 12, sigma_mult: float = 1.0, 
             return 0.0
         return float(nrng.normal(mu, _sigma(pos, mu, None) * sigma_mult))
 
-    out, pid = [], 1000
+    out, pid, tpls = [], 1000, {}
+    for t in range(1, teams + 1):
+        tpls[t], pid = _team(rng, pid, fit, FIT_PAIRS[(t - 1) % len(FIT_PAIRS)])
     for w in range(1, weeks + 1):
         matchups = []
         order = list(range(1, teams + 1))
         rng.shuffle(order)
         for h, a in zip(order[::2], order[1::2]):
-            hr, pid = _roster(rng, draw, pid, bool(lazy_every and h % lazy_every == 0), w)
-            ar, pid = _roster(rng, draw, pid, bool(lazy_every and a % lazy_every == 0), w)
+            hr = _roster(rng, draw, tpls[h], bool(lazy_every and h % lazy_every == 0), w)
+            ar = _roster(rng, draw, tpls[a], bool(lazy_every and a % lazy_every == 0), w)
             score = lambda rows: round(sum(r["actual"] for r in rows if r["slot"] in SLOTS), 2)
             matchups.append({"home": h, "away": a, "home_score": score(hr), "away_score": score(ar), "playoff": False,
                              "home_roster": hr, "away_roster": ar})
         out.append({"week": w, "first_kickoff": f"2025-{9 + (w - 1) // 4:02d}-{1 + 7 * ((w - 1) % 4):02d}", "matchups": matchups})
-    players = _universe(out, weeks, rng, draw, pid)
+    players = _universe(out, weeks, rng, draw, pid, {t["espn_id"]: t["mu"] for tpl in tpls.values() for t in tpl})
     return {"version": bt.REPLAY_VERSION, "season": 2025, "league": "syn", "pulled": "2026-10-20",
-            "settings": {"name": "Synthetic", "team_count": teams, "lineup_slots": SLOTS, "ppr": 1.0, "reg_season_weeks": weeks, "playoff_weeks": []},
+            "settings": {"name": "Synthetic", "team_count": teams, "lineup_slots": SLOTS, "ppr": 1.0, "reg_season_weeks": weeks, "playoff_weeks": [],
+                         "playoff_team_count": max(teams // 2, 1), "bench_slots": sum(n for _, n, _ in PLAN) - sum(SLOTS.values()), "position_limits": {}},
             "skipped_weeks": [], "weeks": out, "universe_size": len(players), "universe_missing": 0, "players": players}
 
 
-def _universe(out: list[dict], weeks: int, rng: random.Random, draw, pid: int) -> dict[int, dict]:
+def _universe(out: list[dict], weeks: int, rng: random.Random, draw, pid: int, level: dict[int, float]) -> dict[int, dict]:
     """The synthetic universe (the replay file's `players`): every rostered player, his box-score `proj` and `actual`
-    on the week he was rostered and a draw of the same shape on every other week, plus a wire of `WIRE_PER_POS` per
-    position; everyone with a preseason total (`proj_season`) and a projection and an actual in every week."""
+    on the weeks he was rostered and a draw of the same shape on any other week, plus a wire of `WIRE_PER_POS` per
+    position; everyone with a preseason total (`proj_season`, his season level over `NFL_GAMES`, the prior `blend`
+    fades) and a projection and an actual in every week."""
     players: dict[int, dict] = {}
 
     def add(r: dict, mu: float, known: dict[int, dict]):
@@ -86,12 +112,17 @@ def _universe(out: list[dict], weeks: int, rng: random.Random, draw, pid: int) -
             p = known.get(w) or {"proj": round(max(mu + rng.gauss(0, 1.5), 0.5), 1)}
             wk[w] = {"proj": p["proj"], "actual": p.get("actual", round(draw(r["pos"], p["proj"]), 2))}
         players[r["espn_id"]] = {"espn_id": r["espn_id"], "name": r["name"], "pos": r["pos"], "team": r["team"],
-                                 "eligible": list(r["eligible"]), "proj_season": round(mu * weeks, 1), "bye_weeks": [], "weeks": wk}
+                                 "eligible": list(r["eligible"]), "proj_season": round(mu * NFL_GAMES, 1), "bye_weeks": [], "weeks": wk}
 
+    known: dict[int, dict[int, dict]] = {}
     for wk in out:
         for m in wk["matchups"]:
             for r in m["home_roster"] + m["away_roster"]:
-                add(r, r["proj"], {wk["week"]: {"proj": r["proj"], "actual": r["actual"]}})
+                known.setdefault(r["espn_id"], {})[wk["week"]] = {"proj": r["proj"], "actual": r["actual"]}
+                known[r["espn_id"]]["row"] = r
+    for pid_, wks in known.items():
+        r = wks.pop("row")
+        add(r, level[pid_], wks)
     for pos, _, base in PLAN:
         for i in range(WIRE_PER_POS):
             mu = round(max(base - 4 + rng.gauss(0, 3) - i / 6, 0.5), 1)
@@ -260,6 +291,7 @@ def test_pull_keeps_the_box_scores_shape_and_skips_two_week_matchups_and_byes():
                                   "bye_weeks": [9], "weeks": {1: {"proj": 12.3, "actual": 15.0}, 2: {"proj": 13.0, "actual": 2.0}, 3: {"proj": 10.0}}}
     assert rep["players"][99]["weeks"][2] == {"proj": 5.0, "actual": 9.0} and rep["players"][12]["bye_weeks"] == []
     assert rep["settings"]["lineup_slots"] == {"QB": 1, "RB": 1, "WR": 1} and rep["settings"]["ppr"] == 0.5
+    assert (rep["settings"]["playoff_team_count"], rep["settings"]["bench_slots"], rep["settings"]["position_limits"]) == (2, 5, {})   # the scanner replay's inputs
     assert [w["week"] for w in rep["weeks"]] == [1, 2] and rep["skipped_weeks"] == [3, 4]
     w1 = rep["weeks"][0]
     assert w1["first_kickoff"] == "2025-09-04" and len(w1["matchups"]) == 1          # the bye matchup is gone, the earliest game dates it
@@ -317,3 +349,205 @@ def test_a_season_espn_serves_without_lineups_fails_with_the_finding_not_a_key_e
             bt.pull_replay(LeagueRef(name="L1", espn_id=7), _P(current_week=17, box_scores=no_rosters), 2025)
         with pytest.raises(KeyError, match="somethingElse"):
             bt.pull_replay(LeagueRef(name="L1", espn_id=7), _P(current_week=17, box_scores=lambda w, player_team_cache=None: (_ for _ in ()).throw(KeyError("somethingElse"))), 2025)
+
+
+# ---------- the scanner replay ----------
+
+def shuffled(rep: dict, seed: int = 5) -> dict:
+    """The same replay with every week's actuals shuffled across the players of a position: the projections then
+    say nothing about who scores. The box scores and the recorded scores follow the universe."""
+    rep = copy.deepcopy(rep)
+    rng = random.Random(seed)
+    by_pos = defaultdict(list)
+    for p in rep["players"].values():
+        by_pos[p["pos"]].append(p)
+    for w in range(1, len(rep["weeks"]) + 1):
+        for ps in by_pos.values():
+            vals = [p["weeks"][w]["actual"] for p in ps]
+            rng.shuffle(vals)
+            for p, v in zip(ps, vals):
+                p["weeks"][w]["actual"] = v
+    _box_scores_from_universe(rep)
+    return rep
+
+
+def poisoned(rep: dict, week: int, sentinel: float = 999.0) -> dict:
+    """The same replay with every actual from `week` on replaced by `sentinel`, in the universe and the box scores."""
+    rep = copy.deepcopy(rep)
+    for p in rep["players"].values():
+        for w, v in p["weeks"].items():
+            if w >= week:
+                v["actual"] = sentinel
+    _box_scores_from_universe(rep)
+    return rep
+
+
+def _box_scores_from_universe(rep: dict) -> None:
+    for wk in rep["weeks"]:
+        for m in wk["matchups"]:
+            for side in ("home", "away"):
+                for r in m[f"{side}_roster"]:
+                    r["actual"] = rep["players"][r["espn_id"]]["weeks"][wk["week"]]["actual"]
+                m[f"{side}_score"] = round(sum(r["actual"] for r in m[f"{side}_roster"] if r["slot"] in SLOTS), 2)
+
+
+def _pooled_scan(bins: list[dict], lo: float) -> tuple[int, float, float, float]:
+    """(n, hit, promised, realized) over the promised bins at or above `lo`."""
+    sel = [b for b in bins if b["lo"] >= lo and b["n"]]
+    n = sum(b["n"] for b in sel)
+    return (n, sum(b["hit"] * b["n"] for b in sel) / n, sum(b["pred_mean"] * b["n"] for b in sel) / n,
+            sum(b["realized_mean"] * b["n"] for b in sel) / n)
+
+
+SCAN_REPLAY = dict(weeks=7, teams=6, seed=3, fit=5.0)
+
+
+@pytest.fixture(scope="module")
+def scanned():
+    """The scanner replay of the model's own draw, once for the edge tests (six teams over seven weeks with a fit
+    trade on every roster is a few hundred packages and a minute)."""
+    return bt.scan_hits(synthetic_replay(**SCAN_REPLAY), sims=200)
+
+
+def test_scan_hits_on_the_models_own_draw_reads_edge_and_the_realized_mean_tracks_the_promise(scanned):
+    res = scanned
+    assert res["weeks"] == [1, 2, 3, 4, 5, 6] and res["through"] == 7 and res["sims"] == 200 and res["chart"] == bt.CHART_OFF
+    assert res["team_weeks"] > 12 and res["candidates"] >= 80
+    every = res["all"]["every"]
+    assert every["n"] == res["candidates"] and every["unscored"] == 0
+    assert sum(b["n"] for b in every["bins"]) == every["n"] and [b["lo"] for b in every["bins"]] == [lo for lo, _ in bt.SCAN_BINS]
+    n, hit, pred, realized = _pooled_scan(every["bins"], 1.0)   # the rows the card would send (SEND_MIN_PPW is 1)
+    assert n >= 60 and hit > 0.6                                  # well above a coin flip
+    assert abs(realized - pred) < 1.0                            # and the promise is the right size, within this n's noise
+    assert every["realized_raw_mean"] > every["realized_mean"]    # the raw delta counts bench points; the lineup one is the forecast
+    top = res["top3"]["every"]
+    assert 0 < top["n"] <= res["team_weeks"] * bt.TOP_PER_TEAM_WEEK and top["hit"] > 0.6
+    assert res["all"]["touches_zero"]["n"] == 0 and res["all"]["clean"] == every   # no designation in the synthetic season
+
+
+def test_scan_hits_on_shuffled_actuals_reads_no_edge(scanned):
+    """A harness that finds edge where the projections carry none is leaking an actual into the pricing."""
+    res = bt.scan_hits(shuffled(synthetic_replay(**SCAN_REPLAY)), sims=200)
+    every = res["all"]["every"]
+    assert every["n"] >= 100                                       # the pricing still proposes (its season to date is noise now)
+    assert 0.35 < every["hit"] < 0.65
+    # Under half a point realized anywhere: no edge. The mean sits under zero rather than at it because a 2-for-1 leaves
+    # fewer bodies to draw a lineup from when every actual is an exchangeable draw, and consolidations are what the scan
+    # proposes; that is the shape of the shuffled world, not a leak.
+    assert every["realized_mean"] < 0.5
+    for b in every["bins"]:
+        if b["n"] >= 20:
+            assert b["realized_mean"] < 1.0
+    assert every["pred_mean"] > 0.75                               # the promise is still the scan's floor or more; the grade is what moved
+
+
+def test_a_week_w_package_never_reads_a_week_w_or_later_actual():
+    rep = synthetic_replay(**SCAN_REPLAY)
+    clean = bt.scan_week(rep, 3, 8, sims=100)
+    assert len(clean) >= 5
+    bad = bt.scan_week(poisoned(rep, 3), 3, 8, sims=100)
+    key = lambda c: (c["team"], c["rival_team_id"], tuple(c["give_ids"]), tuple(c["get_ids"]), c["my_delta_ppw"], c["their_delta_ppw"], c["p_accept"])
+    assert [key(c) for c in clean] == [key(c) for c in bad]
+    earlier = bt.scan_week(poisoned(rep, 2), 3, 8, sims=100)   # the week-2 actuals are the season to date and the record: they count
+    assert [c["my_delta_ppw"] for c in earlier] != [c["my_delta_ppw"] for c in clean] or [key(c)[:4] for c in earlier] != [key(c)[:4] for c in clean]
+
+
+def _uni(pid, pos, weeks, total=85.0, byes=()):
+    return {"espn_id": pid, "name": f"U{pid}", "pos": pos, "team": "X", "eligible": [pos, "RB/WR/TE"], "proj_season": total,
+            "bye_weeks": list(byes), "weeks": weeks}
+
+
+def test_replay_proj_prices_the_season_to_date_from_the_universe_and_a_zero_week_as_out_this_week():
+    uni = {7: _uni(7, "RB", {1: {"proj": 10.0, "actual": 20.0}, 2: {"proj": 11.0, "actual": 0.0}, 3: {"proj": 12.0, "actual": 30.0}, 4: {"proj": 9.0}})}
+    row = {"espn_id": 7, "name": "U7", "pos": "RB", "team": "X", "eligible": ["RB", "RB/WR/TE"], "slot": "RB", "proj": 12.0, "actual": 30.0, "bye": False}
+    assert bt.season_to_date(uni[7], 3) == (20.0, 2) and bt.season_to_date(uni[7], 1) == (0.0, 0) and bt.season_to_date(None, 3) == (0.0, 0)
+    p = bt.replay_proj(row, uni, 3, 5, team_id=4)
+    assert (p.mu, p.fantasy_team_id, p.slot, p.weeks_out, p.p_zero) == (12.0, 4, "RB", 0.0, 0.02)
+    assert p.sources["games_played"] == 2 and p.sources["ytd_pg"] == 10.0            # the week-3 actual (30) is not in it
+    level = 4 / 6 * 5.0 + 2 / 6 * 10.0                                               # the prior (85/17 a game) fading over PRIOR_FADE_GAMES
+    assert p.mu_ros_active == pytest.approx(0.5 * level + 0.5 * 12.0, abs=0.02)      # shrunk to this week's number, as live
+    zero = bt.replay_proj({**row, "proj": 0.0}, uni, 3, 5)
+    assert zero.p_zero == 1.0 and zero.weeks_out == 1.0 and zero.return_week == 4 and "replay:zero" in zero.flags and "llm:weeks_out" not in zero.flags
+    assert zero.mu_ros_active == pytest.approx(level, abs=0.02) and zero.mu_ros == pytest.approx(level * 4 / 5, abs=0.02)
+    bye = bt.replay_proj({**row, "proj": 0.0, "bye": True}, uni, 3, 5)
+    assert bye.bye and bye.p_zero == 1.0 and bye.weeks_out == 0.0 and 3 in bye.bye_weeks
+    alone = bt.replay_proj(row, {}, 3, 5)                                             # beyond the universe pull: this week's number alone
+    assert alone.mu == 12.0 and alone.mu_ros == 12.0 and alone.sources["games_played"] == 0 and alone.bye_weeks == []
+    wire = bt.pool_row(_uni(8, "WR", {3: {"proj": 6.5}}, byes=[4]), 3)
+    assert wire == {"espn_id": 8, "name": "U8", "pos": "WR", "team": "X", "eligible": ["WR", "RB/WR/TE"], "slot": "", "proj": 6.5, "bye": False}
+    assert bt.pool_row(_uni(8, "WR", {3: {"proj": 6.5}}, byes=[4]), 4)["bye"] is True and bt.pool_row(_uni(9, "TE", {}), 2)["proj"] == 0.0
+
+
+def _two_team_replay() -> dict:
+    """Two teams, one RB slot, three weeks: A (10) and B (5) on team 1, C (12) on team 2, with the actuals set by hand."""
+    def row(pid, proj, slot, actual):
+        return {"espn_id": pid, "name": f"U{pid}", "pos": "RB", "team": "X", "eligible": ["RB"], "slot": slot, "proj": proj, "actual": actual, "bye": False}
+    weeks = []
+    for w, (a, b, c) in enumerate(((10.0, 2.0, 15.0), (8.0, 9.0, 1.0), (12.0, 3.0, 20.0)), 1):
+        weeks.append({"week": w, "first_kickoff": f"2025-09-{w:02d}",
+                      "matchups": [{"home": 1, "away": 2, "home_score": a, "away_score": c, "playoff": False,
+                                    "home_roster": [row(1, 10.0, "RB", a), row(2, 5.0, "BE", b)],
+                                    "away_roster": [row(3, 12.0, "RB", c)] + ([row(5, 3.0, "BE", 1.0)] if w == 1 else [])}]})   # U5: cut after week 1, beyond the universe
+    weeks[1]["matchups"][0]["home_roster"][1]["proj"] = 11.0   # week 2: B projects over A, so the seat goes to B
+    uni = {1: _uni(1, "RB", {1: {"proj": 10.0, "actual": 10.0}, 2: {"proj": 10.0, "actual": 8.0}, 3: {"proj": 10.0, "actual": 12.0}}),
+           2: _uni(2, "RB", {1: {"proj": 5.0, "actual": 2.0}, 2: {"proj": 11.0, "actual": 9.0}, 3: {"proj": 5.0, "actual": 3.0}}),
+           3: _uni(3, "RB", {1: {"proj": 12.0, "actual": 15.0}, 2: {"proj": 12.0, "actual": 1.0}, 3: {"proj": 12.0, "actual": 20.0}}),
+           4: _uni(4, "RB", {1: {"proj": 4.0, "actual": 4.0}, 2: {"proj": 4.0, "actual": 4.0}, 3: {"proj": 4.0}}, byes=[3])}
+    return {"version": bt.REPLAY_VERSION, "season": 2025, "league": "two", "pulled": "2026-10-20",
+            "settings": {"name": "Two", "team_count": 2, "lineup_slots": {"RB": 1}, "ppr": 1.0, "reg_season_weeks": 3, "playoff_weeks": [],
+                         "playoff_team_count": 1, "bench_slots": 1, "position_limits": {}},
+            "skipped_weeks": [], "weeks": weeks, "universe_size": 4, "universe_missing": 1, "players": uni}
+
+
+def test_standings_and_the_schedule_stop_at_the_week_and_the_record_feeds_the_sim():
+    rep = _two_team_replay()
+    assert bt.standings_at(rep, 1) == {1: (0, 0, 0.0), 2: (0, 0, 0.0)}
+    assert bt.standings_at(rep, 3) == {1: (1, 1, 18.0), 2: (1, 1, 16.0)}           # weeks 1 and 2 only
+    assert bt.schedule_after(rep, 1, 3) == [[(1, 2)], [(1, 2)]] and bt.schedule_after(rep, 3, 3) == []
+    rosters = {1: [bt.replay_proj(r, rep["players"], 2, 2, 1) for r in rep["weeks"][1]["matchups"][0]["home_roster"]],
+               2: [bt.replay_proj(r, rep["players"], 2, 2, 2) for r in rep["weeks"][1]["matchups"][0]["away_roster"]]}
+    odds = bt.playoff_odds(rep, 2, rosters, sims=200)
+    assert set(odds) == {1, 2} and odds[1] + odds[2] == pytest.approx(100.0, abs=0.1)
+    assert bt.playoff_odds({**rep, "settings": {**rep["settings"], "playoff_team_count": None}}, 2, rosters) is None
+    proj, actual = bt.by_week(rep)
+    assert actual[2] == {1: 2.0, 2: 9.0, 3: 3.0} and proj[2][2] == 11.0 and actual[4] == {1: 4.0, 2: 4.0, 3: 0.0}   # the bye week is a zero, not missing
+    assert 3 not in actual.get(5, {})
+
+
+def test_score_packages_seats_each_later_week_on_its_projection_and_scores_it_on_its_actual():
+    rep = _two_team_replay()
+    c = {"week": 1, "team": 1, "rank": 1, "rival_team_id": 2, "give": ["U2"], "get": ["U3"], "give_ids": [2], "get_ids": [3], "drops": [],
+         "my_delta_ppw": 2.0, "wire_ids": [4]}
+    out = bt.score_packages(rep, [c])[0]
+    # raw: week 2: C 1 - B 9 = -8; week 3: C 20 - B 3 = +17 -> +4.5
+    # lineup: before = {A, B, wire D}, after = {A, C, D}. Week 2: before seats B (proj 11) -> 9; after seats C (12) -> 1: -8.
+    #         Week 3: before seats A (10) -> 12; after seats C (12) -> 20: +8. Mean 0.0.
+    assert (out["weeks"], out["missing"], out["realized_ppw"], out["realized_lineup_ppw"], out["hit"]) == (2, 0, 4.5, 0.0, False)
+    gone = bt.score_packages(rep, [{**c, "get_ids": [5], "get": ["U5"]}])[0]
+    assert (gone["weeks"], gone["missing"], gone["realized_lineup_ppw"], gone["hit"]) == (0, 2, None, None)   # no actual after week 1: missing, not zero
+    drop = bt.score_packages(rep, [{**c, "give_ids": [], "give": [], "drops": ["U1"]}])[0]      # a cap drop leaves with the trade
+    # before as above; after = {B, C, D}. Week 2: C (12) -> 1 vs 9: -8. Week 3: C -> 20 vs A 12: +8. Mean 0.0; raw = C alone: 10.5
+    assert (drop["realized_ppw"], drop["realized_lineup_ppw"]) == (10.5, 0.0)
+    assert bt.score_packages(rep, [{**c, "week": 3}])[0]["weeks"] == 0                         # the last week has nothing after it
+
+
+def test_scan_table_bins_on_the_promise_and_counts_the_unscored():
+    rows = [{"my_delta_ppw": 0.8, "realized_lineup_ppw": 1.0, "realized_ppw": 3.0, "hit": True},
+            {"my_delta_ppw": 1.5, "realized_lineup_ppw": -2.0, "realized_ppw": -1.0, "hit": False},
+            {"my_delta_ppw": 2.0, "realized_lineup_ppw": 4.0, "realized_ppw": 6.0, "hit": True},
+            {"my_delta_ppw": 4.0, "realized_lineup_ppw": 5.0, "realized_ppw": 5.0, "hit": True},
+            {"my_delta_ppw": 9.0, "realized_lineup_ppw": None, "realized_ppw": None, "hit": None}]
+    t = bt.scan_table(rows)
+    assert (t["n"], t["unscored"], t["hit"], t["pred_mean"], t["realized_mean"], t["realized_raw_mean"]) == (4, 1, 0.75, 2.08, 2.0, 3.25)
+    assert [(b["lo"], b["hi"], b["n"], b["hit"], b["realized_mean"]) for b in t["bins"]] == [(0.0, 1.0, 1, 1.0, 1.0), (1.0, 2.0, 1, 0.0, -2.0), (2.0, 4.0, 1, 1.0, 4.0), (4.0, None, 1, 1.0, 5.0)]
+    empty = bt.scan_table([])
+    assert empty["n"] == 0 and empty["hit"] is None and all(b["n"] == 0 for b in empty["bins"])
+
+
+def test_scan_hits_on_a_replay_with_one_week_or_only_playoff_weeks_scores_nothing():
+    rep = synthetic_replay(weeks=1, teams=4)
+    res = bt.scan_hits(rep)
+    assert res["weeks"] == [] and res["candidates"] == 0 and res["through"] is None and res["all"]["every"]["n"] == 0
+    rep = synthetic_replay(weeks=2, teams=4)
+    rep["settings"]["reg_season_weeks"] = 1                                       # week 2 is a playoff week: nothing regular to grade
+    assert bt.scan_hits(rep)["candidates"] == 0

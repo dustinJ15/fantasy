@@ -328,13 +328,23 @@ def replay_pull(season: int = typer.Option(..., "--season", help="The season to 
 @app.command()
 def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay file(s) from `ff replay-pull`; default: every file under data/replay/"),
              trades: bool = typer.Option(False, "--trades", help="Score the offers ESPN executed (data/projlog/offer_outcomes.json) against the replays instead"),
+             scan: bool = typer.Option(False, "--scan", help="The scanner replay: every package the trade scan would have proposed each week, for every team, graded against the weeks after"),
+             sims: int = typer.Option(None, "--sims", help="Draws per week for the playoff odds behind --scan"),
              as_json: bool = typer.Option(False, "--json", help="Print the result as JSON")):
     """Replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set
-    (default), or the trades I made against what the players then scored (--trades). Offline, from the replay files."""
+    (default), the trades I made against what the players then scored (--trades), or every package the scan would
+    have proposed against the weeks that followed (--scan). Offline, from the replay files."""
     from . import backtest as bt
     paths = [bt.load_replay(p) for p in (replay or sorted(str(p) for p in bt.REPLAY_DIR.glob("*.json")))]
     if not paths:
         rprint(f"no replay files under {bt.REPLAY_DIR}; run `ff replay-pull --season 2025` first"); raise typer.Exit(1)
+    if scan:
+        results = [bt.scan_hits(r, sims=sims or bt.SCAN_SIMS) for r in paths]
+        if as_json:
+            print(json.dumps(results, indent=1)); return
+        for res in results:
+            _print_scan(res)
+        return
     if trades:
         from .rulings import load_outcomes
         rows = bt.trade_hits(load_outcomes(), {r["league"]: r for r in paths})
@@ -374,6 +384,32 @@ def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay fil
                f"P(win) lineup differed from it {d['n']} times" + (f" (under {d['min_n']}: not a verdict)" if d["n"] < d["min_n"] else "")
                + (f": won {d['win_rate']['win']} vs {d['win_rate']['ev']}, promised {d['gain_promised']:+.3f}, realized {d['gain_realized']:+.3f}"
                   if d["n"] else ""))
+
+
+def _print_scan(res: dict) -> None:
+    """The scanner replay's tables: one row per sample (every package, the card's top three per team-week, each with
+    and without the packages touching a player ESPN had at zero that week), then the reliability rows by promise."""
+    fmt = lambda x: "—" if x is None else f"{x:+.2f}"
+    rate = lambda x: "—" if x is None else f"{x:.2f}"
+    if not res["weeks"]:
+        rprint(f"\n[bold]{res['league']} {res['season']}[/]: no regular-season week with a later one to grade"); return
+    rprint(f"\n[bold]{res['league']} {res['season']}[/] packages proposed in weeks {res['weeks'][0]}-{res['weeks'][-1]}, graded through week "
+           f"{res['through']}: {res['team_weeks']} team-weeks, {res['candidates']} packages, the sim at {res['sims']} draws")
+    rprint(f"  [dim]{res['chart']}[/]")
+    t = Table("sample", "n", "hit", "promised /wk", "realized lineup /wk", "realized raw /wk")
+    for sample, label in (("all", "every package"), ("top3", "the card's top 3")):
+        for split, word in (("every", ""), ("clean", ", nobody at zero"), ("touches_zero", ", touching a zero")):
+            x = res[sample][split]
+            if split != "every" and not x["n"]:
+                continue
+            t.add_row(label + word, str(x["n"]), rate(x["hit"]), fmt(x["pred_mean"]), fmt(x["realized_mean"]), fmt(x["realized_raw_mean"]))
+    rprint(t)
+    t = Table("promised /wk", "sample", "n", "hit", "promised", "realized lineup /wk")
+    for sample, label in (("all", "every package"), ("top3", "the card's top 3")):
+        for b in res[sample]["every"]["bins"]:
+            hi = "+" if b["hi"] is None else f"-{b['hi']:.0f}"
+            t.add_row(f"{b['lo']:.0f}{hi}", label, str(b["n"]), rate(b["hit"]), fmt(b["pred_mean"]), fmt(b["realized_mean"]))
+    rprint(t)
 
 
 @app.command()
