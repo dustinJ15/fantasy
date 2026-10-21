@@ -144,7 +144,7 @@ on it (the outcome predates `rulings.predicted_ppw`). Not a number to act on; th
 
 `ff replay-pull --season 2026` for the three leagues (the version-2 file: the player universe, 1054 players in each), then
 `ff backtest --scan` and `ff backtest --claims` (D12 step 5, the first real run of `docs/plans/scanner-replay.md`'s two
-scorers). Every regular-season week with a later replayed week, every team as me: a week-1 package or claim is graded on
+scorers; `ff backtest --prior`, D17, scores the price behind every row the same way, below). Every regular-season week with a later replayed week, every team as me: a week-1 package or claim is graded on
 five weeks, a week-5 one on week 6 alone. What the replay cannot carry, and the tables are read with: FantasyCalc keeps no
 archive, so the scan ran with no market values (no lowball veto, no star, no throw-in; `p_accept` on the other signals and
 with no truth to grade it against); Sleeper keeps no archive of adds and ESPN none of the waiver order, so the claim ranking
@@ -331,7 +331,8 @@ ranking is worse than the league. It is not that simple, and the rows say why.
   and he went dark for a reason no price sees (the starter came back). The clean rows did not move (claim-worthy, both
   on the field: +4.7 to +4.4, +3.7 to +3.6, +1.6 to +1.3). A second finding, not this fix: the in-range wire body *with* a
   preseason total is under-priced by that prior (bias -1.3, -1.2 and -1.1 a game, 3.4 mean absolute; this week's number
-  as his prior too would read +0.3 and 3.2), TODO D17.
+  as his prior too would read +0.3 and 3.2): scored on everyone under "The rest-of-season prior" below (D17, 2026-10-21),
+  the prior stays.
 - **Where the body stayed on the field the ranking has edge.** The claim-worthy rows with neither the claimed player
   nor the displaced starter dark: L1 n 10, hit 0.90, promised +1.7, realized +4.7; L2 n 29, hit 0.76, promised +1.5,
   realized +3.7; L3 n 6, hit 0.67, promised +1.4, realized +1.6 (the same hand count). Under-promised, not over: the
@@ -350,3 +351,68 @@ ranking is worse than the league. It is not that simple, and the rows say why.
 **Ruling on `CLAIM_WORTHY_PPW` (1.0): stays.** The clean claim-worthy rows realize more than they promise in all three
 leagues, which argues for no higher bar; the dark ones are a pricing hole, not a threshold one (the bar cannot tell a
 hot fill-in from a starter). Re-read with the D13 floor in (2026-10-21, above): stays. Again at the end of the regular season (TODO D14 holds the line).
+
+### The rest-of-season prior
+
+`ff backtest --prior` (D17, 2026-10-21): every body priced in weeks 1-5, rostered (`WeekInputs.everyone`: the number behind
+the hold, trade and drop rows, and the starter a claim displaces) and wire (`pool`) apart, his price at week w
+(`mu_ros_active`, the healthy per-game level `season_pg` and `per_game` build) against his points a game over the weeks
+after it (every later week with an actual is a game, a zero on a game week included, his bye none; `on the field after`
+drops the rows where he scored zero in every one), under the prior `season_pg` fades today and the alternatives D17 named.
+`stays`: ESPN's preseason total per NFL game, this week's matchup-neutral number in its place when he has none (D13), over
+`PRIOR_FADE_GAMES` (6); `faster`: the same prior over three games; `larger`: the larger of the total and this week's
+number; `week`: this week's number whether or not he has a total; `none`: his own games alone. `wire near a starter` is
+the wire body within three points of the weakest rest-of-season starter he could displace on some roster
+(`PRIOR_NEAR_PPW`): the rows the claim ranking prints, the D13 and D17 sample. Each cell is bias / mean absolute error in
+points a game, over zero over-priced; the rows with no total are one price under `stays`, `larger` and `week` (he fades
+this week's number already) and print for the fade and for `none`.
+
+| league | sample | n | bodies | stays | faster | larger | week | none |
+|---|---|---|---|---|---|---|---|---|
+| L1 | rostered, a total | 816 | 195 | -0.30 / 4.65 | +0.24 / 4.81 | +1.15 / 4.85 | +1.14 / 4.85 | +1.02 / 5.13 |
+| L1 | rostered, a total, on the field after | 749 | 187 | -1.02 / 4.37 | -0.43 / 4.55 | +0.51 / 4.54 | +0.51 / 4.54 | +0.47 / 4.95 |
+| L1 | wire, a total | 1132 | 258 | -0.99 / 2.44 | -0.94 / 2.55 | -0.48 / 2.50 | -0.56 / 2.56 | -0.92 / 2.78 |
+| L1 | wire near a starter, a total | 239 | 90 | -1.62 / 3.72 | -1.11 / 3.80 | -0.18 / 3.58 | -0.22 / 3.62 | -0.28 / 3.92 |
+| L1 | wire near a starter, a total, on the field after | 231 | 87 | -1.86 / 3.66 | -1.35 / 3.73 | -0.40 / 3.50 | -0.44 / 3.54 | -0.49 / 3.86 |
+| L1 | rostered, no total | 143 | 39 | +2.75 / 4.41 | +2.59 / 4.30 | +2.75 / 4.41 | +2.75 / 4.41 | +2.41 / 4.34 |
+| L1 | wire near a starter, no total | 151 | 55 | +1.12 / 4.06 | +0.94 / 4.03 | +1.12 / 4.06 | +1.12 / 4.06 | +0.83 / 4.02 |
+| L2 | rostered, a total | 723 | 177 | -0.20 / 4.66 | +0.35 / 4.84 | +1.23 / 4.89 | +1.22 / 4.89 | +1.14 / 5.19 |
+| L2 | rostered, a total, on the field after | 664 | 171 | -0.96 / 4.33 | -0.37 / 4.53 | +0.55 / 4.53 | +0.54 / 4.53 | +0.55 / 4.95 |
+| L2 | wire, a total | 1225 | 278 | -0.98 / 2.54 | -0.91 / 2.65 | -0.45 / 2.61 | -0.52 / 2.67 | -0.88 / 2.88 |
+| L2 | wire near a starter, a total | 387 | 139 | -1.30 / 3.74 | -0.89 / 3.86 | -0.16 / 3.77 | -0.19 / 3.81 | -0.31 / 4.01 |
+| L2 | wire near a starter, a total, on the field after | 371 | 134 | -1.60 / 3.66 | -1.20 / 3.76 | -0.45 / 3.65 | -0.48 / 3.69 | -0.61 / 3.90 |
+| L2 | rostered, no total | 115 | 36 | +2.54 / 4.79 | +2.47 / 4.79 | +2.54 / 4.79 | +2.54 / 4.79 | +2.26 / 4.90 |
+| L2 | wire near a starter, no total | 188 | 68 | +1.56 / 4.01 | +1.35 / 3.91 | +1.56 / 4.01 | +1.56 / 4.01 | +1.23 / 3.87 |
+| L3 | rostered, a total | 708 | 175 | -0.14 / 4.72 | +0.41 / 4.91 | +1.31 / 4.97 | +1.31 / 4.97 | +1.21 / 5.28 |
+| L3 | rostered, a total, on the field after | 653 | 170 | -0.86 / 4.41 | -0.24 / 4.63 | +0.68 / 4.64 | +0.67 / 4.64 | +0.68 / 5.09 |
+| L3 | wire, a total | 1240 | 282 | -1.00 / 2.53 | -0.94 / 2.63 | -0.48 / 2.59 | -0.55 / 2.64 | -0.89 / 2.86 |
+| L3 | wire near a starter, a total | 285 | 108 | -1.76 / 3.77 | -1.32 / 3.83 | -0.51 / 3.61 | -0.55 / 3.63 | -0.66 / 3.92 |
+| L3 | wire near a starter, a total, on the field after | 279 | 103 | -1.95 / 3.69 | -1.52 / 3.74 | -0.71 / 3.49 | -0.75 / 3.52 | -0.86 / 3.82 |
+| L3 | rostered, no total | 96 | 30 | +2.80 / 5.12 | +2.74 / 5.11 | +2.80 / 5.12 | +2.80 / 5.12 | +2.58 / 5.31 |
+| L3 | wire near a starter, no total | 163 | 58 | +1.24 / 4.19 | +1.01 / 4.08 | +1.24 / 4.19 | +1.24 / 4.19 | +0.86 / 4.02 |
+
+Read:
+
+- **The finding holds, and reads larger on everyone than the claim tables' sample did.** The in-range wire body with a
+  total is priced 1.3 to 1.8 a game under what he scored after in all three leagues (1.6 to 2.0 on the rows where he
+  stayed on the field), the whole wire a point under: his total is a backup's, and through week 5 the fade still gives it
+  a sixth to five sixths of the weight while he is producing.
+- **`larger` is the one prior that removes it, and it costs the rostered body more.** On the in-range wire body it reads
+  -0.2 to -0.5 and lowers the error in two leagues (3.72 to 3.58, 3.77 to 3.61; L2 flat). On the rostered body with a
+  total, 816, 723 and 708 rows, it reads +1.2 to +1.3 over where `stays` is within 0.3 of zero, and his error goes up 0.2
+  to 0.25; the wire as a whole reads worse too. The `week` column says why: this week's number carries ESPN's weekly
+  optimism (+1.1 to +1.3 on the rostered body on its own), which the fading total damps; on the wire body the weekly
+  number is small enough that the same optimism is the lesser error.
+- **`faster` is worse than `stays` on every sample with a total.** The level of the prior is the question, not the fade.
+- **The bodies with no total read as D13 left them**: `none` a little better on the wire (2.73 against 2.81) and worse
+  on a roster. The rostered body with no total reads +2.5 to +2.8 over (+1.6 to +1.9 on the field; 96 to 143 rows, 30 to
+  39 bodies) under every prior, a finding the claim tables could not see: TODO D19.
+- **The sample is five weeks of one season and the same bodies in every league.** n is rows; one player's next month
+  swings five rows at once, and the three leagues share a wire.
+
+**Ruling on the prior (2026-10-21): stays.** One number prices a body wherever he sits, and a claim row compares him with a
+rostered starter priced the same way, so the prior that fixes the wire body's point is paid by every rostered body on the
+card. The under-pricing is a known bias of the claim ranking (the clean claim-worthy rows realize more than they promise,
+above) and `CLAIM_WORTHY_PPW`'s re-read is where it is priced (D14). Re-read on the full-season replay (D18): `larger`
+takes over if it lowers the rostered body's error too, or if the in-range wire bias passes two points while the rostered
+one holds within half a point of zero.

@@ -65,16 +65,15 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   (`ff replay-pull --season 2026`, `ff backtest --claims`; the D13 floor is in since 2026-10-21): the ruling of 2026-10-21
   is stays, on clean claim-worthy rows of n 10, 30 and 7 realizing +4.4, +3.6 and +1.3 against a promise of +1.5; the bar
   moves only if the 1-2 bin's clean rows realize under a point in all three leagues over the season.
-- [ ] **D17 (S, needs the replay files). The preseason total under-prices the wire body who has one.** Found on the D13
-  floor's evaluation (2026-10-21, `docs/accuracy.md` "The claim ranking", the floor bullet): over the 2026 replay's weeks
-  1-5, the wire bodies within three points of a starter *with* a preseason total read 1.3, 1.2 and 1.1 a game under what
-  they scored after (3.4 mean absolute), because a wire body's preseason total is a backup's and `season_pg` fades it
-  over `PRIOR_FADE_GAMES` (6) games while he is already producing; this week's number as his prior instead read +0.3 and
-  3.2 in the same shape. Not a change to make on that number alone: it is the first five weeks of one season, this
-  week's number carries this week's matchup for a rostered starter too, and the rostered bodies (the hold, trade and
-  drop rows) were not scored. Score it on everyone (`WeekInputs.everyone` and `pool`, his price at week w against his
-  points a game after it, rostered and wire apart), then decide whether the prior fades faster, or is the larger of
-  the total and this week's number, or stays.
+- [ ] **D18 (XS, end of the regular season). Re-read the rest-of-season prior** on the full-season replay (`ff backtest
+  --prior`, `docs/accuracy.md` "The rest-of-season prior"): the ruling of 2026-10-21 is stays, the larger of the total and
+  this week's number fixing the in-range wire body (-1.6 to -0.2) at +1.2 on every rostered body; it takes over if it
+  lowers the rostered body's error too, or the in-range wire bias passes two points with the rostered one within half a
+  point of zero.
+- [ ] **D19 (S, needs the replay files). The rostered body with no preseason total reads +2.5 to +2.8 a game over** what he
+  scores after (`ff backtest --prior`, 2026-10-21: 96 to 143 rows, 30 to 39 bodies a league; +1.6 to +1.9 on the rows where
+  he scored at all), under every prior the table tries. Who they are first (a backup QB starting this week, a streamed K or
+  D/ST, a body the designation the replay lacks would have docked), then whether `level_prior` or `weeks_out` owns it.
 - [ ] **D15 (XS, end of the regular season). Re-read `MUST_TRY_PPW` (2.0)** on the full-season scan replay
   (`ff backtest --scan`, minutes per league): the ruling of 2026-10-21 is stays, the 2-4 bin realizing +2.4 to +3.6 in
   all three leagues on five weeks; the bar moves down only if the 1-2 bin realizes its promise at a hit rate over 0.55 in

@@ -38,7 +38,7 @@ from typing import Any
 
 from .config import DATA_DIR, LeagueRef
 from .model.lineup import Lineup, as_set, optimize, win_prob
-from .model.projections import PlayerProj, blend
+from .model.projections import PRIOR_FADE_GAMES, PlayerProj, blend, per_game, season_pg
 from .model.season import SeasonCtx, greedy_lineup
 from .model.sim import simulate
 from .model.trades import lineup_strength, scan
@@ -842,3 +842,106 @@ def claim_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
             "team_weeks": len({(c["week"], c["team"]) for c in rows}), "rows": len(rows), "trending": TRENDING_OFF,
             "all": split(rows), "top1": split([c for c in rows if c["rank"] == 1]), "claim_worthy": split([c for c in rows if c["claim_worthy"]]),
             "adds": {**claim_table(adds), "unpriced": unpriced}}
+
+
+# ---------- the rest-of-season prior (D17) ----------
+# The price `blend` puts on every body at week w (`mu_ros_active`, his healthy per-game level: the number behind every
+# hold, trade, drop and claim row) against his points a game over the weeks after it, rostered and wire apart, under the
+# prior `season_pg` fades today and the alternatives D17 named. The claim tables found the wire body *with* a preseason
+# total under-priced by it (his total is a backup's and he is already producing); this scorer says what each
+# alternative costs the rostered body, whom the claim tables never scored.
+
+# A wire body is `near` a starter when he is within this of the weakest rest-of-season starter he could displace on
+# some roster (`own_starter_value`): the rows the claim ranking prints, as D13 and D17 sampled them.
+PRIOR_NEAR_PPW = 3.0
+# The `faster` variant's fade, against `PRIOR_FADE_GAMES` (6)
+PRIOR_FAST_FADE = 3
+PRIOR_VARIANTS = ("stays", "faster", "larger", "week", "none")
+
+
+def prior_prices(p: PlayerProj) -> dict[str, float]:
+    """`mu_ros_active` again from the inputs `blend` keeps in `sources`, under each prior `season_pg` could fade.
+    `stays`: what `blend` priced (the preseason total per game, else this week's matchup-neutral number, over
+    `PRIOR_FADE_GAMES`), to the rounding of `sources`; `faster`: the same prior over `PRIOR_FAST_FADE` games; `larger`:
+    the larger of the total and this week's number; `week`: this week's number whether or not he has a total; `none`:
+    his own games alone. Each is then shrunk to this week's number as `per_game` does when he plays it."""
+    s = p.sources
+    games, week_pg, opp = int(s.get("games_played") or 0), float(s.get("mu_neutral") or 0.0), float(s.get("opp_mult") or 1.0)
+    ytd = s.get("ytd_pg") * opp if s.get("ytd_pg") is not None else None
+    total = s.get("prior_pg") if s.get("prior_src") == "season" else None
+    week = week_pg if week_pg > 0 else None
+    plays = p.p_zero < 0.5 and not p.bye
+    cur = total if total is not None else week
+    priors = {"stays": (cur, PRIOR_FADE_GAMES), "faster": (cur, PRIOR_FAST_FADE), "larger": (max(total or 0.0, week or 0.0) or None, PRIOR_FADE_GAMES),
+              "week": (week if week is not None else total, PRIOR_FADE_GAMES), "none": (None, PRIOR_FADE_GAMES)}
+    return {k: round(per_game(season_pg(ytd, games, pr, fade), week_pg, plays), 2) for k, (pr, fade) in priors.items()}
+
+
+def prior_week(rep: dict, week: int, through: int) -> list[dict]:
+    """Every body priced in week `week`, rostered (`WeekInputs.everyone`) and wire (`pool`), with his price under each
+    prior (`prices`, from `prior_prices`), whether ESPN gave him a preseason total, and for a wire body whether he is `near` a starter
+    (within `PRIOR_NEAR_PPW` of the weakest rest-of-season starter he could displace on any roster). Not yet scored.
+    Nothing here reads an actual from week `week` on (`WeekInputs`)."""
+    inp = WeekInputs(rep, week, through)
+    lineups = [_team_lineups(mine, inp.slots)[0] for mine in inp.rosters.values()]
+
+    def near(p: PlayerProj) -> bool:
+        return any(slot and d >= -PRIOR_NEAR_PPW for d, slot in (own_starter_value(p, lu) for lu in lineups))
+
+    out = []
+    for kind, ps in (("rostered", inp.everyone), ("wire", inp.pool)):
+        for p in ps:
+            out.append({"week": week, "espn_id": p.espn_id, "name": p.name, "pos": p.pos, "kind": kind,
+                        "near": kind == "wire" and near(p), "total": p.sources.get("prior_src") == "season",
+                        "bye_weeks": list(p.bye_weeks), "price": p.mu_ros_active, "prices": prior_prices(p)})
+    return out
+
+
+def score_prior(rep: dict, rows: list[dict], through: int | None = None) -> list[dict]:
+    """Each row against his points a game over the weeks after its own, `through` exclusive (default: one past the
+    last replayed week): every later week with an actual is a game, a zero on a game week included (as ESPN's
+    `appliedAverage` counts it, and as a body who went dark scored), his bye weeks none; a week with no actual is
+    `missing`, not a zero. `after_pg` is None with no graded week; `dark` says he scored zero in every one. The
+    week-w actual is read nowhere."""
+    through = through or (max(w["week"] for w in rep["weeks"]) + 1 if rep["weeks"] else 0)
+    _, actual = by_week(rep)
+    for r in rows:
+        mine, byes = actual.get(r["espn_id"], {}), set(r["bye_weeks"])
+        pts = [mine[t] for t in range(r["week"] + 1, through) if t in mine and t not in byes]
+        r.update(weeks=len(pts), missing=sum(1 for t in range(r["week"] + 1, through) if t not in mine and t not in byes),
+                 after_pg=round(sum(pts) / len(pts), 2) if pts else None, dark=bool(pts) and all(x == 0.0 for x in pts))
+    return rows
+
+
+def prior_table(rows: list[dict]) -> dict[str, Any]:
+    """n, the distinct bodies behind it, and for each prior its bias (the price minus his points a game after, averaged:
+    over zero is over-priced) and mean absolute error, over the scored rows."""
+    sc = [r for r in rows if r["after_pg"] is not None]
+    out: dict[str, Any] = {"n": len(sc), "bodies": len({r["espn_id"] for r in sc}), "unscored": len(rows) - len(sc)}
+    for k in PRIOR_VARIANTS:
+        out[k] = {"bias": _mean([r["prices"][k] - r["after_pg"] for r in sc]), "mae": _mean([abs(r["prices"][k] - r["after_pg"]) for r in sc])}
+    return out
+
+
+def prior_hits(rep: dict, weeks: list[int] | None = None) -> dict[str, Any]:
+    """The prior replay of one league: every regular-season week with a later replayed week (`weeks` narrows it),
+    `prior_week` then `score_prior`, into tables (`prior_table`) for the rostered bodies, the wire, and the wire bodies
+    near a starter, each split by whether ESPN gave him a preseason total (`total`, the D17 body; `no_total`, the D13
+    body) and again to the rows where he scored in some graded week (`on_field`)."""
+    reg = rep["settings"].get("reg_season_weeks")
+    played = [w["week"] for w in rep["weeks"] if reg is None or w["week"] <= reg]
+    through = max(played) + 1 if played else 0
+    scored = [w for w in played if w + 1 < through and (not weeks or w in weeks)]
+    rows: list[dict] = []
+    for w in scored:
+        rows += prior_week(rep, w, through)
+    score_prior(rep, rows, through)
+
+    def split(rs: list[dict]) -> dict:
+        return {prior: {"every": prior_table(sub), "on_field": prior_table([r for r in sub if not r["dark"]])}
+                for prior, sub in (("total", [r for r in rs if r["total"]]), ("no_total", [r for r in rs if not r["total"]]))}
+
+    return {"league": rep.get("league"), "season": rep.get("season"), "weeks": scored, "through": through - 1 if scored else None,
+            "rows": len(rows), "variants": PRIOR_VARIANTS, "fades": {"stays": PRIOR_FADE_GAMES, "faster": PRIOR_FAST_FADE},
+            "rostered": split([r for r in rows if r["kind"] == "rostered"]), "wire": split([r for r in rows if r["kind"] == "wire"]),
+            "near": split([r for r in rows if r["near"]])}

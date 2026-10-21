@@ -382,16 +382,25 @@ def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay fil
              trades: bool = typer.Option(False, "--trades", help="Score the offers ESPN executed (data/projlog/offer_outcomes.json) against the replays instead"),
              scan: bool = typer.Option(False, "--scan", help="The scanner replay: every package the trade scan would have proposed each week, for every team, graded against the weeks after"),
              claims: bool = typer.Option(False, "--claims", help="The claim replay: every free agent the waiver ranking would have listed each week, for every team, graded against the weeks after, next to the adds the managers made"),
+             prior: bool = typer.Option(False, "--prior", help="The prior replay: every body's rest-of-season price each week, rostered and wire apart, against his points a game after it, under the preseason-total prior and its alternatives"),
              sims: int = typer.Option(None, "--sims", help="Draws per week for the playoff odds behind --scan"),
              as_json: bool = typer.Option(False, "--json", help="Print the result as JSON")):
     """Replay a season through the same code: P(win) calibration and the optimizer against the lineups managers set
     (default), the trades I made against what the players then scored (--trades), every package the scan would
-    have proposed against the weeks that followed (--scan), or every claim the waiver ranking would have listed
-    (--claims). Offline, from the replay files."""
+    have proposed against the weeks that followed (--scan), every claim the waiver ranking would have listed
+    (--claims), or every body's rest-of-season price against what he scored after (--prior). Offline, from the
+    replay files."""
     from . import backtest as bt
     paths = [bt.load_replay(p) for p in (replay or sorted(str(p) for p in bt.REPLAY_DIR.glob("*.json")))]
     if not paths:
         rprint(f"no replay files under {bt.REPLAY_DIR}; run `ff replay-pull --season 2025` first"); raise typer.Exit(1)
+    if prior:
+        results = [bt.prior_hits(r) for r in paths]
+        if as_json:
+            print(json.dumps(results, indent=1)); return
+        for res in results:
+            _print_prior(res)
+        return
     if claims:
         results = [bt.claim_hits(r) for r in paths]
         if as_json:
@@ -514,6 +523,26 @@ def _print_claims(res: dict) -> None:
             lo = "" if b["lo"] is None else f"{b['lo']:.0f}"
             hi = "+" if b["hi"] is None else (f"-{b['hi']:.0f}" if b["lo"] is not None else f"under {b['hi']:.0f}")
             t.add_row(lo + hi, label, str(b["n"]), rate(b["hit"]), fmt(b["pred_mean"]), fmt(b["realized_mean"]))
+    rprint(t)
+
+
+def _print_prior(res: dict) -> None:
+    """The prior replay's table: one row per sample (the rostered bodies, the wire, the wire bodies near a starter, each
+    with and without a preseason total and again on the rows where he scored after), a column per prior with its bias
+    (the price over his points a game after) and mean absolute error."""
+    fmt = lambda v: "—" if v["bias"] is None else f"{v['bias']:+.2f} / {v['mae']:.2f}"
+    if not res["weeks"]:
+        rprint(f"\n[bold]{res['league']} {res['season']}[/]: no regular-season week with a later one to grade"); return
+    rprint(f"\n[bold]{res['league']} {res['season']}[/] every body priced in weeks {res['weeks'][0]}-{res['weeks'][-1]}, graded through week "
+           f"{res['through']}: {res['rows']} rows; each cell is bias / mean absolute error, points a game. stays fades the total "
+           f"over {res['fades']['stays']} games, faster over {res['fades']['faster']}; larger takes the larger of the total and this week's number")
+    t = Table("sample", "n", "bodies", *res["variants"])
+    for kind, label in (("rostered", "rostered"), ("wire", "wire"), ("near", "wire near a starter")):
+        for prior, pw in (("total", "a total"), ("no_total", "no total")):
+            for split, sw in (("every", ""), ("on_field", ", on the field after")):
+                x = res[kind][prior][split]
+                if x["n"]:
+                    t.add_row(f"{label}, {pw}{sw}", str(x["n"]), str(x["bodies"]), *(fmt(x[v]) for v in res["variants"]))
     rprint(t)
 
 

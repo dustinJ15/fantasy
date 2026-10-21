@@ -136,4 +136,7 @@ are in `docs/accuracy.md`. The three things this plan could not know:
   done 2026-10-21: the probe of ESPN's past-period player list (`scripts/probe_replay_pool.py`), the universe pull (replay
   version 2, above), the two scorers (`ff backtest --scan`, `ff backtest --claims`) and the first real tables
   (`docs/accuracy.md`, "The scanner replay"). What they found is D13 (a wire body with no preseason total is priced
-  from his last game or two) and the three constant re-reads D14-D16.
+  from his last game or two) and the three constant re-reads D14-D16. D17 (2026-10-21) added the third scorer,
+  `prior_hits` (`ff backtest --prior`): every body's week-w price against his points a game after, rostered and wire
+  apart, under the prior `season_pg` fades and its alternatives; the prior stays (`docs/accuracy.md`, "The rest-of-season
+  prior"), re-read at the end of the regular season (D18).

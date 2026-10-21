@@ -721,3 +721,63 @@ def test_claim_table_bins_on_the_promise_and_reads_the_start_now_rows_apart():
 def test_claim_hits_on_a_replay_with_one_week_scores_nothing():
     res = bt.claim_hits(synthetic_replay(weeks=1, teams=4))
     assert res["weeks"] == [] and res["rows"] == 0 and res["through"] is None and res["all"]["every"]["n"] == 0 and res["adds"]["n"] == 0
+
+
+def test_prior_prices_reproduce_blends_price_and_each_alternative_moves_it_as_named():
+    """D17: `prior_prices` re-prices a body from the inputs `blend` keeps in `sources`. `stays` is `blend`'s own
+    `mu_ros_active` on every body (the scorer's arithmetic tracks the live one); on U7 (a total of five a game, one
+    25-point game, 14 this week) `faster` fades the same prior over three games, `larger` and `week` take this week's
+    14 as the prior, `none` his one game alone; on U6, who has no total, `stays`, `larger` and `week` are one price."""
+    rep = _dark_replay()
+    rows = {r["espn_id"]: r for r in bt.prior_week(rep, 2, 4)}
+    assert {k: r["prices"]["stays"] for k, r in rows.items()} == {k: r["price"] for k, r in rows.items()}
+    # U7: 0.5 * (5/6 * 5 + 1/6 * 25) + 7 = 11.17; over three games 0.5 * (2/3 * 5 + 1/3 * 25) + 7 = 12.83; the prior at 14: 14.92; 25 alone: 19.5
+    assert rows[7]["prices"] == {"stays": 11.17, "faster": 12.83, "larger": 14.92, "week": 14.92, "none": 19.5}
+    assert rows[6]["prices"] == {"stays": 14.92, "faster": 15.83, "larger": 14.92, "week": 14.92, "none": 19.5}
+    assert (rows[1]["kind"], rows[1]["total"], rows[1]["price"], rows[1]["prices"]["faster"]) == ("rostered", True, 7.92, 8.33)
+    big = synthetic_replay(**SCAN_REPLAY)
+    priced = bt.prior_week(big, 3, 8)
+    assert len(priced) > 100 and max(abs(r["prices"]["stays"] - r["price"]) for r in priced) <= 0.05   # to the rounding of `sources`
+
+
+def test_prior_hits_scores_the_price_at_week_w_on_the_games_after_it_rostered_and_wire_apart():
+    """The truth is his points a game over the weeks after the row: a bye is not a game (U4's week 3), a week with no
+    actual is `missing` (U5, beyond the universe), a zero on a game week counts and marks him `dark` when every one is
+    (U6, U7). A wire body is `near` when within three of a starter he could displace (U6, U7, U8 in week 2; U4 at
+    4.4 against U1's 7.9 is not); the tables read rostered, wire and near apart, each by whether he has a total."""
+    rep = _dark_replay()
+    w1 = {r["espn_id"]: r for r in bt.score_prior(rep, bt.prior_week(rep, 1, 4), 4)}
+    assert (w1[4]["weeks"], w1[4]["missing"], w1[4]["after_pg"], w1[4]["dark"]) == (1, 0, 4.0, False)
+    assert (w1[5]["weeks"], w1[5]["missing"], w1[5]["after_pg"]) == (0, 2, None)
+    assert (w1[1]["after_pg"], w1[8]["after_pg"]) == (10.0, 13.0)
+    w2 = {r["espn_id"]: r for r in bt.score_prior(rep, bt.prior_week(rep, 2, 4), 4)}
+    assert {k: (r["kind"], r["near"], r["total"]) for k, r in w2.items()} == {
+        1: ("rostered", False, True), 2: ("rostered", False, True), 3: ("rostered", False, True),
+        4: ("wire", False, True), 6: ("wire", True, False), 7: ("wire", True, True), 8: ("wire", True, True)}
+    assert (w2[4]["weeks"], w2[4]["after_pg"]) == (0, None)                                  # week 3 is his bye: nothing to grade
+    assert (w2[6]["after_pg"], w2[6]["dark"], w2[7]["dark"], w2[8]["after_pg"], w2[8]["dark"]) == (0.0, True, True, 14.0, False)
+    res = bt.prior_hits(rep)
+    assert res["weeks"] == [1, 2] and res["rows"] == 15 and res["variants"] == bt.PRIOR_VARIANTS
+    ros = res["rostered"]["total"]["every"]
+    # U1, U2, U3 in weeks 1 and 2: priced 7.5, 5.0, 8.5 then 7.92, 7.75, 9.33 against 10, 6, 10.5 then 12, 3, 20
+    assert (ros["n"], ros["bodies"], ros["unscored"]) == (6, 3, 0)
+    assert ros["stays"] == {"bias": -2.58, "mae": 4.17} and ros["larger"]["bias"] == -0.33
+    assert res["rostered"]["no_total"]["every"] == {"n": 0, "bodies": 0, "unscored": 1, **{k: {"bias": None, "mae": None} for k in bt.PRIOR_VARIANTS}}   # U5
+    wire = res["wire"]["total"]
+    assert (wire["every"]["n"], wire["every"]["bodies"], wire["every"]["unscored"]) == (5, 3, 1) and (wire["on_field"]["n"], wire["on_field"]["bodies"]) == (3, 2)
+    assert res["near"]["no_total"]["every"]["n"] == 1 and res["near"]["no_total"]["every"]["stays"] == {"bias": 14.92, "mae": 14.92}   # U6 in week 2
+    assert res["wire"]["no_total"]["every"]["stays"]["bias"] == 8.46                             # U6 in week 1 (priced 2) and week 2 (14.92), dark after both
+
+
+def test_a_week_w_prior_row_never_reads_a_week_w_or_later_actual():
+    rep = synthetic_replay(**SCAN_REPLAY)
+    key = lambda r: (r["espn_id"], r["kind"], r["near"], r["total"], r["prices"])
+    clean = bt.prior_week(rep, 3, 8)
+    assert [key(r) for r in clean] == [key(r) for r in bt.prior_week(poisoned(rep, 3), 3, 8)]
+    assert [key(r) for r in clean] != [key(r) for r in bt.prior_week(poisoned(rep, 2), 3, 8)]   # the week-2 actuals are the season to date
+    week3 = copy.deepcopy(rep)                                                                  # week 3's own actual is not the truth either
+    for p in week3["players"].values():
+        p["weeks"][3]["actual"] = 999.0
+    _box_scores_from_universe(week3)
+    truth = lambda rows: [(r["espn_id"], r["weeks"], r["after_pg"]) for r in rows]
+    assert truth(bt.score_prior(rep, bt.prior_week(rep, 3, 8), 8)) == truth(bt.score_prior(week3, bt.prior_week(week3, 3, 8), 8))
