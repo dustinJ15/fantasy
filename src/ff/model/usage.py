@@ -50,12 +50,76 @@ def weekly_usage(season: int, through_week: int | None = None) -> pl.DataFrame:
         "tgt_share": _col(st, "target_share"), "ay_share": _col(st, "air_yards_share"),
         "fpts_ppr": _col(st, "fantasy_points_ppr"), "fpts": _col(st, "fantasy_points"),
         "rec_td": _col(st, "receiving_tds"), "rush_td": _col(st, "rushing_tds"),
+        "opp": _col(st, "opponent_team"),
     }
     sel = [pl.col(pid).alias("gsis_id"), pl.col(name).alias("name"), pl.col(team).alias("team"), pl.col(pos).alias("pos"), pl.col("week")]
     for k, c in cols.items():
         sel.append((pl.col(c) if c else pl.lit(None)).alias(k))
     df = st.select(sel)
     return df
+
+
+# The positions the opponent factor prices (nflverse has no kicks, and a D/ST is the defense); K and D/ST read 1.0.
+FACTOR_POSITIONS = ("QB", "RB", "WR", "TE")
+# ESPN's team abbreviations where nflverse's differ (the scoreboard's `opp` is ESPN's; the stats' `opponent_team` is nflverse's).
+NFLVERSE_TEAM = {"LAR": "LA", "WSH": "WAS"}
+
+
+def nfl_team(abbrev: str | None) -> str | None:
+    """nflverse's abbreviation for an ESPN team abbreviation (LAR -> LA, WSH -> WAS, the rest unchanged)."""
+    return NFLVERSE_TEAM.get(abbrev, abbrev) if abbrev else None
+
+
+def team_games(w: pl.DataFrame) -> pl.DataFrame:
+    """One row per team-game and position over the weekly rows: `week`, `team` (the offense), `opp` (the defense),
+    `pos` and `pts`, the PPR points the offense's players at that position scored in that game, 0 when none of them
+    had a stat row (a game is any week a team has a row for, so a bye is no game). `season` is carried when present."""
+    keys = (["season"] if "season" in w.columns else []) + ["week", "team", "opp"]
+    rows = w.filter(pl.col("team").is_not_null() & pl.col("opp").is_not_null())
+    games = rows.select(keys).unique()
+    grid = games.join(pl.DataFrame({"pos": list(FACTOR_POSITIONS)}), how="cross")
+    pts = (rows.filter(pl.col("pos").is_in(FACTOR_POSITIONS)).group_by(keys + ["pos"])
+               .agg(pl.col("fpts_ppr").fill_null(0.0).sum().alias("pts")))
+    return grid.join(pts, on=keys + ["pos"], how="left").with_columns(pl.col("pts").fill_null(0.0)).sort(keys + ["pos"])
+
+
+def opponent_factors(tg: pl.DataFrame, through_week: int | None = None) -> pl.DataFrame:
+    """Each defense's points-allowed factor per position over the team-games through `through_week` (every week when
+    None): `games` it has played, `allowed_pg` (PPR points a game the position scored against it), `raw` (that over
+    the league's average team-game at the position) and `factor`, the schedule-adjusted one: `allowed_pg` over what
+    those offenses scored a game at the position in their other games (one pass of adjustment; an offense with no
+    other game reads the league average). A defense with no game yet has no row; a factor whose expectation is zero
+    reads 1.0. `season` is carried when present and the league average is per season."""
+    g = tg.filter(pl.col("week") <= through_week) if through_week is not None else tg
+    by = (["season"] if "season" in g.columns else [])
+    if g.is_empty():
+        return pl.DataFrame({c: [] for c in by + ["team", "pos", "games", "allowed_pg", "expected_pg", "raw", "factor"]})
+    g = g.with_columns([
+        pl.col("pts").mean().over(by + ["pos"]).alias("league_pg"),
+        pl.col("pts").sum().over(by + ["team", "pos"]).alias("off_pts"),
+        pl.len().over(by + ["team", "pos"]).alias("off_games"),
+    ]).with_columns(
+        pl.when(pl.col("off_games") > 1).then((pl.col("off_pts") - pl.col("pts")) / (pl.col("off_games") - 1))
+          .otherwise(pl.col("league_pg")).alias("elsewhere"))
+    out = g.group_by(by + ["opp", "pos"]).agg([
+        pl.len().cast(pl.Int64).alias("games"), pl.col("pts").mean().alias("allowed_pg"),
+        pl.col("elsewhere").mean().alias("expected_pg"), pl.col("league_pg").first().alias("league_pg"),
+    ]).rename({"opp": "team"})
+    return out.with_columns([
+        pl.when(pl.col("league_pg") > 0).then(pl.col("allowed_pg") / pl.col("league_pg")).otherwise(1.0).alias("raw"),
+        pl.when(pl.col("expected_pg") > 0).then(pl.col("allowed_pg") / pl.col("expected_pg")).otherwise(1.0).alias("factor"),
+    ]).drop("league_pg").sort(by + ["pos", "team"])
+
+
+def opponent_factor_index(season: int, through_week: int) -> dict[tuple[str, str], dict]:
+    """The live read: (nflverse defense, pos) -> {factor, raw, games, allowed_pg} over the season's games through
+    `through_week` (the week before the one being priced: the week's own box score never enters the factor).
+    Empty before the first week."""
+    if through_week < 1:
+        return {}
+    f = opponent_factors(team_games(weekly_usage(season, through_week)))
+    return {(r["team"], r["pos"]): {"factor": round(r["factor"], 3), "raw": round(r["raw"], 3), "games": int(r["games"]),
+                                    "allowed_pg": round(r["allowed_pg"], 2)} for r in f.iter_rows(named=True)}
 
 
 def season_summary(season: int, through_week: int | None = None) -> pl.DataFrame:

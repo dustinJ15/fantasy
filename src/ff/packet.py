@@ -42,12 +42,15 @@ def league_snapshot(ref: LeagueRef, force: bool = False) -> dict:
 def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining: int, overrides: dict | None,
            sl_proj: dict | None = None, lines: dict | None = None, week: int | None = None,
            weekday: int | None = None, wx: dict | None = None,
-           usage_sig: dict | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
+           usage_sig: dict | None = None, defense: dict | None = None) -> tuple[list[PlayerProj], list[PlayerProj]]:
     """`wx` is team -> kickoff forecast (`weather.by_team`); None or a missing team reads as calm. `usage_sig` is
-    gsis_id -> season-to-date opportunity (`usage.signals`); None or an unmatched player leaves his level alone."""
+    gsis_id -> season-to-date opportunity (`usage.signals`); None or an unmatched player leaves his level alone.
+    `defense` is (nflverse team, pos) -> this season's points-allowed factor through last week
+    (`usage.opponent_factor_index`); his opponent comes from `lines` (ESPN's abbreviation, `usage.nfl_team` maps it),
+    so no line or no factor leaves this week's number alone."""
     ppr = snap["settings"].get("ppr", 1.0)
     key = "pts_ppr" if ppr >= 0.75 else ("pts_half_ppr" if ppr > 0 else "pts_std")
-    sl_proj, lines, wx, usage_sig = sl_proj or {}, lines or {}, wx or {}, usage_sig or {}
+    sl_proj, lines, wx, usage_sig, defense = sl_proj or {}, lines or {}, wx or {}, usage_sig or {}, defense or {}
 
     def mk(rows):
         out = []
@@ -61,9 +64,10 @@ def _projs(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, weeks_remaining
             spts = float(sp[key]) if sp and sp.get(key) is not None else None
             ln = lines.get(r["team"]) or {}
             gsis = (xw.lookup(r["espn_id"], r["name"], r["pos"]) or {}).get("gsis_id") if usage_sig else None
+            opp = defense.get((usage_mod.nfl_team(ln.get("opp")), r["pos"])) if ln.get("opp") else None
             out.append(blend(r, fp, inj.get(str(r["espn_id"])), weeks_remaining, overrides,
                              sleeper_pts=spts, implied_total=ln.get("implied"), week=week, weekday=weekday,
-                             weather=wx.get(r["team"]), usage=usage_sig.get(gsis) if gsis else None))
+                             weather=wx.get(r["team"]), usage=usage_sig.get(gsis) if gsis else None, opponent=opp))
         return out
     return mk(snap["roster"]), mk(snap["free_agents"])
 
@@ -131,10 +135,11 @@ def apply_accepted_trades(by_team: dict, pending: list[dict], my_id: int | None)
 def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trending: dict, usage_sig: dict,
                    overrides: dict | None = None, sims: int = 3000, sl_proj: dict | None = None, lines: dict | None = None,
                    now=None, skips: dict | None = None, pushes: dict | None = None, offer_history: dict | None = None,
-                   ir_moves: dict | None = None, wx: dict | None = None) -> dict:
+                   ir_moves: dict | None = None, wx: dict | None = None, defense: dict | None = None) -> dict:
     """`ir_moves` is the IR-slot memory (`rulings.load_ir_moves`), updated in place with this roster; the real build
     passes it and saves it afterwards, tests and the demo leave it out. `wx` is team -> kickoff forecast
-    (`weather.by_team`) for the wind discount; left out, every game is calm."""
+    (`weather.by_team`) for the wind discount; left out, every game is calm. `defense` is the opponent factor table
+    (`usage.opponent_factor_index`, through last week); left out, every matchup is average."""
     s = snap["settings"]
     week = snap["week"]
     slots = s["lineup_slots"]
@@ -145,7 +150,8 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     # projections use the Friday sit-risk numbers, so fixtures and the demo do not change with the calendar.
     now_dt = now if (now is not None and getattr(now, "tzinfo", None) is not None) else datetime.now(UTC)
     rostered, fas = _projs(snap, xw, fp_index, inj, weeks_remaining, overrides, sl_proj, lines, week=week,
-                           weekday=now_dt.weekday() if now is not None else None, wx=wx, usage_sig=usage_sig)
+                           weekday=now_dt.weekday() if now is not None else None, wx=wx, usage_sig=usage_sig,
+                           defense=defense)
     apply_clock(rostered, snap["roster"], lines or {}, now)
     apply_clock(fas, snap["free_agents"], lines or {}, now, free_agents=True)
     pool = rostered + fas
@@ -423,6 +429,16 @@ def _lineup_after(mine: list[PlayerProj], fas: list[PlayerProj], waivers: list[d
     return {**after.to_dict(), "adds": [p.name for p in fills]}
 
 
+def _opponent_factors(season: int, week: int) -> dict:
+    """The defenses' points-allowed factors through the week before the one the league is pricing
+    (`usage.opponent_factor_index`: the week's own box score never enters); empty when nflverse has nothing yet or is
+    down (every matchup then reads average, as before)."""
+    try:
+        return usage_mod.opponent_factor_index(season, week - 1)
+    except Exception:
+        return {}
+
+
 def _sleeper_projections(season: int, week: int) -> dict:
     """Sleeper's weekly projections for the week the league is pricing; empty when the week is unknown or Sleeper is down
     (the blend then runs on ESPN and FantasyPros alone, as before)."""
@@ -461,6 +477,7 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
     lines_by_week: dict[int, dict] = {}
     sl_proj_by_week: dict[int, dict] = {}
     wx_by_week: dict[int, dict] = {}
+    defense_by_week: dict[int, dict] = {}
 
     skips, pushes, outcomes, ir_moves = load_skips(), load_pushes(), load_outcomes(), load_ir_moves()
     league_blocks, watch, injured, exposure = [], [], [], defaultdict(list)
@@ -471,10 +488,11 @@ def build(only: str | None = None, overrides_path: str | None = None, force: boo
             lines_by_week[wk] = vegas.implied_totals(wk or None)
             sl_proj_by_week[wk] = _sleeper_projections(e.season, wk)
             wx_by_week[wk] = weather.by_team(lines_by_week[wk])
-        lines, sl_proj, wx = lines_by_week[wk], sl_proj_by_week[wk], wx_by_week[wk]
+            defense_by_week[wk] = _opponent_factors(e.season, wk) if usage_err is None else {}
+        lines, sl_proj, wx, defense = lines_by_week[wk], sl_proj_by_week[wk], wx_by_week[wk], defense_by_week[wk]
         blk = analyze_league(snap, xw, fp_index, inj, trending, usage_sig, overrides, sims, sl_proj, lines,
                              now=datetime.now(UTC), skips=skips, pushes=pushes, offer_history=history(outcomes, ref.name),
-                             ir_moves=ir_moves, wx=wx)
+                             ir_moves=ir_moves, wx=wx, defense=defense)
         for p in blk["roster"]:
             exposure[p["name"]].append(ref.name)
             st = (p["sources"].get("espn_status") or p["sources"].get("sleeper_status") or "").upper()

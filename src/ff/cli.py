@@ -309,9 +309,10 @@ def accuracy(week: int | None = typer.Option(None, "--week", help="Score the wee
 @app.command("fit-opportunity")
 def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season of the training sample"),
                     end: int = typer.Option(2025, "--to", help="Last season (the live season is partial; leave it out)")):
-    """Fit OPPORTUNITY_WEIGHT and OPPORTUNITY_RATIO_CLIP (model/projections.py) and XFP_PER_ATTEMPT (model/usage.py) to
-    nflverse weekly stats of past seasons, leave-one-season-out, and print them next to the constants (writes nothing;
-    docs/plans/fitted-projection.md says how to adopt a row). Needs the network, no cookies."""
+    """Fit OPPORTUNITY_WEIGHT and OPPORTUNITY_RATIO_CLIP (model/projections.py) and XFP_PER_ATTEMPT (model/usage.py), then
+    OPPONENT_K (this week's opponent factor), to nflverse weekly stats of past seasons, leave-one-season-out, and print
+    them next to the constants (writes nothing; docs/plans/fitted-projection.md says how to adopt a row). Needs the
+    network, no cookies."""
     from . import opfit
     out = opfit.run(range(start, end + 1))
     a = out["attempt"]
@@ -338,6 +339,23 @@ def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season
     for r in out["weights"]:
         if r["w_by_games"]:
             rprint(f"[dim]{r['pos']} weight by games played: " + ", ".join(f"{k}: {v[0]} (n {v[1]})" for k, v in r["w_by_games"].items() if v[0] is not None) + "[/]")
+    opp = out["opponent"]
+    rprint(f"[dim]{opp['rows']} opponent rows: a player at a week (≥ {opfit.projections.OPPORTUNITY_MIN_GAMES} games, ≥ {opfit.FIT_MIN_PPG} PPR a "
+           f"game so far), the defense he faced with its schedule-adjusted points-allowed factor through the week before (≥ "
+           f"{opfit.projections.OPPONENT_MIN_GAMES} games), and his points that week; the model is `opponent_mult`'s, "
+           f"`ppg * (1 + k * (factor - 1))` held to ±{opfit.projections.OPPONENT_MULT_CAP:.0%}, scored leave-one-season-out[/]")
+    t = Table("pos", "n", "OPPONENT_K now", "fit", "rmse k=0", "rmse now", "rmse fit", "folds", "verdict")
+    for r in opp["weeks"]:
+        folds = f"{min(r['k_folds'])}-{max(r['k_folds'])}" if r["k_folds"] else "—"
+        verdict = "fit" if r["fitted"] else ("keep prior" if r["n"] >= r["min_n"] else f"keep prior (n < {r['min_n']})")
+        t.add_row(r["pos"], str(r["n"]), str(r["k_prior"]), "—" if r["k_fit"] is None else str(r["k_fit"]),
+                  str(r["rmse_none"]), str(r["rmse_prior"]), str(r["rmse_fit"]), folds, verdict)
+    rprint(t)
+    for r in opp["weeks"]:
+        if r["k_fit"] is not None:
+            rprint(f"[dim]{r['pos']}: without the cap rmse {r['rmse_nocap']}, the cap binds on {r['cap_binds']:.1%} of rows; the unadjusted "
+                   f"factor fits k {r['k_raw']} at rmse {r['rmse_raw']}; k by the defense's games played: "
+                   + ", ".join(f"{k}: {v[0]} (n {v[1]})" for k, v in r["k_by_def_games"].items() if v[0] is not None) + "[/]")
 
 
 @app.command("replay-pull")

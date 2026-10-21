@@ -303,3 +303,30 @@ def test_usage_reaches_the_rest_of_season_level_through_the_crosswalk(monkeypatc
     assert moved[star["espn_id"]]["usage"]["tgt_share"] == 0.26   # the usage cell still renders from the same dict
     others = [eid for eid in mine if eid != star["espn_id"]]
     assert all(moved[e]["mu_ros"] == mine[e]["mu_ros"] for e in others)
+
+
+def test_the_opponent_factor_reaches_this_weeks_number_through_the_scoreboards_opponent(monkeypatch):
+    """D10 step 2: `analyze_league` hands `_projs` the defense table keyed by nflverse team and position; a player's
+    opponent is the scoreboard line's `opp` (ESPN's abbreviation, LAR -> LA), so the demo QB facing the Rams reads
+    their QB factor on `sources.def_mult` and `mu`, this week only, and nobody else moves."""
+    from ff.model import projections
+    monkeypatch.setattr(projections, "OPPONENT_K", {"QB": 0.2, "RB": 0.25, "WR": 0.1, "TE": 0.2})
+    snap = make_snapshot()
+    qb = next(p for p in snap["roster"] if p["fantasy_team_id"] == snap["my_team_id"] and p["pos"] == "QB")
+    line = {"opp": "LAR", "home": True, "implied": None, "spread": None, "total": None, "kickoff": None, "indoor": False}
+    lines = {qb["team"]: line}
+    defense = {("LA", "QB"): {"factor": 1.4, "games": 6, "raw": 1.3, "allowed_pg": 24.0},
+               ("LA", "RB"): {"factor": 0.5, "games": 6, "raw": 0.6, "allowed_pg": 12.0}}
+    base = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=50, lines=lines)
+    blk = analyze_league(snap, FakeXW(), {}, {}, {}, {}, overrides=None, sims=50, lines=lines, defense=defense)
+    mine = {p["espn_id"]: p for p in base["roster"]}
+    moved = {p["espn_id"]: p for p in blk["roster"]}
+    assert moved[qb["espn_id"]]["sources"]["def_mult"] == 1.08 and moved[qb["espn_id"]]["sources"]["def_factor"] == 1.4
+    assert moved[qb["espn_id"]]["mu"] == pytest.approx(mine[qb["espn_id"]]["mu"] * 1.08, abs=0.02)
+    assert moved[qb["espn_id"]]["mu_ros"] == mine[qb["espn_id"]]["mu_ros"] and "def:x1.08" in moved[qb["espn_id"]]["flags"]
+    others = [eid for eid in mine if eid != qb["espn_id"] and mine[eid]["team"] != qb["team"]]
+    assert others and all(moved[e]["mu"] == mine[e]["mu"] and moved[e]["sources"]["def_mult"] == 1.0 for e in others)
+    # the RB on the same team faces the same defense at his own position's factor: a stingy run defense, held to the cap
+    rb = next((p for p in blk["roster"] if p["team"] == qb["team"] and p["pos"] == "RB"), None)
+    if rb is not None:
+        assert rb["sources"]["def_mult"] == 0.9
