@@ -310,7 +310,8 @@ def accuracy(week: int | None = typer.Option(None, "--week", help="Score the wee
 def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season of the training sample"),
                     end: int = typer.Option(2025, "--to", help="Last season (the live season is partial; leave it out)")):
     """Fit OPPORTUNITY_WEIGHT and OPPORTUNITY_RATIO_CLIP (model/projections.py) and XFP_PER_ATTEMPT (model/usage.py), then
-    OPPONENT_K (this week's opponent factor), to nflverse weekly stats of past seasons, leave-one-season-out, and print
+    OPPONENT_K (this week's opponent factor) and VEGAS_K (this week's implied total, on nflverse schedules' closing
+    lines), to nflverse weekly stats of past seasons, leave-one-season-out, and print
     them next to the constants (writes nothing; docs/plans/fitted-projection.md says how to adopt a row). Needs the
     network, no cookies."""
     from . import opfit
@@ -356,6 +357,19 @@ def fit_opportunity(start: int = typer.Option(2016, "--from", help="First season
             rprint(f"[dim]{r['pos']}: without the cap rmse {r['rmse_nocap']}, the cap binds on {r['cap_binds']:.1%} of rows; the unadjusted "
                    f"factor fits k {r['k_raw']} at rmse {r['rmse_raw']}; k by the defense's games played: "
                    + ", ".join(f"{k}: {v[0]} (n {v[1]})" for k, v in r["k_by_def_games"].items() if v[0] is not None) + "[/]")
+    veg = out["vegas"]
+    rprint(f"[dim]{veg['rows']} implied-total rows: a player at a week (≥ {opfit.projections.OPPORTUNITY_MIN_GAMES} games, ≥ {opfit.FIT_MIN_PPG} PPR a "
+           f"game so far), his level moved toward his usage by `opportunity_mult`, times this week's opponent multiplier at "
+           f"OPPONENT_K, and his team's implied total off nflverse's closing line; the model is `blend`'s, "
+           f"`level * (1 + k * (implied / {opfit.projections.LEAGUE_AVG_IMPLIED} - 1))`, scored leave-one-season-out. Mean implied "
+           f"total over every team-game: {veg['league_implied']} (LEAGUE_AVG_IMPLIED {opfit.projections.LEAGUE_AVG_IMPLIED})[/]")
+    t = Table("pos", "n", "VEGAS_K now", "fit", "rmse k=0", "rmse now", "rmse fit", "folds", "k on raw ppg", "verdict")
+    for r in veg["weeks"]:
+        folds = f"{min(r['k_folds'])}-{max(r['k_folds'])}" if r["k_folds"] else "—"
+        verdict = "fit" if r["fitted"] else ("keep prior" if r["n"] >= r["min_n"] else f"keep prior (n < {r['min_n']})")
+        t.add_row(r["pos"], str(r["n"]), str(r["k_prior"]), "—" if r["k_fit"] is None else str(r["k_fit"]),
+                  str(r["rmse_none"]), str(r["rmse_prior"]), str(r["rmse_fit"]), folds, "—" if r["k_ppg"] is None else str(r["k_ppg"]), verdict)
+    rprint(t)
 
 
 @app.command("replay-pull")

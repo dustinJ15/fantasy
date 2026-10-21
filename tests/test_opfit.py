@@ -2,7 +2,8 @@
 with no actual read before the week it is priced at, the closed-form weight recovers a known truth and stays a share,
 one clip is chosen for every position, and the pass-attempt value is the least-squares one; step 2's opponent factor
 is each defense's points allowed over what the offenses it faced score elsewhere, read through the week before, and
-`k` is the closed-form one scored with the cap. Synthetic frames; the network is never touched."""
+`k` is the closed-form one scored with the cap; step 3 reads each side's implied total off the closing line and fits `k` on the
+level the live number has, not on a raw start that regresses. Synthetic frames; the network is never touched."""
 import numpy as np
 import polars as pl
 import pytest
@@ -200,3 +201,95 @@ def test_the_adopted_opponent_constants_are_what_the_fitter_prints():
     assert set(projections.OPPONENT_K) == set(opfit.FIT_POSITIONS) == set(usage.FACTOR_POSITIONS)
     assert all(opfit.K_BOUNDS[0] < k <= opfit.K_BOUNDS[1] for k in projections.OPPONENT_K.values())
     assert usage.nfl_team("LAR") == "LA" and usage.nfl_team("WSH") == "WAS" and usage.nfl_team("GB") == "GB" and usage.nfl_team(None) is None
+
+
+def _sched(rows: list[tuple]) -> pl.DataFrame:
+    """Rows of (week, game_type, home, away, spread_line, total_line)."""
+    return pl.DataFrame([{"season": 2024, "week": wk, "game_type": gt, "home_team": h, "away_team": a, "spread_line": sp, "total_line": tot}
+                         for wk, gt, h, a, sp, tot in rows], schema_overrides={"spread_line": pl.Float64, "total_line": pl.Float64})
+
+
+def test_implied_lines_split_the_total_by_the_home_spread_in_the_stats_team_codes():
+    """nflverse's spread is the home margin (positive = home favored): KC -3 at home in a 46 total is 24.5 to 21.5,
+    the same split `sources/vegas.py` reads off ESPN's scoreboard. A playoff game and a game with no line are not
+    rows; OAK and SD read as the weekly stats' LV and LAC."""
+    ln = opfit.implied_lines(_sched([(1, "REG", "KC", "BAL", 3.0, 46.0), (2, "REG", "OAK", "SD", -2.0, 44.0),
+                                     (3, "REG", "KC", "DEN", None, 40.0), (19, "WC", "KC", "MIA", 4.0, 44.0)]))
+    got = {(r["week"], r["team"]): r["implied"] for r in ln.iter_rows(named=True)}
+    assert got == {(1, "KC"): 24.5, (1, "BAL"): 21.5, (2, "LV"): 21.0, (2, "LAC"): 23.0}
+
+
+def test_vegas_frame_prices_the_week_on_the_live_level_and_the_live_opponent_multiplier():
+    """A receiver at A, 10 targets a game (xFP 15.5), 10 points against B in week 1 and 20 a game against D after: his row carries
+    `level`, his ppg moved toward his usage by the live `opportunity_mult`, his own team's implied total that week
+    (not the opponent's), and `def_mult` 1.0 until D has OPPONENT_MIN_GAMES games through the week before, the live
+    multiplier after."""
+    rows = [(1, "A", "B", "WR", 10.0), (1, "B", "A", "WR", 12.0), (1, "C", "D", "WR", 12.0), (1, "D", "C", "WR", 12.0)]
+    for wk in range(2, 6):   # A scores 10 elsewhere and 20 against D: D's factor reads over 1
+        rows += [(wk, "A", "D", "WR", 20.0), (wk, "D", "A", "WR", 30.0), (wk, "B", "C", "WR", 12.0), (wk, "C", "B", "WR", 12.0)]
+    w = _games(rows).with_columns(pl.when(pl.col("gsis_id") == "A-WR").then(10).otherwise(0).alias("targets"))
+    lines = opfit.implied_lines(_sched([(1, "REG", "A", "B", 4.0, 50.0), (1, "REG", "C", "D", 0.0, 40.0)]
+                                       + [(wk, "REG", "A", "D", 4.0, 50.0) for wk in range(2, 6)]
+                                       + [(wk, "REG", "B", "C", 0.0, 40.0) for wk in range(2, 6)]))
+    df = opfit.vegas_frame(opfit.with_xfp(w), lines)
+    a = df.filter(pl.col("gsis_id") == "A-WR").sort("week")
+    assert a["week"].to_list() == [3, 4, 5] and a["implied"].to_list() == [27.0, 27.0, 27.0]
+    mult = projections.opportunity_mult("WR", {"ppg": 15.0, "xfp_pg": 10 * usage.XFP_PER_TARGET, "games": 2})
+    assert a.row(0, named=True)["ppg"] == pytest.approx(15.0)   # 10 and 20 in weeks 1-2
+    assert a.row(0, named=True)["level"] == pytest.approx(15.0 * mult) and mult > 1.0   # scoring under his targets reads over
+    assert a.row(0, named=True)["def_mult"] == 1.0   # week 3: D has two games through week 2
+    tg = usage.team_games(w)
+    for i, wk in ((1, 4), (2, 5)):
+        f = usage.opponent_factors(tg, through_week=wk - 1).filter((pl.col("team") == "D") & (pl.col("pos") == "WR")).row(0, named=True)
+        assert f["factor"] > 1.05
+        cap = projections.OPPONENT_MULT_CAP
+        assert a.row(i, named=True)["def_mult"] == pytest.approx(min(max(1 + projections.OPPONENT_K["WR"] * (f["factor"] - 1), 1 - cap), 1 + cap))
+    assert a.row(0, named=True)["pts"] == 20.0 and a.row(1, named=True)["def_mult"] > 1.0
+
+
+def _vegas_sample(k_true: float, n: int = 6000, seed: int = 0, noise: float = 0.0, seasons: int = 5, luck: float = 0.0) -> opfit.VegasSample:
+    """`level` the player's true rate, `implied` partly his team's quality; `ppg` is `level` plus a start's luck that
+    the market's line also reads (`luck` > 0), which then regresses: y is the level times the implied-total term."""
+    rng = np.random.default_rng(seed)
+    level = rng.uniform(6.0, 25.0, n)
+    hot = rng.normal(0.0, 1.0, n)
+    implied = 23.0 + rng.normal(0.0, 5.0, n) + 3.0 * luck * hot
+    ppg = level * (1 + 0.15 * luck * hot)
+    y = level * (1 + k_true * (implied / 23.0 - 1)) + rng.normal(0.0, noise, n)
+    return opfit.VegasSample(np.repeat(np.arange(2020, 2020 + seasons), n // seasons), ppg, level, implied, np.ones(n), y)
+
+
+def test_fit_vegas_k_recovers_the_truth_on_the_level_and_the_raw_start_hides_it():
+    assert opfit.fit_vegas_k(_vegas_sample(0.0)) == pytest.approx(0.0)
+    assert opfit.fit_vegas_k(_vegas_sample(0.4, noise=1.0)) == pytest.approx(0.4, abs=0.03)
+    s = _vegas_sample(0.0)
+    s.y = s.level * (1 - 0.3 * (s.implied / 23.0 - 1))   # a shootout scoring him down: held at 0
+    assert opfit.fit_vegas_k(s) == 0.0
+    # the confound the fit is built around: a hot start and his line rise together and the start regresses, so the
+    # same truth fitted on raw ppg reads far under it (the 2016-2025 QB row fits 0 on ppg, 0.41 on the level)
+    s = _vegas_sample(0.4, noise=2.0, luck=1.0)
+    assert opfit.fit_vegas_k(s) == pytest.approx(0.4, abs=0.04)
+    assert opfit.fit_vegas_k(s, on_ppg=True) < 0.2
+    # the opponent multiplier is on the base: a truth of level * def_mult * term is recovered, not absorbed into k
+    s = _vegas_sample(0.3, noise=1.0)
+    s.def_mult = np.where(np.arange(s.n) % 2, 1.1, 0.9); s.y = s.level * s.def_mult * (1 + 0.3 * (s.implied / 23.0 - 1))
+    assert opfit.fit_vegas_k(s) == pytest.approx(0.3, abs=1e-9)
+
+
+def test_fit_vegas_position_is_out_of_sample_against_the_prior():
+    s = _vegas_sample(0.4, noise=2.0)
+    sse, n, ks = opfit.oos_vegas(s)
+    assert n == s.n and len(ks) == 5 and all(abs(k - 0.4) < 0.05 for k in ks)
+    row = opfit.fit_vegas_position(s, "QB", min_n=100)
+    assert row["k_prior"] == projections.VEGAS_K["QB"] and row["rmse_fit"] < row["rmse_none"]
+    assert row["fitted"] == (row["rmse_fit"] < row["rmse_prior"])
+    assert row["mean_implied"] == pytest.approx(float(s.implied.mean()), abs=0.01)
+    thin = opfit.fit_vegas_position(_vegas_sample(0.4, n=200, noise=2.0), "WR", min_n=1000)
+    assert not thin["fitted"] and thin["k_fit"] is not None
+
+
+def test_the_adopted_vegas_constants_are_what_the_fitter_prints():
+    """QB took the fit (0.413 on 2016-2025, 2026-10-21); RB, WR and TE tied their hand numbers and kept them."""
+    assert all(opfit.K_BOUNDS[0] <= projections.VEGAS_K[p] <= opfit.K_BOUNDS[1] for p in opfit.FIT_POSITIONS)
+    assert projections.VEGAS_K["QB"] == 0.41
+    assert (projections.VEGAS_K["RB"], projections.VEGAS_K["WR"], projections.VEGAS_K["TE"]) == (0.3, 0.35, 0.3)

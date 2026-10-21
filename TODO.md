@@ -89,9 +89,10 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   factor (`usage.opponent_factors`, each defense's points allowed a game at the position over what those offenses score
   elsewhere, through last week; `OPPONENT_K` fitted QB 0.20, RB 0.25, WR 0.09, TE 0.19 on 26,670 player-weeks, worth
   0.3% of the weekly error; the ±10% cap kept) multiplies this week's `mu` in `blend` beside `VEGAS_K`
-  (`sources.def_factor`, `def_mult`, the `def:x1.08` flag). Left, one PR each, in order: 3. the
-  implied-total term (`VEGAS_K` fitted on nflverse `schedules` `spread_line` / `total_line`, ROADMAP item 4's open
-  calibration; the same row as step 2, `opfit.opponent_frame`, with the implied total in place of the factor); 4. the
+  (`sources.def_factor`, `def_mult`, the `def:x1.08` flag). Step 3 done 2026-10-21: the implied total (`opfit.fit_vegas` on
+  nflverse `schedules` closing lines, fitted on the opportunity-moved level times the opponent multiplier: on raw `ppg` a
+  hot start and his line rise together and the fit reads zero) took `VEGAS_K` QB 0.41 (was 0.35); RB, WR and TE tie their
+  hand numbers and keep them. Left, one PR each, in order: 4. the
   recent-usage trend (the last three games' share against the season's, a second term on the
   rest-of-season level, the same closed form as step 1); 5. the blend with consensus by out-of-sample error (the
   historical model's weekly number against ESPN's in the 2026 replay and the projlog; needs the replay files and the

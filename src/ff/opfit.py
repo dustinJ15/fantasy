@@ -1,6 +1,7 @@
 """The projection-constant fitter (TODO D10): step 1 fits `projections.OPPORTUNITY_WEIGHT` and `OPPORTUNITY_RATIO_CLIP`
-per position, and `usage.XFP_PER_ATTEMPT`; step 2 fits `projections.OPPONENT_K`, this week's opponent factor; all to
-nflverse weekly stats of past seasons. Prints, never writes: the constants are copied by hand with the sample and the
+per position, and `usage.XFP_PER_ATTEMPT`; step 2 fits `projections.OPPONENT_K`, this week's opponent factor; step 3
+fits `projections.VEGAS_K`, this week's implied team total (nflverse `schedules`); all to nflverse weekly stats of past
+seasons. Prints, never writes: the constants are copied by hand with the sample and the
 date in the comment (`docs/plans/fitted-projection.md`).
 
 The question it answers is the one `opportunity_mult` makes a prior on: a player's season so far reads `ppg` points a
@@ -19,6 +20,7 @@ import numpy as np
 import polars as pl
 
 from .model import projections, usage
+from .sources import nflverse
 
 FIT_SEASONS = tuple(range(2016, 2026))
 FIT_POSITIONS = ("QB", "RB", "WR", "TE")
@@ -58,12 +60,15 @@ def with_xfp(w: pl.DataFrame, per_attempt: float | None = None) -> pl.DataFrame:
 def season_rows(w: pl.DataFrame) -> pl.DataFrame:
     """One row per player-game of a season (FIT_POSITIONS), sorted, with his season so far on it: `games` before that
     week, `pts_before` and `xfp_before` over them (the row's own game subtracted from the prefix, so nothing on the row
-    is read before its week), `fpts` and `xfp` that game, `opp` the defense he faced, and the season's totals."""
+    is read before its week), `fpts` and `xfp` that game, `opp` the defense he faced, `team` his offense, and the season's
+    totals."""
     agg = [pl.col("fpts_ppr").fill_null(0.0).sum().alias("fpts")]
     if "xfp" in w.columns:
         agg.append(pl.col("xfp").fill_null(0.0).sum().alias("xfp"))
     if "opp" in w.columns:
         agg.append(pl.col("opp").drop_nulls().first().alias("opp"))
+    if "team" in w.columns:
+        agg.append(pl.col("team").drop_nulls().first().alias("team"))
     g = (w.filter(pl.col("pos").is_in(FIT_POSITIONS))
           .group_by(["season", "gsis_id", "pos", "week"]).agg(agg)
           .sort(["season", "gsis_id", "week"]))
@@ -340,6 +345,161 @@ def fit_opponent(w: pl.DataFrame) -> dict:
     return {"rows": len(df), "weeks": [fit_opponent_position(OppSample.of(df, pos), pos) for pos in FIT_POSITIONS]}
 
 
+# ---------- step 3: the implied team total ----------
+
+# nflverse `schedules` keeps a franchise's code of the season (OAK, SD, STL); the weekly stats carry today's (LV, LAC, LA).
+SCHEDULE_TEAM = {"OAK": "LV", "SD": "LAC", "STL": "LA"}
+
+
+def implied_lines(sched: pl.DataFrame) -> pl.DataFrame:
+    """Every team's implied total in every regular-season game with a closing line: `season`, `week`, `team`,
+    `implied`. nflverse's `spread_line` is the home side's margin (positive = home favored), so the home side's
+    implied total is `total / 2 + spread / 2`, the same number `sources/vegas.py` reads off ESPN's scoreboard (whose
+    spread has the other sign). Teams read in the weekly stats' codes (SCHEDULE_TEAM)."""
+    g = sched.filter((pl.col("game_type") == "REG") & pl.col("spread_line").is_not_null() & pl.col("total_line").is_not_null())
+    cols = [pl.col("season").cast(pl.Int64), pl.col("week").cast(pl.Int64)]
+    home = g.select(cols + [pl.col("home_team").alias("team"), (pl.col("total_line") / 2 + pl.col("spread_line") / 2).alias("implied")])
+    away = g.select(cols + [pl.col("away_team").alias("team"), (pl.col("total_line") / 2 - pl.col("spread_line") / 2).alias("implied")])
+    return (pl.concat([home, away]).with_columns(pl.col("team").replace(SCHEDULE_TEAM))
+              .sort(["season", "week", "team"]))
+
+
+def schedules(seasons: Iterable[int] = FIT_SEASONS) -> pl.DataFrame:
+    """nflverse `schedules` over the seasons (the network)."""
+    return pl.concat([nflverse.schedules(int(s)) for s in seasons], how="vertical_relaxed")
+
+
+def vegas_frame(w: pl.DataFrame, lines: pl.DataFrame, min_games: int = projections.OPPORTUNITY_MIN_GAMES,
+                min_ppg: float = FIT_MIN_PPG) -> pl.DataFrame:
+    """A row per player-game at which the live read would have priced his week (step 2's rows, without waiting on the
+    defense's games): `ppg` over his games before it, `level` that moved toward his usage by the live
+    `projections.opportunity_mult` (the adopted weight, clip and xFP; `w` needs the `xfp` column, `with_xfp`),
+    `implied` his team's implied total that week, and `def_mult`, the opponent multiplier `blend` applies beside the
+    implied total, at the adopted OPPONENT_K and cap, 1.0 where the defense had under OPPONENT_MIN_GAMES games through
+    the week before (as the live read does). `pts` is the truth. A game with no closing line drops out.
+
+    The base is `level`, not `ppg`: a hot start and his team's line rise together (the market reads the same box
+    scores) and the start then regresses, so on raw `ppg` the implied total is fitted against the regression and
+    reads near zero; the live number it multiplies is a projection, which has already regressed. The fit on `ppg` is
+    printed beside it (`k_ppg`) so the reader sees the confound."""
+    tg = usage.team_games(w)
+    f = (factors_by_week(tg).rename({"team": "opp", "games": "def_games"}).select(["season", "opp", "pos", "week", "def_games", "factor"])
+         .with_columns(pl.col("season").cast(pl.Int64), pl.col("week").cast(pl.Int64)))
+    ln = lines.with_columns(pl.col("season").cast(pl.Int64), pl.col("week").cast(pl.Int64))
+    g = (season_rows(w).filter((pl.col("games") >= min_games) & pl.col("team").is_not_null())
+           .with_columns((pl.col("pts_before") / pl.col("games")).alias("ppg"), (pl.col("xfp_before") / pl.col("games")).alias("xfp_pg"),
+                         pl.col("season").cast(pl.Int64), pl.col("week").cast(pl.Int64))
+           .filter(pl.col("ppg") >= min_ppg)
+           .join(ln, on=["season", "week", "team"], how="inner")
+           .join(f, on=["season", "opp", "pos", "week"], how="left"))
+    k = pl.col("pos").replace_strict(projections.OPPONENT_K, default=0.0, return_dtype=pl.Float64)
+    cap = projections.OPPONENT_MULT_CAP
+    live = (1.0 + k * (pl.col("factor") - 1.0)).clip(1.0 - cap, 1.0 + cap)
+    om = [projections.opportunity_mult(r["pos"], {"ppg": r["ppg"], "xfp_pg": r["xfp_pg"], "games": r["games"]})
+          for r in g.select(["pos", "ppg", "xfp_pg", "games"]).iter_rows(named=True)]
+    g = g.with_columns(pl.when(pl.col("def_games").fill_null(0) >= projections.OPPONENT_MIN_GAMES).then(live).otherwise(1.0).alias("def_mult"),
+                       (pl.col("ppg") * pl.Series(om, dtype=pl.Float64)).alias("level"))
+    return g.select(["season", "gsis_id", "pos", "week", "games", "ppg", "level", "team", "opp", "implied", "def_mult", pl.col("fpts").alias("pts")])
+
+
+@dataclass
+class VegasSample:
+    """One position's implied-total rows as arrays: `season` for the folds, `ppg` his points a game so far and `level`
+    that moved toward his usage, `implied` his team's total that week, `def_mult` the opponent multiplier already on
+    the live number, `y` his points that week."""
+    season: np.ndarray
+    ppg: np.ndarray
+    level: np.ndarray
+    implied: np.ndarray
+    def_mult: np.ndarray
+    y: np.ndarray
+
+    @classmethod
+    def of(cls, df: pl.DataFrame, pos: str) -> VegasSample:
+        d = df.filter(pl.col("pos") == pos)
+        return cls(d["season"].to_numpy(), d["ppg"].to_numpy().astype(float), d["level"].to_numpy().astype(float),
+                   d["implied"].to_numpy().astype(float), d["def_mult"].to_numpy().astype(float), d["pts"].to_numpy().astype(float))
+
+    @property
+    def n(self) -> int:
+        return int(self.y.size)
+
+
+def _vbase(s: VegasSample, on_ppg: bool = False) -> np.ndarray:
+    """The number the implied total multiplies: `level` (or raw `ppg`) times the opponent multiplier."""
+    return (s.ppg if on_ppg else s.level) * s.def_mult
+
+
+def _vx(s: VegasSample, avg: float, on_ppg: bool = False) -> np.ndarray:
+    """The regressor: `base * (implied / avg - 1)`, so the live `base * (1 + k * (implied / avg - 1))` is `base + k * x`
+    (`blend` multiplies the implied-total and opponent terms onto one number; the order does not matter)."""
+    return _vbase(s, on_ppg) * (s.implied / avg - 1.0)
+
+
+def fit_vegas_k(s: VegasSample, mask: np.ndarray | None = None, avg: float = projections.LEAGUE_AVG_IMPLIED,
+                on_ppg: bool = False) -> float:
+    """The least-squares `k`, closed form, held to K_BOUNDS (a negative `k` would score a player down in a shootout).
+    `on_ppg` fits it on raw `ppg` instead of `level`, for the reader. `mask` picks the training rows."""
+    x = _vx(s, avg, on_ppg)
+    y = s.y - _vbase(s, on_ppg)
+    if mask is not None:
+        x, y = x[mask], y[mask]
+    den = float((x * x).sum())
+    if den <= 0:
+        return 0.0
+    return float(np.clip((x * y).sum() / den, *K_BOUNDS))
+
+
+def vegas_rmse(s: VegasSample, k: float, avg: float = projections.LEAGUE_AVG_IMPLIED, mask: np.ndarray | None = None) -> float:
+    err = _vbase(s) + k * _vx(s, avg) - s.y
+    if mask is not None:
+        err = err[mask]
+    return float(np.sqrt(np.mean(err**2))) if err.size else float("nan")
+
+
+def oos_vegas(s: VegasSample, avg: float = projections.LEAGUE_AVG_IMPLIED) -> tuple[float, int, list[float]]:
+    """Leave-one-season-out: `k` fitted on the other seasons, scored on the held-out one (the live shape: `level`
+    times the opponent multiplier); the summed squared error and count over every held-out row, and the per-fold `k`s."""
+    sse, n, ks = 0.0, 0, []
+    for yr in np.unique(s.season):
+        test = s.season == yr
+        if test.all():
+            continue
+        k = fit_vegas_k(s, ~test, avg)
+        ks.append(k)
+        err = (_vbase(s) + k * _vx(s, avg) - s.y)[test]
+        sse += float((err**2).sum()); n += int(err.size)
+    return sse, n, ks
+
+
+def fit_vegas_position(s: VegasSample, pos: str, avg: float = projections.LEAGUE_AVG_IMPLIED, min_n: int = FIT_MIN_N) -> dict:
+    """One position's row: the sample, the prior `k` (VEGAS_K) and its error, no implied total at all (k = 0), the `k`
+    fitted on every season and its out-of-sample error, the per-fold `k`s, `k_ppg` (the same fit on raw `ppg`: the
+    regression confound `vegas_frame` explains), the sample's mean implied total (against LEAGUE_AVG_IMPLIED, the
+    centre the term reads around), and the verdict: `fit` when the fitted `k` beats the prior out of sample on `min_n`
+    rows or more, else `keep prior`."""
+    prior_k = projections.VEGAS_K.get(pos, 0.0)
+    row = {"pos": pos, "n": s.n, "seasons": int(np.unique(s.season).size), "k_prior": prior_k, "avg": avg,
+           "rmse_none": None, "rmse_prior": None, "k_fit": None, "rmse_fit": None, "k_ppg": None, "k_folds": [],
+           "mean_implied": None, "fitted": False, "min_n": min_n}
+    if not s.n:
+        return row
+    sse, n, ks = oos_vegas(s, avg)
+    row.update(rmse_none=round(vegas_rmse(s, 0.0, avg), 4), rmse_prior=round(vegas_rmse(s, prior_k, avg), 4),
+               k_fit=round(fit_vegas_k(s, avg=avg), 3), rmse_fit=_rmse(sse, n), k_ppg=round(fit_vegas_k(s, avg=avg, on_ppg=True), 3),
+               k_folds=[round(x, 3) for x in ks], mean_implied=round(float(s.implied.mean()), 2))
+    row["fitted"] = s.n >= min_n and row["rmse_fit"] is not None and row["rmse_fit"] < row["rmse_prior"] - 1e-9
+    return row
+
+
+def fit_vegas(w: pl.DataFrame, lines: pl.DataFrame) -> dict:
+    """Step 3 over FIT_POSITIONS: the implied-total frame and `fit_vegas_position` for each, and the mean implied
+    total of every team-game with a line (the league's, against LEAGUE_AVG_IMPLIED). `w` carries `xfp` (`with_xfp`)."""
+    df = vegas_frame(w, lines)
+    return {"rows": len(df), "league_implied": round(float(lines["implied"].mean()), 2) if len(lines) else None,
+            "weeks": [fit_vegas_position(VegasSample.of(df, pos), pos) for pos in FIT_POSITIONS]}
+
+
 def fit_attempt_value(w: pl.DataFrame, carry: float = usage.XFP_PER_CARRY) -> dict:
     """The PPR points a pass attempt is worth at the league average: QB weeks with an attempt, points less `carry` a
     carry, least squares through the origin on attempts (`per_attempt`, with its per-season range). `joint` is the
@@ -382,9 +542,10 @@ def refit_opportunity_values(w: pl.DataFrame) -> dict[str, dict]:
 
 def run(seasons: Iterable[int] = FIT_SEASONS) -> dict:
     """Everything `ff fit-opportunity` prints: the attempt value first, then the weight rows on a training frame that
-    prices attempts at that value (the pair is adopted together), and the per-opportunity refit for information."""
+    prices attempts at that value (the pair is adopted together), the per-opportunity refit for information, the
+    opponent factor (step 2) and the implied total (step 3)."""
     w = weekly(seasons)
     attempt = fit_attempt_value(w)
     df = training_frame(with_xfp(w, attempt["per_attempt"]))
     return {"seasons": [int(s) for s in seasons], "rows": len(df), "attempt": attempt, "values": refit_opportunity_values(w),
-            **fit_weights(df), "opponent": fit_opponent(w)}
+            **fit_weights(df), "opponent": fit_opponent(w), "vegas": fit_vegas(with_xfp(w), implied_lines(schedules(seasons)))}
