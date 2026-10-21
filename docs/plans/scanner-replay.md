@@ -1,13 +1,13 @@
 # Plan: the scanner replay (every trade row and every claim row of every replayed week, graded)
 
-Status: steps 1-3 done (TODO D12): the probe (`scripts/probe_replay_pool.py`, "What the probe found" below, with the one
-change it made to the pull), the universe pull and `scan_hits` (`ff backtest --scan`, "What step 3 found" below); steps 4
-and 5 planned. Written 2026-10-20 in a session without `leagues.toml`. The harness this extends: `docs/plans/backtest.md`.
-Written: 2026-10-20 against `main` at 4a67182; the probe's findings added against 4230107, the universe pull against eafbcf0,
-`scan_hits` against 01610b6.
-TODO ids: D12 (steps 4-5, in order, in TODO.md).
-Still open: D12 steps 4-5; the re-pull of the three leagues (`ff replay-pull --season 2026`, the cookies) before the first
-real `ff backtest --scan`.
+Status: steps 1-4 done (TODO D12): the probe (`scripts/probe_replay_pool.py`, "What the probe found"), the universe pull,
+`scan_hits` (`ff backtest --scan`, "What step 3 found") and `claim_hits` (`ff backtest --claims`, "What step 4 found");
+step 5 planned. Written 2026-10-20 in a session without `leagues.toml`. The harness this extends: `docs/plans/backtest.md`.
+Written: 2026-10-20 against `main` at 4a67182; the probe's findings against 4230107, the universe pull against eafbcf0,
+`scan_hits` against 01610b6, `claim_hits` against 9dbd49b.
+TODO ids: D12 (step 5, in TODO.md).
+Still open: D12 step 5; the re-pull of the three leagues (`ff replay-pull --season 2026`, the cookies) before the first
+real `ff backtest --scan` or `--claims`.
 
 For an agent building or reading the scanner replay: the part of the backtest that grades the trade scan (`model/trades.py`
 `scan`) and the waiver ranking (`model/waivers.py` `rank_free_agents`) rather than the lineup. ROADMAP item 8's second
@@ -117,10 +117,11 @@ team as `my_id`:
 ### `claim_hits` (`ff backtest --claims`)
 
 For each regular-season week w and each team as `my_id`: `rank_free_agents(pool, my_lineup, my_bench, repl,
-weeks_remaining, 0, {}, week_lineup=..., lineup_slots=slots)` with `my_lineup` the rest-of-season starters
-(`season.starters_ros` per position, as the packet builds it) and `week_lineup` the week-w highest-points lineup. Each
-row keeps `delta_over_starter`, `slot`, `delta_week`, `week_slot`, the displaced starter's id (the weakest at `slot`
-by `mu_ros`, which `own_starter_value` finds and the replay records).
+weeks_remaining, 0, {}, week_lineup=..., lineup_slots=slots)` with `my_lineup` the rest-of-season starters (the
+highest-points lineup of every player's `ros()` view, as `packet.build` builds it; `my_bench` the rest without an IR
+occupant) and `week_lineup` the week-w highest-points lineup. Each row keeps `delta_over_starter`, `slot`,
+`delta_week`, `week_slot`, the displaced starter's id (the weakest at `slot` by `mu_ros`, which `own_starter_value`
+finds and the replay records) and the displaced week starter's (`week_starter_id`, None for an empty seat).
 
 Scored two ways, matching the two claims the row makes:
 
@@ -175,8 +176,8 @@ projection shape, every player with a preseason total and actuals in every week.
    needs the cookies and is the first thing step 3 does: the version-1 files under `data/replay/` are refused until then.
 3. **`scan_hits`** (M, done 2026-10-20): `replay_proj`, `standings_at`, the pool, the sim, the scan per team-week, the
    two realized scores, the tables, `ff backtest --scan`; the three synthetic properties as tests. "What step 3 found".
-4. **`claim_hits`** (S): the claim rows per team-week, the two realized scores, the managers' actual adds, `ff
-   backtest --claims`.
+4. **`claim_hits`** (S, done 2026-10-21): the claim rows per team-week, the two realized scores, the managers' actual
+   adds, `ff backtest --claims`; the three synthetic properties as tests. "What step 4 found".
 5. **The first real tables** (XS, after the pull): `docs/accuracy.md` gets the scan and claim tables for 2026 to
    date, read the way this plan says; what they say about `MUST_TRY_PPW`, `SEND_MIN_PPW` and `CLAIM_WORTHY_PPW` is a
    TODO line each, not a constant change in the same PR.
@@ -249,3 +250,26 @@ grades, `scan_table` tabulates). Four things the plan above did not say, each no
   team-week, about half a minute for six teams over seven weeks, so a 12-team league over 13 weeks is minutes per
   league, not seconds.
 
+## What step 4 found
+
+Built 2026-10-21 (`backtest.claim_hits`, `ff backtest --claims`; `claim_week` ranks a week, `adds_week` prices the
+managers' adds, `score_claims` grades, `claim_table` tabulates; `WeekInputs` is the week priced once, shared with
+`scan_week`). Three things the plan above did not say, each now in the code:
+
+- **No sim, so seconds, not minutes.** The claim ranking reads no playoff odds (`SeasonCtx` weights every remaining
+  week 1 with `playoff_pct` None, as `scan_week` builds it too), so `--claims` on a 12-team league is seconds per
+  league where `--scan` is minutes. The `--sims` flag is the scan's alone.
+- **The managers' adds are priced as claim rows, not looked up.** An add between week w and w+1 is a player on no
+  week-w roster and on one in w+1; he is priced at week w for the team that added him with the same `own_starter_value`
+  and one-week read the ranking uses, whether or not the ranking listed him (`rank` None), so the two samples grade on
+  one scale. A player the universe does not reach, or with no rest-of-season number, is `unpriced` and counted; a
+  player who moved between rosters is a trade, not an add, and is not in it.
+- **The shuffled world has a position structure, as the scan's did.** With every actual an exchangeable draw within a
+  position, a claimed body over the starter he displaces is zero in expectation only when they share a position; a
+  RB over the TE in the flex is not, so `tests/test_backtest.py` holds the same-position rows to no edge and the
+  claim-worthy rows (promising 3 or more) to under a point realized with a coin-flip hit rate. The displaced starter's
+  draw is shared by every row at his slot that week, so the same-position mean wanders a point either side of zero
+  across shuffle seeds (checked on four), which is the sample's shape, not a leak; the poison test is the exact check.
+  On the model's own draw the claim-worthy rows hit about 80% with the realized mean within a tenth of the promise,
+  the card's first claim per team-week hits every time (the synthetic hole is a ten-point upgrade, nothing subtle),
+  and the marginal 0-1 bin realizes under its promise (the winner's curse the scan found, at the claim's own floor).

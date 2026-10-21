@@ -3,7 +3,8 @@ as calibrated, one whose actuals are three times as wide has to read as over-con
 out-score the one a lazy manager set, a trade is scored week by week against the replay, and the pull keeps the box
 score's shape (and skips a two-week matchup). The scanner replay (TODO D12, `docs/plans/scanner-replay.md`): on the
 model's own draw the scan's packages read edge and the realized mean tracks the promised one; with the actuals
-shuffled within a position they read none; and a week-w package never prices from a week-w or later actual."""
+shuffled within a position they read none; and a week-w package never prices from a week-w or later actual. The claim
+rows (`claim_hits`) are held to the same three properties, and the managers' actual adds are priced as claim rows."""
 from __future__ import annotations
 
 import copy
@@ -551,3 +552,114 @@ def test_scan_hits_on_a_replay_with_one_week_or_only_playoff_weeks_scores_nothin
     rep = synthetic_replay(weeks=2, teams=4)
     rep["settings"]["reg_season_weeks"] = 1                                       # week 2 is a playoff week: nothing regular to grade
     assert bt.scan_hits(rep)["candidates"] == 0
+
+
+# ---------- the claim rows (D12 step 4) ----------
+
+@pytest.fixture(scope="module")
+def claimed():
+    """The claim replay of the model's own draw, once: the same six teams over seven weeks as `scanned`."""
+    return bt.claim_hits(synthetic_replay(**SCAN_REPLAY))
+
+
+def test_claim_hits_on_the_models_own_draw_reads_edge_and_the_realized_mean_tracks_the_promise(claimed):
+    res = claimed
+    assert res["weeks"] == [1, 2, 3, 4, 5, 6] and res["through"] == 7 and res["trending"] == bt.TRENDING_OFF
+    assert res["team_weeks"] == 36 and res["rows"] >= 500
+    every = res["all"]["every"]
+    assert every["n"] == res["rows"] and every["unscored"] == 0
+    assert sum(b["n"] for b in every["bins"]) == every["n"] and [b["lo"] for b in every["bins"]] == [lo for lo, _ in bt.CLAIM_BINS]
+    worthy = res["claim_worthy"]["every"]                        # the rows `priority_cost` prices live
+    assert worthy["n"] >= 300 and worthy["hit"] > 0.7            # well above a coin flip
+    assert abs(worthy["realized_mean"] - worthy["pred_mean"]) < 1.0   # and the promise is the right size
+    assert all(b["n"] == 0 for b in worthy["bins"] if b["hi"] is not None and b["hi"] <= bt.CLAIM_WORTHY_PPW)
+    top = res["top1"]["every"]                                   # the card's first claim per team-week
+    assert top["n"] == res["team_weeks"] and top["hit"] > 0.8 and top["realized_mean"] > worthy["realized_mean"]
+    wk = worthy["week"]                                           # the START NOW rows on their one-week promise
+    assert wk["n"] >= 100 and wk["hit"] > 0.6 and abs(wk["realized_mean"] - wk["pred_mean"]) < 1.5
+    assert res["all"]["touches_zero"]["n"] == 0 and res["all"]["clean"] == every   # no designation in the synthetic season
+    assert res["adds"]["n"] == 0 and res["adds"]["unpriced"] == 0                  # the synthetic rosters persist: nobody adds
+
+
+def test_claim_hits_on_shuffled_actuals_reads_no_edge():
+    """A harness that finds edge where the projections carry none is leaking an actual into the pricing. The displaced
+    starter's draw is shared by every row at his slot that week, so the mean wanders a point either side of zero
+    across shuffle seeds; the test holds it to no edge against a promise of three or more."""
+    rep = shuffled(synthetic_replay(**SCAN_REPLAY))
+    rows = []
+    for w in range(1, 7):
+        rows += bt.claim_week(rep, w, 7)
+    bt.score_claims(rep, rows, 7)
+    t = bt.claim_table([c for c in rows if c["claim_worthy"]])
+    assert t["n"] >= 300 and 0.4 < t["hit"] < 0.6
+    assert t["pred_mean"] > 3.0 and t["realized_mean"] < 1.0
+    assert t["week"]["n"] >= 100 and t["week"]["pred_mean"] > 3.0 and t["week"]["realized_mean"] < 1.0
+    # Within a position every actual is an exchangeable draw, so the claimed body over the starter he displaces is zero
+    # in expectation whoever is picked; across positions (a RB over the TE in the flex) it is not, which is the shape
+    # of the shuffled world, not a leak.
+    same = [c for c in rows if c["starter_id"] is not None and rep["players"][c["starter_id"]]["pos"] == c["pos"]]
+    s = bt.claim_table(same)
+    assert s["n"] >= 1000 and 0.4 < s["hit"] < 0.6 and abs(s["realized_mean"]) < 1.0
+
+
+def test_a_week_w_claim_row_never_reads_a_week_w_or_later_actual():
+    rep = synthetic_replay(**SCAN_REPLAY)
+    clean = bt.claim_week(rep, 3, 8)
+    assert len(clean) >= 50
+    bad = bt.claim_week(poisoned(rep, 3), 3, 8)
+    key = lambda c: (c["team"], c["espn_id"], c["rank"], c["delta_over_starter"], c["slot"], c["starter_id"], c["delta_week"], c["week_slot"], c["week_starter_id"])
+    assert [key(c) for c in clean] == [key(c) for c in bad]
+    earlier = bt.claim_week(poisoned(rep, 2), 3, 8)   # the week-2 actuals are the season to date: they count
+    assert [key(c) for c in earlier] != [key(c) for c in clean]
+
+
+def test_score_claims_reads_the_weeks_after_against_the_fixed_starter_and_the_week_itself_for_start_now():
+    rep = _two_team_replay()
+    row = {"week": 1, "team": 1, "espn_id": 3, "starter_id": 2, "delta_over_starter": 2.0, "start_now": True, "week_starter_id": 1, "delta_week": 2.0}
+    out = bt.score_claims(rep, [dict(row)])[0]
+    # weeks 2 and 3: C - B = 1 - 9, 20 - 3 -> +4.5; week 1: C 15 - A 10 = +5
+    assert (out["weeks"], out["missing"], out["realized_over_starter"], out["hit"], out["realized_week"], out["hit_week"]) == (2, 0, 4.5, True, 5.0, True)
+    cut = bt.score_claims(rep, [{**row, "starter_id": 5}])[0]                 # U5 has no actual after week 1: missing, not zero
+    assert (cut["weeks"], cut["missing"], cut["realized_over_starter"], cut["hit"]) == (0, 2, None, None)
+    seat = bt.score_claims(rep, [{**row, "week_starter_id": None}])[0]        # an empty seat scores zero: his whole week counts
+    assert seat["realized_week"] == 15.0
+    later = bt.score_claims(rep, [{**row, "start_now": False, "delta_over_starter": -2.0}])[0]
+    assert (later["realized_week"], later["hit_week"], later["hit"]) == (None, None, False)   # +4.5 against a promise under zero
+    assert bt.score_claims(rep, [{**row, "week": 3}])[0]["weeks"] == 0        # the last week has nothing after it
+
+
+def test_adds_week_prices_the_managers_add_as_a_claim_row_and_counts_one_beyond_the_universe():
+    rep = _two_team_replay()
+    assert bt.adds_week(rep, 1, 4) == ([], 0)                                 # nobody added anyone
+    home2 = rep["weeks"][1]["matchups"][0]["home_roster"]
+    home2.append({"espn_id": 4, "name": "U4", "pos": "RB", "team": "X", "eligible": ["RB"], "slot": "BE", "proj": 4.0, "actual": 4.0, "bye": False})
+    home2.append({"espn_id": 9, "name": "U9", "pos": "RB", "team": "X", "eligible": ["RB"], "slot": "BE", "proj": 4.0, "actual": 4.0, "bye": False})
+    adds, unpriced = bt.adds_week(rep, 1, 4)
+    assert unpriced == 1 and [(a["team"], a["espn_id"], a["rank"], a["slot"], a["starter_id"]) for a in adds] == [(1, 4, None, "RB", 1)]
+    a = adds[0]
+    assert a["delta_over_starter"] < 0 and not a["claim_worthy"] and not a["start_now"] and a["week_starter_id"] is None
+    bt.score_claims(rep, adds, 4)
+    # week 2: U4 4 - A 8; week 3: U4 on bye (zero) - A 12 -> -8.0, the sign the promise had
+    assert (a["weeks"], a["realized_over_starter"], a["hit"]) == (2, -8.0, True)
+    assert bt.adds_week(rep, 3, 4) == ([], 0)                                 # the last week has no next one
+
+
+def test_claim_table_bins_on_the_promise_and_reads_the_start_now_rows_apart():
+    rows = [{"delta_over_starter": -1.0, "realized_over_starter": -2.0, "hit": True, "delta_week": 2.0, "realized_week": 3.0, "hit_week": True},
+            {"delta_over_starter": 0.5, "realized_over_starter": 1.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None},
+            {"delta_over_starter": 1.5, "realized_over_starter": -2.0, "hit": False, "delta_week": 4.0, "realized_week": -1.0, "hit_week": False},
+            {"delta_over_starter": 2.0, "realized_over_starter": 4.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None},
+            {"delta_over_starter": 4.0, "realized_over_starter": 5.0, "hit": True, "delta_week": 0.0, "realized_week": None, "hit_week": None},
+            {"delta_over_starter": 9.0, "realized_over_starter": None, "hit": None, "delta_week": 0.0, "realized_week": None, "hit_week": None}]
+    t = bt.claim_table(rows)
+    assert (t["n"], t["unscored"], t["hit"], t["pred_mean"], t["realized_mean"]) == (5, 1, 0.8, 1.4, 1.2)
+    assert [(b["lo"], b["hi"], b["n"], b["hit"], b["realized_mean"]) for b in t["bins"]] == [
+        (None, 0.0, 1, 1.0, -2.0), (0.0, 1.0, 1, 1.0, 1.0), (1.0, 2.0, 1, 0.0, -2.0), (2.0, 4.0, 1, 1.0, 4.0), (4.0, None, 1, 1.0, 5.0)]
+    assert t["week"] == {"n": 2, "hit": 0.5, "pred_mean": 3.0, "realized_mean": 1.0}
+    empty = bt.claim_table([])
+    assert empty["n"] == 0 and empty["hit"] is None and empty["week"]["n"] == 0 and all(b["n"] == 0 for b in empty["bins"])
+
+
+def test_claim_hits_on_a_replay_with_one_week_scores_nothing():
+    res = bt.claim_hits(synthetic_replay(weeks=1, teams=4))
+    assert res["weeks"] == [] and res["rows"] == 0 and res["through"] is None and res["all"]["every"]["n"] == 0 and res["adds"]["n"] == 0
