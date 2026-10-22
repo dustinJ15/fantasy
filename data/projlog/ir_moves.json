@@ -1,7 +1,7 @@
 {
  "rosters": {
   "L1": {
-   "date": "2026-10-21",
+   "date": "2026-10-22",
    "names": {
     "4374302": "Amon-Ra St. Brown",
     "4890973": "Ashton Jeanty",
@@ -17,16 +17,16 @@
     "4360310": "Trevor Lawrence",
     "4686658": "Mike Washington Jr.",
     "4241416": "Chuba Hubbard",
-    "-16011": "Colts D/ST",
-    "4239934": "AJ Dillon",
-    "8439": "Aaron Rodgers"
+    "8439": "Aaron Rodgers",
+    "4689936": "Jake Bates",
+    "4036133": "T.J. Hockenson"
    },
    "ir": [
     "4430834"
    ]
   },
   "L2": {
-   "date": "2026-10-21",
+   "date": "2026-10-22",
    "names": {
     "4242335": "Jonathan Taylor",
     "4685382": "Omarion Hampton",
@@ -40,16 +40,16 @@
     "4241416": "Chuba Hubbard",
     "4429205": "Jordan Addison",
     "3917315": "Kyler Murray",
-    "4034949": "Eddy Pineiro",
     "4695883": "Jalen Coker",
     "4239934": "AJ Dillon",
     "-16030": "Jaguars D/ST",
-    "-16020": "Jets D/ST"
+    "-16020": "Jets D/ST",
+    "4567104": "Will Reichard"
    },
    "ir": []
   },
   "L3": {
-   "date": "2026-10-21",
+   "date": "2026-10-22",
    "names": {
     "4431611": "Caleb Williams",
     "4242335": "Jonathan Taylor",
@@ -66,9 +66,12 @@
     "-16020": "Jets D/ST",
     "4599739": "Kendre Miller",
     "4259619": "Blake Grupe",
-    "4428718": "Tre Tucker"
+    "4428718": "Tre Tucker",
+    "4689936": "Jake Bates"
    },
-   "ir": []
+   "ir": [
+    "4259619"
+   ]
   }
  },
  "moves": {
@@ -83,6 +86,14 @@
    "stashed": "2026-10-21",
    "added": [],
    "left": "2026-10-21"
+  },
+  "L3|4259619": {
+   "name": "Blake Grupe",
+   "league": "L3",
+   "stashed": "2026-10-22",
+   "added": [
+    "Jake Bates"
+   ]
   }
  }
 }
