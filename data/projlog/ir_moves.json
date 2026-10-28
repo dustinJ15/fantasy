@@ -1,7 +1,7 @@
 {
  "rosters": {
   "L1": {
-   "date": "2026-10-27",
+   "date": "2026-10-28",
    "names": {
     "4374302": "Amon-Ra St. Brown",
     "4890973": "Ashton Jeanty",
@@ -19,14 +19,14 @@
     "8439": "Aaron Rodgers",
     "4689936": "Jake Bates",
     "4036133": "T.J. Hockenson",
-    "4239934": "AJ Dillon"
+    "5083754": "Ryan Flournoy"
    },
    "ir": [
     "4608686"
    ]
   },
   "L2": {
-   "date": "2026-10-27",
+   "date": "2026-10-28",
    "names": {
     "4242335": "Jonathan Taylor",
     "4685382": "Omarion Hampton",
@@ -41,15 +41,15 @@
     "4429205": "Jordan Addison",
     "3917315": "Kyler Murray",
     "4695883": "Jalen Coker",
-    "4239934": "AJ Dillon",
     "-16030": "Jaguars D/ST",
     "-16020": "Jets D/ST",
-    "4567104": "Will Reichard"
+    "4567104": "Will Reichard",
+    "3916433": "Jakobi Meyers"
    },
    "ir": []
   },
   "L3": {
-   "date": "2026-10-27",
+   "date": "2026-10-28",
    "names": {
     "4431611": "Caleb Williams",
     "4242335": "Jonathan Taylor",
@@ -63,10 +63,10 @@
     "3917315": "Kyler Murray",
     "3929645": "Juwan Johnson",
     "2578570": "Jacoby Brissett",
-    "-16020": "Jets D/ST",
     "4599739": "Kendre Miller",
     "4428718": "Tre Tucker",
-    "4689936": "Jake Bates"
+    "4689936": "Jake Bates",
+    "-16014": "Rams D/ST"
    },
    "ir": []
   }
