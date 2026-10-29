@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from .model import injuries
+from .model import acceptance, injuries
 from .model.lineup import NEVER_STARTS_AT
 
 # Chance of sitting at which a starter needs a contingency plan rather than a note.
@@ -32,14 +32,79 @@ def handcuff_for(lg: dict, name: str) -> str | None:
     return next((h["starter"] for h in lg.get("handcuffs") or [] if h.get("handcuff") == name), None)
 
 
+def bodies_ahead(lg: dict, p: dict) -> list[dict]:
+    """My bodies at his position, off the IR slot, worth more the rest of the season than he is, best first."""
+    ahead = [q for q in lg["roster"] if q["name"] != p["name"] and q["pos"] == p["pos"] and q.get("slot") != "IR"
+             and (q.get("mu_ros") or 0.0) > (p.get("mu_ros") or 0.0)]
+    return sorted(ahead, key=lambda q: -(q.get("mu_ros") or 0.0))
+
+
+def depth_share(lg: dict, p: dict) -> float:
+    """`model.injuries.depth_share` for a roster body: a tenth of his points when he is the third or later body at a
+    one-starter position (the QB3 in a one-QB league), else all of them."""
+    return injuries.depth_share(p["pos"], len(bodies_ahead(lg, p)), (lg.get("settings") or {}).get("lineup_slots"))
+
+
+def offer_hold(lg: dict, name: str) -> tuple[dict, float] | None:
+    """(the open offer of mine he sits in, what cancelling it forgoes in points a week) or None when he is in none. The
+    forgone number is the offer's chance of landing (`p_accept` from the scan when the package matched one, else the
+    acceptance prior) times my gain a week from it (`my_delta_ppw`, zero when the offer is not priced or costs me).
+    An accepted trade is not an offer: `packet.apply_accepted_trades` already moved him."""
+    for t in lg.get("outgoing_trades") or []:
+        if t.get("accepted") or name not in (t.get("give") or []):
+            continue
+        p_acc = t.get("p_accept")
+        p_acc = acceptance.BASE if p_acc is None else float(p_acc)
+        return t, round(p_acc * max(float(t.get("my_delta_ppw") or 0.0), 0.0), 2)
+    return None
+
+
 def drop_cost(p: dict, lg: dict) -> float:
-    """What a cut costs me, from `model.injuries.drop_cost`: rest-of-season points a week, the market penalty for
-    cutting a player someone would trade for, the insurance a handcuff to my RB1 carries, less the week a body on
-    bye or likely to sit gives the Sunday pickup nothing for. The Drop row ranks by the same number."""
+    """What a cut costs me, from `model.injuries.drop_cost`: rest-of-season points a week (a tenth of them for a QB3
+    behind two healthy QBs, `depth_share`), the market penalty for cutting a player someone would trade for, the
+    insurance a handcuff to my RB1 carries, what cancelling an open offer he sits in forgoes (`offer_hold`), less
+    the week a body on bye or likely to sit gives the Sunday pickup nothing for. The Drop row ranks by the same
+    number."""
     cuff = sum(h.get("est_value") or 0.0 for h in lg.get("handcuffs") or [] if h.get("handcuff") == p["name"])
+    held = offer_hold(lg, p["name"])
     return injuries.drop_cost(p["mu_ros"], market=p.get("market"), handcuff_value=cuff,
                               sit_this_week=1.0 if p.get("bye") else (p.get("p_zero") or 0.0), weeks_out=p.get("weeks_out") or 0.0,
-                              mu_ros_active=p.get("mu_ros_active"), weeks_remaining=weeks_left(lg))
+                              mu_ros_active=p.get("mu_ros_active"), weeks_remaining=weeks_left(lg),
+                              depth_share=depth_share(lg, p), offer_hold=held[1] if held else 0.0)
+
+
+def depth_note(lg: dict, p: dict) -> str:
+    """"QB3 behind Herbert and Lawrence, starts only if both are out" when `depth_share` priced him as the third
+    body at a one-starter position; empty otherwise."""
+    if depth_share(lg, p) >= 1.0:
+        return ""
+    ahead = bodies_ahead(lg, p)
+    return f"{p['pos']}{len(ahead) + 1} behind {' and '.join(q['name'] for q in ahead[:2])}, starts only if both are out"
+
+
+def offer_note(lg: dict, name: str) -> str:
+    """"in your Rodgers, Hubbard for Jones offer to Them: cancel it first, ESPN will not drop a player in a pending
+    trade; the offer is 35% to land for +1.2/wk, so cancelling forgoes ~0.4/wk" for a drop who sits in an open offer
+    of mine; empty when he is in none. No parenthetical: `report._spot_words` opens the drop note's first one."""
+    held = offer_hold(lg, name)
+    if held is None:
+        return ""
+    t, ppw = held
+    out = (f"in your {', '.join(t.get('give') or []) or 'nothing'} for {', '.join(t.get('get') or []) or 'nothing'} offer to "
+           f"{t.get('rival') or 'them'}: cancel it first, ESPN will not drop a player in a pending trade")
+    if t.get("my_delta_ppw") is not None:
+        p_acc = acceptance.BASE if t.get("p_accept") is None else float(t["p_accept"])
+        out += f"; the offer is {p_acc:.0%} to land for {float(t['my_delta_ppw']):+.1f}/wk, so cancelling forgoes ~{ppw:.1f}/wk"
+    return out
+
+
+def drop_click(lg: dict, name: str) -> str:
+    """The click that cuts him: "drop X", or "cancel your offer to Them, then drop X" when he sits in an open offer of
+    mine (ESPN refuses the drop until it is cancelled)."""
+    held = offer_hold(lg, name)
+    if held is None:
+        return f"drop {name}"
+    return f"cancel your offer to {held[0].get('rival') or 'them'}, then drop {name}"
 
 
 def sit_note(p: dict) -> str:
@@ -127,9 +192,12 @@ def drop_note(lg: dict, name: str, exclude: set[str] = frozenset()) -> str:
     # Passed over for a reason of his own (locked today, priced, or my RB1's backup); a body outranked only by this
     # drop's bye or sit risk is not "kept", and the note on the drop already says why he goes.
     locked_over = lambda q: bool(q.get("locked")) and not p.get("locked")  # noqa: E731
+    # A body cheaper by `mu_ros` alone was kept for his market price or his handcuff value; when this drop is depth
+    # (a QB3 at a tenth of his points) or sits in an open offer, the gap is this drop's, not a reason to name anyone.
+    plain = depth_share(lg, p) >= 1.0 and offer_hold(lg, name) is None
     cheaper = [q for q in pool.values() if q["name"] != name and q["mu_ros"] < p["mu_ros"]
-               and (locked_over(q) or (drop_cost(q, lg) > drop_cost(p, lg) and (market_value(q) is not None or handcuff_for(lg, q["name"]))))]
-    mv, extra = market_value(p), ", ".join(x for x in (sit_note(p), lock_note(p)) if x)
+               and (locked_over(q) or (plain and drop_cost(q, lg) > drop_cost(p, lg) and (market_value(q) is not None or handcuff_for(lg, q["name"]))))]
+    mv, extra = market_value(p), ", ".join(x for x in (sit_note(p), lock_note(p), depth_note(lg, p), offer_note(lg, name)) if x)
     if mv is None and not cheaper and not extra:
         return ""
     out = f" (market {mv:.0f}, {p['mu_ros']:.1f}/wk" if mv is not None else f" (not priced by the market, {p['mu_ros']:.1f}/wk"
@@ -206,7 +274,24 @@ class Spots:
             return None, " (no obvious drop, your call who goes)"
         self.dropped.append(order[0])
         self.note(drop=order[0])
-        return order[0], f"; drop {order[0]}{drop_note(self.lg, order[0], excl)}"
+        return order[0], f"; {drop_click(self.lg, order[0])}{drop_note(self.lg, order[0], excl)}"
+
+    def peek(self, adding: str | None = None, lands_ts: int | None = None) -> tuple[str | None, float | None]:
+        """What `take` would hand the next row, without spending it: (drop name or None, what the spot costs in
+        points a week). An open spot, a freed one, the spot an accepted trade frees and a Drop-verdict player cost 0;
+        a named drop costs `drop_cost`; (None, None) when there is no spot and nobody to drop."""
+        if self.open > 0 or self.freed:
+            return None, 0.0
+        if lands_ts and self.after_ts and self.after_open > 0 and lands_ts >= self.after_ts:
+            return None, 0.0
+        excl = self.reserved | set(self.dropped)
+        order = drop_order(self.lg, excl)
+        if not order:
+            return None, None
+        if order[0] in free_drops(self.lg, excl):
+            return order[0], 0.0
+        p = next((q for q in self.lg["roster"] if q["name"] == order[0]), None)
+        return order[0], round(drop_cost(p, self.lg), 2) if p is not None else 0.0
 
     def swap(self, adding: str, drop: str) -> None:
         """A row that names its own drop (a stream swaps out the specialist it replaces): the spot is spent and the

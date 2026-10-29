@@ -367,3 +367,10 @@ def test_waiver_order_is_read_from_espns_acquisition_settings():
     assert waiver_order({"waiverOrderReset": True}) == "reset"
     assert waiver_order({"waiverOrderReset": False}) == "rolling"
     assert waiver_order({}) is None
+
+
+def test_second_row_worth_it_is_the_margin_over_the_spot_cost():
+    from ff.model.waivers import second_row_worth_it
+    assert second_row_worth_it(None, 0.0, 1.0) and second_row_worth_it(5.0, 0.0, 1.0)   # a free spot always is
+    assert not second_row_worth_it(None, 3.0, 1.0)                                        # no number on him, a real drop: no
+    assert second_row_worth_it(8.0, 6.5, 1.0) and not second_row_worth_it(7.0, 6.5, 1.0)

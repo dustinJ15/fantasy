@@ -258,12 +258,13 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
 
 
 def predicted_ppw(lg: dict, offer: dict) -> float | None:
-    """`my_delta_ppw` of the scan candidate with this offer's players (both sides, as sets), else None."""
+    """`my_delta_ppw` of the scan candidate with this offer's players (both sides, as sets), else the number the
+    packet priced the open offer at (`packet._price_open_offer`, on the `outgoing_trades` row), else None."""
     give, get = set(offer.get("give") or []), set(offer.get("get") or [])
     for c in lg.get("trades") or []:
         if set(c.get("give") or []) == give and set(c.get("get") or []) == get and c.get("my_delta_ppw") is not None:
             return float(c["my_delta_ppw"])
-    return None
+    return float(offer["my_delta_ppw"]) if offer.get("my_delta_ppw") is not None else None
 
 
 def history(outs: dict[str, dict], league: str, today: date | None = None) -> dict[int, dict]:

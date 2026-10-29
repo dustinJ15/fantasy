@@ -7,6 +7,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from .ledger import RISKY_TO_SIT, Spots, bench, drop_candidate, drop_cost, drop_note, drop_order, drop_verdict_note, free_drops, handcuff_for, market_value, sit_note, weeks_left, weeks_word
+from .model import acceptance
 from .model import waivers as waivers_model
 from .model.injuries import fill_spot
 from .model.lineup import EMPTY_SLOT, NEVER_STARTS_AT
@@ -221,13 +222,15 @@ def words(text: str) -> int:
 
 
 def _spot_words(drop: str | None, suffix: str) -> tuple[str, list[str]]:
-    """Split a `Spots.take` suffix into the click ("; drop X") and the reason behind it for the detail line."""
+    """Split a `Spots.take` suffix into the click ("; drop X", or "; cancel your offer to Them, then drop X" for a body
+    in an open offer of mine) and the reason behind it for the detail line."""
     def unwrap(x: str) -> str:
         m = re.match(r"^\((.*?)\)(.*)$", x.strip())   # the first parenthetical opened up; what follows it stays as is
         return (m.group(1) + m.group(2)) if m else x.strip()
     if drop:
-        rest = unwrap(suffix.replace(f"; drop {drop}", "", 1))
-        return f"; drop {drop}", [f"{drop}: {rest}"] if rest else []
+        click, sep, rest = suffix.partition(" (")   # the click runs to the first parenthetical, which is the numbers
+        rest = unwrap(sep.strip() + rest) if sep else ""
+        return click.rstrip(), [f"{drop}: {rest}"] if rest else []
     rest = unwrap(suffix)
     return "", [rest] if rest else []
 
@@ -562,6 +565,13 @@ def _claimed_item(lg: dict, w: dict) -> dict:
 # A wire body at a slot a claim I already have in fills is a row only when he beats the claimed one by this much
 # (points this week for a START NOW row, points a week for an upgrade); under it the claim stands and he is not a row.
 COMPETING_GAIN = 1.0
+# Upgrade rows a league's card prints. The first is the best claim-worthy body on the wire; a second prints only at a
+# different slot, and only when the body coming in is worth `SECOND_ROW_MARGIN` a week more than the spot costs him
+# (`Spots.peek`: an open spot or a Drop-verdict player is free, a named drop costs `drop_cost`). One row a morning
+# hid the second real upgrade on a two-hole roster (2026-10-29); the gate keeps it from cutting a body worth keeping
+# for a marginal one.
+MAX_UPGRADE_ROWS = 2
+SECOND_ROW_MARGIN = waivers_model.CLAIM_WORTHY_PPW
 
 
 def _competing(lg: dict, w: dict, key: str) -> tuple[dict, float] | None:
@@ -597,7 +607,8 @@ def _clear_of_claims(lg: dict, ws: list[dict], key: str) -> list[dict]:
 
 def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
     """The claims I already have in first, one row each with no verb (`_claimed_item`); then at most one pickup who
-    starts this week and one who upgrades a slot for the season; each spends a spot on the ledger and goes into
+    starts this week and `MAX_UPGRADE_ROWS` who upgrade a slot for the season (the second at another slot, and only
+    when he out-values his drop by `SECOND_ROW_MARGIN`); each spends a spot on the ledger and goes into
     `added` so no row below brings him in again. A claim in a rolling-priority league also says whether the priority
     it spends is worth it (`_priority_note`); a row at a slot a claim I have in already fills says so and leaves the
     call to Claude (`_competing_note`). The wire moves between the sync and the click (Oct 10: the pickup was on
@@ -623,11 +634,21 @@ def _waiver_items(lg: dict, spots: Spots, added: set[str]) -> list[dict]:
         out.append({"kind": "waiver", "id": f"waiver:{slug(w['name'])}", "label": "Waiver",
                     "text": f"{_add_verb(lg, w)} {w['name']} ({w['pos']}) and start him at {w['week_slot']}{click}{_competing_note(lg, w, 'delta_week')}",
                     "detail": detail, "add": w, "drop": drop})
-    for w in ups[:1]:
+    printed: list[dict] = []
+    for w in ups:
+        if len(printed) >= MAX_UPGRADE_ROWS:
+            break
+        if printed:
+            if w["slot"] in {x["slot"] for x in printed}:
+                continue  # the first row already fills this slot; a second body there is its fallback, not a row
+            _, cost = spots.peek(adding=w["pos"], lands_ts=w.get("lands_ts"))
+            if cost is None or not waivers_model.second_row_worth_it(w.get("mu_ros"), cost, SECOND_ROW_MARGIN):
+                continue
         drop, suffix = spots.take(adding=w["pos"], lands_ts=w.get("lands_ts"))
         click, spot = _spot_words(drop, suffix)
         added.add(w["name"])
-        nxt = next((x for x in ups if x is not w), None)
+        printed.append(w)
+        nxt = next((x for x in ups if x not in printed and x["slot"] == w["slot"]), None) or next((x for x in ups if x not in printed), None)
         detail = [f"+{w['delta_over_starter']:.1f}/wk over your {w['slot']}{due_note(w.get('kickoff_day'))}", *_claim_detail(lg, w), *_priority_detail(lg, w), *spot]
         if nxt:
             detail.append(f"if he is gone, {nxt['name']} ({nxt['pos']}, +{nxt['delta_over_starter']:.1f}/wk)")
@@ -748,9 +769,21 @@ def _sent_items(lg: dict, spots: Spots | None = None) -> list[dict]:
                     detail.append(f"the waiver run ({dl.get('waiver_run_word')}) comes first, so a claim placed today still needs a drop")
             out.append({"kind": "sent", "id": f"sent:{slug('-'.join(t['get']) or t['rival'] or 'sent')}", "label": "Accepted", "text": text, "detail": detail})
             continue
+        give, get = ", ".join(t["give"]) or "nothing", ", ".join(t["get"]) or "nothing"
+        detail = [f"{t['hours_left']:.0f}h left"] if t.get("hours_left") is not None else []
+        if t.get("my_delta_ppw") is not None:
+            p_acc = acceptance.BASE if t.get("p_accept") is None else float(t["p_accept"])
+            detail.append(f"{p_acc:.0%} to land{'' if t.get('p_accept') is not None else ' (the scan did not price this package; the prior)'} for {float(t['my_delta_ppw']):+.1f}/wk")
+        cancelled = [g for g in t["give"] if spots is not None and g in spots.dropped]
+        if cancelled:
+            # A row above cuts a body in this offer: the click there says cancel first, and this row is the reminder
+            # why (ESPN will not drop a player in a pending trade), not a second thing to weigh.
+            out.append({"kind": "sent", "id": f"sent:{slug('-'.join(t['get']) or t['rival'] or 'sent')}", "label": "Cancel",
+                        "text": f"cancel your {give} for {get} offer to {t['rival'] or 'them'}: the row above drops {', '.join(cancelled)}",
+                        "detail": ["ESPN will not drop a player in a pending trade; re-send the offer without him if you still want the deal", *detail]})
+            continue
         out.append({"kind": "sent", "id": f"sent:{slug('-'.join(t['get']) or t['rival'] or 'sent')}", "label": "Already sent",
-                    "text": f"your {', '.join(t['give']) or 'nothing'} for {', '.join(t['get']) or 'nothing'} is still waiting on {t['rival'] or 'them'}",
-                    "detail": [f"{t['hours_left']:.0f}h left"] if t.get("hours_left") is not None else []})
+                    "text": f"your {give} for {get} is still waiting on {t['rival'] or 'them'}", "detail": detail})
     return out
 
 

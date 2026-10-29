@@ -332,3 +332,17 @@ def test_the_same_morning_he_comes_off_ir_counts_as_a_bounce():
     mine = roster(); hurt(mine[1], 2, 15, 3)
     (row,) = run(mine, 3, 60, ir_slots=1, memory={2: {"left_days": 0, "stashed": None, "added": []}})
     assert row["verdict"] == "hold" and row["why"][0].startswith("came off IR today")
+
+
+def test_the_cheapest_cut_prices_a_qb3_at_a_tenth_of_his_points():
+    """The Drop row and the ledger rank by the same number: a 15-a-game QB3 behind two healthy QBs is cheaper to cut
+    than a 4-a-game TE2 (`depth_share`), and the hold row names him as the cheaper drop."""
+    mine = roster() + [P(13, "QB2", "QB", 17), P(14, "QB3", "QB", 15)]
+    hurt(mine[6], 4, 15, 3)  # WR2, four weeks
+    starters = {p.espn_id for p in mine if p.weeks_out < 1 and p.name not in ("RB4", "TE2", "QB2", "QB3")}
+    (row,) = run(mine, 3, 60, waivers=fa(6.0, pos="WR", slot="WR"), starters=starters)  # the pickup clears the hold margin
+    assert row["verdict"] == "hold" and "QB3 is the cheaper drop" in row["why"][0]
+    # in a superflex league the QB3 keeps his number and the TE2 is the cut
+    sf = decide(mine, {"QB": 1, "OP": 1, "RB": 2, "WR": 2, "TE": 1, "RB/WR/TE": 1, "K": 1, "D/ST": 1}, 3, 15, REG, 60, 0,
+                fa(6.0, pos="WR", slot="WR"), [], {}, starters, None, [], None)
+    assert "TE2 is the cheaper drop" in sf[0]["why"][0]

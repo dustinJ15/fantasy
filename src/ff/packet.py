@@ -132,6 +132,25 @@ def apply_accepted_trades(by_team: dict, pending: list[dict], my_id: int | None)
     return moves
 
 
+def _price_open_offer(my_id: int, rid: int, give: list[PlayerProj], get: list[PlayerProj], by_team: dict, slots: dict,
+                      repl: dict, values: dict, limits: dict, ctx, playoff_pct: dict, reg_season_weeks: int,
+                      cands: list[dict]) -> dict:
+    """`my_delta_ppw` and `p_accept` for an offer of mine still open: the scan's own numbers when it priced the same
+    package this morning (`cands`, before `drop_already_offered` removed it), else the lineup delta from `evaluate`
+    with `p_accept` None (the ledger then uses the acceptance prior). A failure to price is a note, never a dead
+    briefing: {price_error}."""
+    gives, gets = {p.name for p in give}, {p.name for p in get}
+    match = next((c for c in cands if set(c.get("give") or []) == gives and set(c.get("get") or []) == gets), None)
+    if match is not None:
+        return {"my_delta_ppw": match.get("my_delta_ppw"), "p_accept": match.get("p_accept")}
+    try:
+        ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values, limits=limits, ctx=ctx, playoff_pct=playoff_pct,
+                      reg_season_weeks=reg_season_weeks, _counter_search=False)
+    except Exception as e:  # noqa: BLE001 - a side number on the Sent row; the card must still render
+        return {"my_delta_ppw": None, "p_accept": None, "price_error": f"{type(e).__name__}: {e}"}
+    return {"my_delta_ppw": ev.get("my_delta_ppw"), "p_accept": None}
+
+
 def pending_claims(raw: list[dict], waivers: list[dict], fas: list[PlayerProj], mine: list[PlayerProj],
                    my_lineup: dict[str, list[PlayerProj]]) -> list[dict]:
     """The claims I already have in (`espn.pending_claims`), with names: each one's add becomes (or marks) a row in
@@ -310,10 +329,10 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
     trades_closed = bool(deadline_ms) and now_dt.timestamp() * 1000 > deadline_ms
     limits = s.get("position_limits") or {}
     roster_max = sum(slots.values()) + int(s.get("bench_slots") or 0)
-    trades = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits,
-                  roster_max=roster_max if s.get("bench_slots") else None, ctx=season_ctx, playoff_pct=playoff_by_team,
-                  reg_season_weeks=s["reg_season_weeks"], history=offer_history) if (my_id and not trades_closed) else []
-    trades = drop_already_offered(trades, snap.get("pending_trades"), by_id)
+    trades_all = scan(my_id, by_team, slots, repl, team_meta, values, limits=limits,
+                      roster_max=roster_max if s.get("bench_slots") else None, ctx=season_ctx, playoff_pct=playoff_by_team,
+                      reg_season_weeks=s["reg_season_weeks"], history=offer_history) if (my_id and not trades_closed) else []
+    trades = drop_already_offered(trades_all, snap.get("pending_trades"), by_id)
     trades = drop_recently_skipped(trades, skips or {}, snap["ref"]["name"], now_dt.date())
     trades = mark_pushed(trades, pushes or {}, snap["ref"]["name"], now_dt.date())
     # attach title-odds delta for the top few (one re-sim each; do 3)
@@ -382,7 +401,14 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
                 "processes_iso": _ms_iso(tx.get("process_ts")),
                 "executes": dl.get("offer_executes_word"), "executes_after_kickoff": dl.get("offer_after_kickoff")}
         if tx.get("accepted") or tx.get("direction") != "incoming" or rid is None:
-            outgoing.append({**base, "give": [p.name for p in give], "get": [p.name for p in get]})
+            row = {**base, "give": [p.name for p in give], "get": [p.name for p in get]}
+            if not tx.get("accepted") and rid is not None and (give or get):
+                # What the offer is worth to me and how likely it lands: the ledger prices a drop of a body in it
+                # (`ledger.offer_hold`), since ESPN will not drop a player in a pending trade and the click has to
+                # cancel the offer first (Oct 29: Rodgers, QB3, sat in a 2-for-2 the card could not weigh).
+                row.update(_price_open_offer(my_id, rid, give, get, by_team, slots, repl, values, limits, season_ctx,
+                                             playoff_by_team, s["reg_season_weeks"], trades_all))
+            outgoing.append(row)
             continue
         ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values, limits=limits, ctx=season_ctx,
                       playoff_pct=playoff_by_team, reg_season_weeks=s["reg_season_weeks"])

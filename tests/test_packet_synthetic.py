@@ -46,6 +46,9 @@ def test_end_to_end_synthetic(monkeypatch):
     assert len(inc) == 1 and inc[0]["verdict"] in ("accept", "decline", "counter") and inc[0]["rival"] == rival2
     assert inc[0]["give"] == give and inc[0]["get"] == get and "my_title_delta" in inc[0]
     assert len(blk["outgoing_trades"]) == 1 and blk["outgoing_trades"][0]["rival"] == rival3
+    # the open offer is priced for the ledger (`ledger.offer_hold`): my lineup delta, and the scan's p(accept) when it built the same package
+    out = blk["outgoing_trades"][0]
+    assert isinstance(out["my_delta_ppw"], float) and "p_accept" in out and "price_error" not in out
     first = report.todos(blk)[0]
     assert first["kind"] == "trade_in" and f"{rival2} offers {get[0]} for your {give[0]}, {give[1]}" in first["text"]
     assert "## Incoming offers" in md and "Your open offers" in md

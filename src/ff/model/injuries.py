@@ -24,6 +24,11 @@ DROP_MARGIN = 3.0
 DROP_RATIO = 0.25
 NOT_DROPPABLE = ("K", "D/ST")
 ONE_STARTER = ("QB", "K", "D/ST")
+# The third body at a one-starter position (a QB3 in a one-QB league) starts only when both ahead of him are out the
+# same week, so his roster spot yields about a tenth of his points, not all of them: by `mu_ros` alone a 15-a-game QB3
+# outranked every WR5 and was never the cut (Oct 29: Rodgers, QB3 in L1, held over a 5-a-game bench body). The QB2 is
+# insurance the lineup uses on a bye or an injury and keeps his full number; a superflex / OP league starts two.
+THIRD_BODY_SHARE = 0.1
 # A bench player is mostly insurance: he starts in the weeks a starter is hurt or on bye. Count a quarter of his margin
 # over the wire (the position's replacement level) for that, on top of any lineup spot he wins outright. Without this
 # term a hurt backup and the best pickup both score 0 against the starting lineup and the rule can never drop anyone.
@@ -59,8 +64,28 @@ def market_value(m: dict | None) -> float | None:
     return float(v) + MARKET_TREND_WEIGHT * float(m.get("trend_30d") or 0)
 
 
+def superflex(slots: dict[str, int] | None) -> bool:
+    """True when a lineup slot seats a QB beside the QB slot ("OP", "QB/RB/WR/TE"): a second QB starts, so no QB is depth."""
+    return any(k == "OP" or ("QB" in k.split("/") and k != "QB") for k in (slots or {}))
+
+
+def depth_share(pos: str, ahead: int, slots: dict[str, int] | None) -> float:
+    """The share of a bench body's points his roster spot is worth: `THIRD_BODY_SHARE` for the third or later body at a
+    one-starter position (two healthier bodies ahead of him, one starting slot, no superflex), 1.0 for everyone else."""
+    if pos in ONE_STARTER and ahead >= 2 and int((slots or {}).get(pos, 1) or 1) <= 1 and not superflex(slots):
+        return THIRD_BODY_SHARE
+    return 1.0
+
+
+def bodies_ahead(pos: str, mu_ros: float, roster_pos_ros: list[tuple[str, float, str]]) -> int:
+    """How many of my bodies at `pos`, off the IR slot, are worth more the rest of the season than `mu_ros`.
+    `roster_pos_ros` is (pos, mu_ros, slot) per roster body, the one shape both callers can build."""
+    return sum(1 for q_pos, q_ros, q_slot in roster_pos_ros if q_pos == pos and q_slot != "IR" and (q_ros or 0.0) > mu_ros)
+
+
 def drop_cost(mu_ros: float, *, market: dict | None = None, handcuff_value: float = 0.0, sit_this_week: float = 0.0,
-              weeks_out: float = 0.0, mu_ros_active: float | None = None, weeks_remaining: int = 1) -> float:
+              weeks_out: float = 0.0, mu_ros_active: float | None = None, weeks_remaining: int = 1,
+              depth_share: float = 1.0, offer_hold: float = 0.0) -> float:
     """What cutting a bench body costs me, in points a week; the one number the Drop row (`cheapest` in `decide`) and
     the checklist ledger (`ledger.drop_order`) both rank by, so they agree on who goes.
 
@@ -70,18 +95,26 @@ def drop_cost(mu_ros: float, *, market: dict | None = None, handcuff_value: floa
     share of this week he gives a Sunday pickup nothing for. `sit_this_week` is 1 on a bye, else his `p_zero`; it
     is counted only past what `weeks_out` already netted out of `mu_ros` (an Out has his game out of `mu_ros`
     already, a bye never is), and it is worth one week in `weeks_remaining`, so it is a tie-breaker in September
-    and a quarter of his value with four weeks left."""
-    cost = mu_ros + MARKET_DROP_PPW * (market_value(market) or 0.0) / 1000.0 + max(handcuff_value or 0.0, 0.0)
+    and a quarter of his value with four weeks left. `depth_share` (`depth_share()`) scales the points his spot
+    yields: a QB3 behind two healthy QBs is a tenth of his number. `offer_hold` is what cancelling the open offer he
+    sits in forgoes (`ledger.offer_hold`: the offer's chance times my gain a week), since ESPN will not drop a player
+    in a pending trade and the click has to cancel it first."""
+    share = max(min(depth_share, 1.0), 0.0)
+    cost = mu_ros * share + MARKET_DROP_PPW * (market_value(market) or 0.0) / 1000.0 + max(handcuff_value or 0.0, 0.0) + max(offer_hold or 0.0, 0.0)
     unused = max(min(sit_this_week, 1.0) - min(weeks_out or 0.0, 1.0), 0.0)
-    per_game = mu_ros_active if mu_ros_active is not None else mu_ros
+    per_game = (mu_ros_active if mu_ros_active is not None else mu_ros) * share
     return cost - unused * per_game / max(int(weeks_remaining or 1), 1)
 
 
-def player_drop_cost(p: PlayerProj, weeks_remaining: int, market: dict | None = None, handcuffs: list[dict] = ()) -> float:
-    """`drop_cost` for a `PlayerProj`: his bye and `p_zero` are this week's, the handcuff list names him by name."""
+def player_drop_cost(p: PlayerProj, weeks_remaining: int, market: dict | None = None, handcuffs: list[dict] = (),
+                     roster: list[PlayerProj] | None = None, slots: dict[str, int] | None = None) -> float:
+    """`drop_cost` for a `PlayerProj`: his bye and `p_zero` are this week's, the handcuff list names him by name;
+    with `roster` and `slots`, a third body at a one-starter position is priced at `THIRD_BODY_SHARE`."""
     cuff = sum(h.get("est_value") or 0.0 for h in handcuffs if h.get("handcuff") == p.name)
+    ahead = bodies_ahead(p.pos, p.mu_ros, [(q.pos, q.mu_ros, q.slot) for q in roster or [] if q.espn_id != p.espn_id])
     return drop_cost(p.mu_ros, market=market, handcuff_value=cuff, sit_this_week=1.0 if p.bye else p.p_zero,
-                     weeks_out=p.weeks_out, mu_ros_active=p.mu_ros_active, weeks_remaining=weeks_remaining)
+                     weeks_out=p.weeks_out, mu_ros_active=p.mu_ros_active, weeks_remaining=weeks_remaining,
+                     depth_share=depth_share(p.pos, ahead, slots) if roster is not None else 1.0)
 
 
 def week_weights(week: int, weeks_remaining: int, reg_season_weeks: int, playoff_pct: float | None) -> dict[int, float]:
@@ -201,7 +234,7 @@ def decide(mine: list[PlayerProj], slots: dict[str, int], week: int, weeks_remai
     # would keep (the market's rookie, my RB1's handcuff) and never holds one the ledger is about to cut.
     droppable = [p for p in mine if p.espn_id not in starters_week and p.pos not in NOT_DROPPABLE and p.slot != "IR"
                  and p.espn_id not in to_ir]
-    cost = lambda p: player_drop_cost(p, weeks_remaining, values.get(str(p.espn_id)), handcuffs)  # noqa: E731
+    cost = lambda p: player_drop_cost(p, weeks_remaining, values.get(str(p.espn_id)), handcuffs, mine, slots)  # noqa: E731
     # A locked body sorts last, the same as the ledger: ESPN refuses the drop until Tuesday.
     cheapest = min(droppable, key=lambda p: (p.locked, cost(p))) if droppable else None
 

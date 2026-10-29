@@ -82,6 +82,17 @@ def claim_worth_it(gain_ppw: float, cost_ppw: float) -> bool:
     return gain_ppw >= cost_ppw
 
 
+def second_row_worth_it(mu_ros_add: float | None, spot_cost_ppw: float, margin: float) -> bool:
+    """Whether a second upgrade row on the card is worth the spot it spends: the body coming in is worth `margin` a
+    week more than the spot costs (`ledger.Spots.peek`: 0 for an open spot or a Drop-verdict player, else the named
+    drop's `drop_cost`). A free spot always is; with no rest-of-season number on the wire body, only a free spot is."""
+    if spot_cost_ppw <= 0:
+        return True
+    if mu_ros_add is None:
+        return False
+    return float(mu_ros_add) - float(spot_cost_ppw) >= margin
+
+
 def rank_free_agents(fas: list[PlayerProj], my_lineup: dict[str, list[PlayerProj]], my_bench: list[PlayerProj],
                      repl: dict[str, float], weeks_remaining: int, budget_remaining: int, trending: dict[str, int],
                      league_max_remaining: int | None = None, top: int = 15,
