@@ -20,7 +20,7 @@ every session needs. Trigger ids, the env id, routine URLs and the recipient add
   editing the `.gs`: `node scripts/gmail_send_relay.test.js`, paste it in, and **Deploy > Manage deployments > New
   version** (the `/exec` URL serves the deployed version, not the editor's). A second routine, "FF Sunday lineup check"
   (`CRON_TZ=America/Denver 45 9 * * 0`, same env and prompt with a preface: inactives are out, research only my questionable
-  starters, email the final lineups as `FF Sunday check — Week N — <date>`, skip waivers, trades and the MLB step 0), runs
+  starters, email the final lineups as `FF Sunday check — Week N — <date>`, skip waivers and trades), runs
   after the 11:30 ET inactives. The routines UI stores a plain cron in UTC; a timezone needs the **Custom** trigger with the
   `CRON_TZ=` prefix typed in, which the UI accepts and displays in local time.
 - Incoming trade offers: every pending offer shows in the morning briefing (`incoming_trades` per league, first checklist item).
@@ -38,14 +38,6 @@ every session needs. Trigger ids, the env id, routine URLs and the recipient add
   the briefing (the gate skipped Monday and UTC 0-11, every Denver evening, until 2026-10-08). `python3
   scripts/trade_poll_gate.py --now <ISO>` answers "would it have polled then".
   GitHub needs secrets `ESPN_S2`, `SWID`, `FF_ROUTINE_FIRE_TOKEN` and variables `FF_TRADE_ROUTINE_ID`, `SEASON`, `LEAGUES_TOML`.
-- MLB pregame alerts (baseball, same env): step 0 of the briefing skill runs `python3 scripts/mlb_pregame.py`, which reads
-  MLB's schedule and prints one one-shot spec (name, `run_once_at` = first pitch minus `LEAD_MIN`, prompt) per first pitch
-  among today's games that matter (postseason, or `WATCH_TEAMS` through `REGULAR_SEASON_LAST_DAY`); the briefing session
-  creates each with `create_trigger` (fresh session, push notification) and the one-shot's reply is the push. The prompt
-  is `.claude/skills/mlb-pregame/SKILL.md` inlined: a session a routine spawns has no repo checkout and no trigger tools,
-  which is why this rides the briefing routine (created in the UI with the repo and the Claude Code Remote connector)
-  instead of a routine of its own, and why there is no token, state file or GitHub cron (the old workflow ran hours late
-  and never had a fire token). `python3 scripts/mlb_pregame.py --text` shows today's plan.
 - Debug a run: `RemoteTrigger list_runs` (trigger_id in ops.local.md) → `get_run_log` on the newest session. Re-run: `RemoteTrigger run`.
 - Reproduce locally: `uv run ff doctor && uv run ff sync && uv run ff briefing --short --sims 500`. Local `.env` has the same cookies.
   No credentials at all: `uv run ff briefing --demo` (synthetic league from `src/ff/demo.py`).
