@@ -106,7 +106,7 @@
   "closed": "2026-10-25"
  },
  "L1|67a6be12-7a4d-47d8-8f7a-f57213bd3c9c": {
-  "status": "open",
+  "status": "expired",
   "league": "L1",
   "rival": "Bi-curious Omarion",
   "rival_team_id": 1,
@@ -122,6 +122,7 @@
   "expires": "2026-10-29T14:55",
   "expires_ts": 1793285711462,
   "proposed_ts": 1793112911434,
-  "predicted_ppw": null
+  "predicted_ppw": null,
+  "closed": "2026-10-30"
  }
 }
