@@ -154,17 +154,17 @@
   "note": "Two starting RBs for one while Jacobs is shelved until wk 7 leaves you one injury from Hampton at RB2. Not for +0.8."
  },
  "L2|Chase Brown": {
-  "date": "2026-10-02",
+  "date": "2026-10-31",
   "league": "L2",
-  "rival": "TBD",
+  "rival": "Bye Week",
   "give": [
-   "Parker Washington",
-   "Sam LaPorta"
+   "Drake Maye",
+   "Jalen Coker"
   ],
   "get": [
    "Chase Brown"
   ],
-  "note": "Washington's your top WR by grade and LaPorta covers McBride's bye. Too much for +1.0."
+  "note": "Brown's carry share keeps slipping, down to 44.8% at its low and back to only 55%, and he's at 3.6 a carry with Perine taking real work. Too much to give Maye for, and Maye is already in the TBD offer."
  },
  "L2|Javonte Williams": {
   "date": "2026-10-02",

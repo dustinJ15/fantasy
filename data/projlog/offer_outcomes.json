@@ -124,5 +124,24 @@
   "proposed_ts": 1793112911434,
   "predicted_ppw": null,
   "closed": "2026-10-30"
+ },
+ "L2|1d0b5edc-1366-4fcb-b19d-4a7400f55940": {
+  "status": "open",
+  "league": "L2",
+  "rival": "TBD",
+  "rival_team_id": 9,
+  "give": [
+   "Jonathan Taylor",
+   "Drake Maye"
+  ],
+  "get": [
+   "Jaylen Warren",
+   "Bucky Irving"
+  ],
+  "opened": "2026-10-31",
+  "expires": "2026-11-01T15:09",
+  "expires_ts": 1793545750580,
+  "proposed_ts": 1793372950550,
+  "predicted_ppw": 0.86
  }
 }
