@@ -524,5 +524,32 @@
    "Tee Higgins"
   ],
   "note": "not shipping St. Brown to the team you're tied with at 5-1 and playing today. He gets the best player in it, and two WR2s won't win you a playoff week"
+ },
+ "L1|Braelon Allen+Justin Jefferson": {
+  "date": "2026-11-02",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Justin Jefferson",
+   "Braelon Allen"
+  ],
+  "note": "same Braelon Allen as the row above, you can't have both. this one gives him more than it gives you and it costs you St. Brown."
+ },
+ "L2|James Cook III+Tyler Shough": {
+  "date": "2026-11-02",
+  "league": "L2",
+  "rival": "Bye Week",
+  "give": [
+   "Jayden Daniels",
+   "Jonathan Taylor"
+  ],
+  "get": [
+   "James Cook III",
+   "Tyler Shough"
+  ],
+  "note": "ships the same Jayden Daniels as the Irving offer, so pick one. Irving is worth more than Cook plus a QB you'd never start behind Maye."
  }
 }

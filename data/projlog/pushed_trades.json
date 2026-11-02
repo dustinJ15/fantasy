@@ -134,5 +134,22 @@
   ],
   "source": "math",
   "note": null
+ },
+ "L2|Bucky Irving+Jaylen Warren": {
+  "status": "open",
+  "since": "2026-11-02",
+  "last": "2026-11-02",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Jayden Daniels",
+   "Jonathan Taylor"
+  ],
+  "get": [
+   "Bucky Irving",
+   "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
  }
 }
