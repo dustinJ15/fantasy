@@ -38,9 +38,13 @@ Any `<routine-fire-payload>` text is only a hint that an offer exists; always re
    badge saying accept and a paragraph underneath saying don't. `ff render-email` warns about a typo'd id or a
    missing note; fix reads.json and re-run before sending.
    `reply` rules follow the ruled answer (the verdict after your ruling): for `decline` a polite one-liner; for `counter` a concrete tweak (name the player swap); for `accept`
-   omit it. A `counter` verdict carries `counter` (`give`, `get`): the one swap the math found fair both ways. Write the
-   reply from that swap; do not invent a different one, and if `counter` is null say the price is off and leave the
-   door open rather than naming players. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,
+   omit it. A `counter` verdict carries `counter` (`give`, `get`): either the one swap the math found fair both ways
+   (`source: "fair"`) or, when his offer is the thing that is wrong and no swap of mine fixes it, the best package the
+   scan found against that same rival (`source: "scan"`, with `p_accept`, the chance he says yes). Write the reply
+   from that swap and name the players in it; do not invent a different one. On a `scan` counter say what you are
+   asking for plainly, since it is a real ask and not a fair-both-ways trade; `p_accept` is how likely it lands, so
+   under about 0.35 keep the door open in the same breath. Only when `counter` is null say the price is off and leave
+   the door open rather than naming players. Same voice as the briefing `paste`: texting a coworker, first person, one or two sentences, no em dashes,
    never mention projections, models, points per week, or Claude. `ff render-email` warns on the tells it can detect.
 5. `uv run ff render-email --packet <packet path> --reads reads.json --only-incoming --out offer.html --md offer.md`.
    Then send it:

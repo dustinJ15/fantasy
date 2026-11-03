@@ -17,7 +17,7 @@ from .model.lineup import Lineup, as_set, compare, is_complete, optimize
 from .model.projections import PlayerProj, blend
 from .model.season import TITLE_RUN_MULT, SeasonCtx
 from .model.sim import simulate
-from .model.trades import apply_title_delta, drop_already_offered, evaluate, lineup_strength, needs, scan
+from .model.trades import apply_title_delta, counter_from_scan, drop_already_offered, evaluate, lineup_strength, needs, scan
 from .model.vbd import own_starter_value, replacement_levels
 from .model.waivers import handcuffs, rank_free_agents
 from .rulings import drop_recently_skipped, history, ir_memory, load_ir_moves, load_outcomes, load_pushes, load_skips, mark_pushed, note_ir_roster, record_outcomes, save_ir_moves
@@ -412,6 +412,12 @@ def analyze_league(snap: dict, xw: Crosswalk, fp_index: dict, inj: dict, trendin
             continue
         ev = evaluate(my_id, rid, give, get, by_team, slots, repl, values, limits=limits, ctx=season_ctx,
                       playoff_pct=playoff_by_team, reg_season_weeks=s["reg_season_weeks"])
+        # `evaluate`'s own counter search only perturbs what I give, so it comes up empty on an offer whose problem is
+        # what he put up. Fall back to the best package the scan already found against this same rival, so a COUNTER
+        # badge always lands with a swap to name instead of "the price is off". `trades_all` is the pre-filter scan:
+        # a counter is a package he has not seen, so the already-offered and recently-skipped filters do not apply.
+        if ev["verdict"] == "counter" and not ev.get("counter"):
+            ev["counter"] = counter_from_scan(trades_all, rid, {p.name for p in give})
         cut = {d["name"] for d in ev.get("drops") or []}
         new_mine = [p for p in mine if p.espn_id not in {g.espn_id for g in give} and p.name not in cut] + get
         new_theirs = [p for p in by_team.get(rid, []) if p.espn_id not in {g.espn_id for g in get}] + give

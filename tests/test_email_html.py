@@ -242,3 +242,37 @@ def test_the_detail_shows_opponent_implied_total_and_usage_next_to_the_projectio
     plain = render_email(bare, full=True)
     assert "set by" not in plain and " 27.5 " not in plain and "tgt " not in plain and "mkt " not in plain
     assert "set by" not in report.render(bare)
+
+
+def test_the_counter_to_send_back_reaches_both_renderers(monkeypatch):
+    """A COUNTER badge is useless without the swap: the HTML offer row never read `counter` at all, so even the
+    fair-both-ways swap `_counter` already found only ever landed in the markdown."""
+    p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    t = {"rival": "O'Brien's Boys", "rival_team_id": 1, "give": ["Spare QB"], "get": ["Bench RB"],
+         "verdict": "counter", "my_delta_ppw": -0.2, "their_delta_ppw": 1.8, "why": ["fills their QB hole"],
+         "hours_left": 48.0,
+         "counter": {"give": ["Spare QB", "My WR3"], "get": ["Their Star"], "my_delta_ppw": 2.02,
+                     "p_accept": 0.401, "source": "scan"}}
+    lg["incoming_trades"] = [t]
+    html, md = render_email(p), report.render(p)
+    for text in ("counter with your Spare QB, My WR3 for Their Star", "+2.0 for you", "40% he takes it"):
+        assert escape(text) in html, f"missing from the HTML offer row: {text}"
+        assert text in md, f"missing from the plain text: {text}"
+    # a scan counter is the best ask available, not a fair trade, so it must not claim his chart backs it
+    assert "fair on his chart" not in html
+
+
+def test_a_fair_counter_still_says_fair_and_a_struck_row_drops_its_counter(monkeypatch):
+    p = _packet(monkeypatch)
+    lg = p["leagues"][0]
+    t = {"rival": "O'Brien's Boys", "rival_team_id": 1, "give": ["My RB"], "get": ["Their WR"],
+         "verdict": "counter", "my_delta_ppw": 0.3, "their_delta_ppw": 0.1, "why": [], "hours_left": 20.0,
+         "counter": {"give": ["My RB2"], "get": ["Their WR"], "my_delta_ppw": 0.9, "fair_his": 0.98,
+                     "source": "fair"}}
+    lg["incoming_trades"] = [t]
+    assert "fair on his chart" in report.counter_note(t)
+    assert "he takes it" not in report.counter_note(t)
+    # Claude's ruling overrides the verdict: a counter under a strikethrough is not the answer any more
+    ruled = render_email(p, {"L9": {"items": {"offer:their-wr": {"verdict": "skip", "note": "decline, he is in a boot"}}}})
+    assert escape("counter with your My RB2") not in ruled

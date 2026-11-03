@@ -320,6 +320,11 @@ def _offers_table(lg: dict, rulings: list[dict] | None = None) -> str:
                 f"<div style='color:{MUTED};font-size:11px'>you {t['my_delta_ppw']:+.1f} ppw / them {t['their_delta_ppw']:+.1f}{td}{mk}{left} · {_e('; '.join(t['why']) or 'even swap on paper')}</div>")
         if skip:
             body = f'<span style="text-decoration:line-through;color:{MUTED}">{body}</span>'
+        # The swap to send back, on a COUNTER badge. Struck with the row when Claude's ruling overrides the verdict,
+        # since a counter under a strikethrough is not the answer any more.
+        if not skip and report.counter_note(t):
+            body += (f'<div style="color:{TONES["warn"][1]};font-size:12px;margin-top:3px">'
+                     f'{_e(report.counter_note(t))}</div>')
         if x.get("ruling_note"):
             body += f'<div style="color:{MUTED if skip else TONES["warn"][1]};font-size:12px;margin-top:3px">{_e(x["ruling_note"])}</div>'
         rows.append([_badge("SKIP" if skip else report.VERDICT_WORD[t["verdict"]], "grey" if skip else VERDICT_TONE[t["verdict"]]), body])

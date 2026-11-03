@@ -255,6 +255,29 @@ def executes_note(dl: dict, lead: str) -> str:
     return out
 
 
+def counter_note(t: dict) -> str | None:
+    """The counter to send back, in words, for an offer the card badges COUNTER. One helper both renderers call.
+
+    Two kinds reach the packet and they do not carry the same promise. `_counter`'s own swap (`source: "fair"`) is
+    fair on his chart by construction, since the search refuses anything outside FAIR_BAND. The scan fallback
+    (`source: "scan"`, `trades.counter_from_scan`) is only the best ask available against him, so it prints its
+    chance of a yes rather than claiming fairness: a 40% package is worth sending and worth knowing is a 40%.
+    """
+    c = t.get("counter")
+    if t.get("verdict") != "counter" or not c:
+        return None
+    note = f"counter with your {', '.join(c['give'])} for {', '.join(c['get'])}"
+    bits = []
+    if c.get("my_delta_ppw") is not None:
+        bits.append(f"{c['my_delta_ppw']:+.1f} for you")
+    if c.get("source") == "scan":
+        if c.get("p_accept") is not None:
+            bits.append(f"{c['p_accept']:.0%} he takes it")
+    else:
+        bits.append("fair on his chart")
+    return note + (f" ({', '.join(bits)})" if bits else "")
+
+
 def incoming_parts(t: dict) -> tuple[str, list[str]]:
     """(the offer in one sentence, the detail behind it): what moves and what it does for each side on the line; the
     title odds, the expiry, the cut ESPN demands, the counter and the execution clock underneath."""
@@ -267,8 +290,8 @@ def incoming_parts(t: dict) -> tuple[str, list[str]]:
         detail.append(f"expires in {t['hours_left']:.0f}h")
     if t.get("drops"):
         detail.append("accepting means dropping " + ", ".join(f"{d['name']} ({d['cap']}-{d['pos']} cap)" for d in t["drops"]))
-    if t.get("verdict") == "counter" and t.get("counter"):
-        detail.append(f"counter with your {', '.join(t['counter']['give'])} for {', '.join(t['counter']['get'])} ({t['counter']['my_delta_ppw']:+.1f} for you, fair on his chart)")
+    if counter_note(t):
+        detail.append(counter_note(t))
     if t.get("executes"):
         ex = f"accept now and it executes {t['executes']}"
         if t.get("executes_after_kickoff"):

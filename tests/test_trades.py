@@ -577,3 +577,43 @@ def test_scan_scales_a_consolidations_gain_by_my_odds(slots):
     # a de-consolidation (1-for-2) is not scaled whatever my odds
     assert ask(30.0, ("TEgood", "RB1"))["variance_mult"] == 1.0
 
+
+
+def test_counter_from_scan_answers_an_offer_the_give_side_cannot_fix(slots):
+    """The Nov 3 Corum-for-Daniels case: his offer is the problem, so `_counter` finds nothing and the scan does."""
+    from ff.model.trades import counter_from_scan
+    # Mine: a spare QB behind a starter, as Dustin held Daniels behind Maye. Theirs: a QB hole and a star TE,
+    # which is why he came shopping for the QB in the first place.
+    mine = [P(1, "QB1", "QB", 20, tid=1), P(23, "QB2", "QB", 18, tid=1), P(2, "RB1", "RB", 16, tid=1),
+            P(3, "RB2", "RB", 15, tid=1), P(4, "RB3", "RB", 14, tid=1), P(5, "WR1", "WR", 14, tid=1),
+            P(6, "WR2", "WR", 12, tid=1), P(21, "WR3", "WR", 10, tid=1), P(7, "TE", "TE", 3, tid=1),
+            P(8, "K", "K", 8, tid=1), P(9, "D", "D/ST", 7, tid=1)]
+    theirs = [P(11, "QBweak", "QB", 8, tid=2), P(12, "RB1", "RB", 8, tid=2), P(13, "RBbench", "RB", 6, tid=2),
+              P(15, "WR1", "WR", 14, tid=2), P(16, "WR2", "WR", 12, tid=2), P(17, "WR3", "WR", 11, tid=2),
+              P(18, "TEgood", "TE", 12, tid=2), P(22, "TE2", "TE", 6, tid=2), P(19, "K", "K", 8, tid=2),
+              P(20, "D", "D/ST", 7, tid=2)]
+    repl = {"QB": 14, "RB": 7, "WR": 8, "TE": 5, "K": 6, "D/ST": 5}
+    by_id = {p.espn_id: p for p in mine + theirs}
+    # He asks for my spare QB and offers a bench RB. No piece of mine turns that into an accept.
+    out = evaluate(1, 2, [by_id[23]], [by_id[13]], {1: mine, 2: theirs}, slots, repl,
+                   values={"23": {"redraft_value": 5000}, "13": {"redraft_value": 400}})
+    assert out["verdict"] in ("counter", "decline")
+    assert out["counter"] is None, "the give-side search cannot fix an offer whose get side is the lowball"
+
+    cands = scan(1, {1: mine, 2: theirs}, slots, repl, {2: {"name": "Rival", "wins": 0, "losses": 2}}, values={})
+    c = counter_from_scan(cands, 2, {"QB2"})
+    assert c and c["source"] == "scan"
+    assert c["give"] and c["get"] and c["p_accept"] >= 0.25
+    # it stays a counter to *his* ask: the player he asked for is still the one going out
+    assert "QB2" in c["give"]
+    # and it asks for more than the bench body he put up
+    assert c["get"] != ["RBbench"]
+    # a rival the offer did not come from is never the source of its counter
+    assert counter_from_scan(cands, 99, {"QB2"}) is None
+
+
+def test_counter_from_scan_refuses_a_package_he_would_laugh_at():
+    from ff.model.trades import COUNTER_SCAN_MIN_P, counter_from_scan
+    hopeless = [{"rival_team_id": 2, "give": ["RB1"], "get": ["TEgood"], "my_delta_ppw": 9.0,
+                 "p_accept": COUNTER_SCAN_MIN_P - 0.05, "score": 9.0}]
+    assert counter_from_scan(hopeless, 2, {"RB1"}) is None

@@ -647,8 +647,42 @@ def _counter(my_id, rival_id, give, get, rosters, slots, repl, values, limits, c
             continue  # a counter he reads as a lowball is not a counter
         key = (-(abs((fair_his or 1.0) - 1.0)), ev["my_delta_ppw"])
         if best is None or key > best[0]:
-            best = (key, {"give": [p.name for p in new_give], "get": [p.name for p in get], "my_delta_ppw": ev["my_delta_ppw"], "fair_his": fair_his})
+            best = (key, {"give": [p.name for p in new_give], "get": [p.name for p in get], "my_delta_ppw": ev["my_delta_ppw"],
+                          "fair_his": fair_his, "source": "fair"})
     return best[1] if best else None
+
+
+# A scan-sourced counter is a real ask, not a fair-both-ways swap: below this chance of a yes it is a package he
+# laughs at, and "the price is off, make me another offer" keeps more doors open than a greedy ask does.
+COUNTER_SCAN_MIN_P = 0.25
+
+
+def counter_from_scan(cands: list[dict], rival_id: int, asked_for: set[str]) -> dict | None:
+    """The counter for an offer `_counter` cannot fix: the best package the morning scan already found against this
+    same rival.
+
+    `_counter` only perturbs what I give and holds `get` fixed, so it answers "is there a piece of mine that makes
+    this fair" and returns None whenever the problem is what he offered (Nov 3: Blake Corum for Jayden Daniels -- no
+    player of mine turns a backup RB into a +0.75 accept, so the alert said only that the price was off). The fix for
+    that offer is on the get side, which is exactly what `scan` searches, so reuse its ranking rather than running a
+    second search.
+
+    Prefers a package that still sends a player he asked for: that keeps the reply a counter to *his* offer instead of
+    opening an unrelated conversation. `cands` is the pre-filter scan (`trades_all`), already sorted by `score`
+    (p_accept x my_gain); `asked_for` is the names on my side of his offer. Returns the `_counter` shape plus
+    `p_accept` and `source`, or None when he has nothing worth asking for.
+    """
+    his = [c for c in cands or [] if c.get("rival_team_id") == rival_id
+           and (c.get("p_accept") or 0) >= COUNTER_SCAN_MIN_P
+           and c.get("give") and c.get("get")]
+    if not his:
+        return None
+    # Keeps the scan's order (score = p_accept x my_gain) inside each group; a package built on the player he asked
+    # for comes first however the scores fall.
+    answers_his_ask = [c for c in his if asked_for & set(c["give"])]
+    best = (answers_his_ask or his)[0]
+    return {"give": list(best["give"]), "get": list(best["get"]), "my_delta_ppw": best.get("my_delta_ppw"),
+            "fair_his": best.get("fair_his"), "p_accept": best.get("p_accept"), "source": "scan"}
 
 
 def _evaluate_once(my_id, rival_id, give, get, rosters, slots, repl, values, limits, ctx, playoff_pct, reg_season_weeks) -> dict:
