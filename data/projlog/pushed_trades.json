@@ -151,5 +151,20 @@
   ],
   "source": "math",
   "note": null
+ },
+ "L3|Brock Purdy": {
+  "status": "open",
+  "since": "2026-11-03",
+  "last": "2026-11-03",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Rashee Rice"
+  ],
+  "get": [
+   "Brock Purdy"
+  ],
+  "source": "math",
+  "note": null
  }
 }
