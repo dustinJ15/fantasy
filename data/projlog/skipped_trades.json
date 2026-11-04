@@ -551,5 +551,19 @@
    "Tyler Shough"
   ],
   "note": "ships the same Jayden Daniels as the Irving offer, so pick one. Irving is worth more than Cook plus a QB you'd never start behind Maye."
+ },
+ "L2|Bucky Irving+Jaylen Warren": {
+  "date": "2026-11-04",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Drake Maye",
+   "Jonathan Taylor"
+  ],
+  "get": [
+   "Jaylen Warren",
+   "Bucky Irving"
+  ],
+  "note": "Same +1.1/wk as the Pollard version but it's a coin flip and it costs me Taylor too. Warren is back to splitting with Dowdle, so his per game number is stale. Pollard one for one at 95% is the same money for less risk."
  }
 }

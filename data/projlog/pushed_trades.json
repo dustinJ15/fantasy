@@ -2,7 +2,7 @@
  "L3|Patrick Mahomes": {
   "status": "open",
   "since": "2026-10-18",
-  "last": "2026-10-18",
+  "last": "2026-11-04",
   "league": "L3",
   "rival": "Down Bad",
   "give": [
@@ -136,7 +136,7 @@
   "note": null
  },
  "L2|Bucky Irving+Jaylen Warren": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-11-02",
   "last": "2026-11-02",
   "league": "L2",
@@ -150,7 +150,9 @@
    "Jaylen Warren"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-11-04",
+  "skip_note": "Same +1.1/wk as the Pollard version but it's a coin flip and it costs me Taylor too. Warren is back to splitting with Dowdle, so his per game number is stale. Pollard one for one at 95% is the same money for less risk."
  },
  "L3|Brock Purdy": {
   "status": "open",

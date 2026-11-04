@@ -1,7 +1,7 @@
 {
  "rosters": {
   "L1": {
-   "date": "2026-11-03",
+   "date": "2026-11-04",
    "names": {
     "4374302": "Amon-Ra St. Brown",
     "4890973": "Ashton Jeanty",
@@ -23,7 +23,7 @@
    "ir": []
   },
   "L2": {
-   "date": "2026-11-03",
+   "date": "2026-11-04",
    "names": {
     "4242335": "Jonathan Taylor",
     "4685382": "Omarion Hampton",
@@ -46,7 +46,7 @@
    "ir": []
   },
   "L3": {
-   "date": "2026-11-03",
+   "date": "2026-11-04",
    "names": {
     "4431611": "Caleb Williams",
     "4242335": "Jonathan Taylor",
@@ -59,11 +59,11 @@
     "4426388": "Jameson Williams",
     "3917315": "Kyler Murray",
     "3929645": "Juwan Johnson",
-    "2578570": "Jacoby Brissett",
     "4599739": "Kendre Miller",
     "4428718": "Tre Tucker",
     "4689936": "Jake Bates",
-    "-16014": "Rams D/ST"
+    "-16014": "Rams D/ST",
+    "3912547": "Sam Darnold"
    },
    "ir": []
   }
