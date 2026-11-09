@@ -168,5 +168,22 @@
   ],
   "source": "math",
   "note": null
+ },
+ "L3|Brock Purdy+Jaylen Warren": {
+  "status": "open",
+  "since": "2026-11-09",
+  "last": "2026-11-09",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Chris Olave",
+   "Luther Burden III"
+  ],
+  "get": [
+   "Brock Purdy",
+   "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
  }
 }
