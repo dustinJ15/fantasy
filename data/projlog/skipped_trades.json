@@ -77,17 +77,17 @@
   "note": "they lose half a point a week on it and you've already got the Henry offer out. no need to be the guy sending two lopsided asks in one day"
  },
  "L2|Puka Nacua": {
-  "date": "2026-09-24",
+  "date": "2026-11-10",
   "league": "L2",
   "rival": "Punts and Pints",
   "give": [
-   "Trey McBride",
-   "Tetairoa McMillan"
+   "Jonathan Taylor",
+   "Jalen Coker"
   ],
   "get": [
    "Puka Nacua"
   ],
-  "note": "McBride is already in the Chase offer that's still pending. one ask per player at a time"
+  "note": "Same Nacua problem, he's been a soft-tissue mess all season. Taylor plus Coker for a guy who can't stay on the field isn't worth +1.2."
  },
  "L2|Amon-Ra St. Brown": {
   "date": "2026-09-24",
@@ -603,5 +603,17 @@
    "Javonte Williams"
   ],
   "note": "Olave can only go one place and he's worth more in the Purdy deal. Send that one first, come back to this if BUTT MUNCH says no."
+ },
+ "L1|Puka Nacua": {
+  "date": "2026-11-10",
+  "league": "L1",
+  "rival": "Tina\u2019s Tight Ends",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Puka Nacua"
+  ],
+  "note": "Nacua has broken down four different ways this year (psoas in camp, then hip, groin, calf) and you'd be sending more at market anyway. Not for St. Brown."
  }
 }
