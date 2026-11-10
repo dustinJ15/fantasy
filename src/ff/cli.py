@@ -145,16 +145,16 @@ def to_html_cmd(file: str = typer.Argument(...), out: str = typer.Argument(...))
     rprint(f"[green]wrote {out}[/]")
 
 
-def _section(league, key, sims=1500):
-    p = _packet(league, None, sims)
+def _section(league, key, sims=1500, demo=False):
+    p = _packet(league, None, sims, demo)
     for lg in p["leagues"]:
         rprint(f"\n[bold]{lg['league_name']} — week {lg['week']}[/]")
         yield lg
 
 
 @app.command()
-def roster(league: str | None = LeagueOpt):
-    for lg in _section(league, "roster"):
+def roster(league: str | None = LeagueOpt, sims: int = 1500, demo: bool = DemoOpt):
+    for lg in _section(league, "roster", sims, demo):
         t = Table("player", "pos", "slot", "wk μ", "sd", "p0", "ROS/g", "flags")
         for p in lg["roster"]:
             t.add_row(p["name"], p["pos"], p["slot"], str(p["mu"]), str(p["sd"]), str(p["p_zero"]), str(p["mu_ros"]), ", ".join(p["flags"]))
@@ -162,8 +162,8 @@ def roster(league: str | None = LeagueOpt):
 
 
 @app.command()
-def lineup(league: str | None = LeagueOpt):
-    for lg in _section(league, "lineup"):
+def lineup(league: str | None = LeagueOpt, sims: int = 1500, demo: bool = DemoOpt):
+    for lg in _section(league, "lineup", sims, demo):
         lw = lg["lineup_win"]
         rprint(f"vs {lg['opponent']['name']} ({lg['opponent']['mu']} ± {lg['opponent']['sd']})  P(win)={lw['p_win']}  proj {lw['mu']} ± {lw['sd']}")
         for s, names in lw["slots"].items():
@@ -173,8 +173,8 @@ def lineup(league: str | None = LeagueOpt):
 
 
 @app.command()
-def waivers(league: str | None = LeagueOpt):
-    for lg in _section(league, "waivers"):
+def waivers(league: str | None = LeagueOpt, sims: int = 1500, demo: bool = DemoOpt):
+    for lg in _section(league, "waivers", sims, demo):
         t = Table("target", "pos", "wk μ", "ROS/g", "Δ starter", "bid", "why")
         for w in lg["waivers"]:
             t.add_row(w["name"], w["pos"], str(w["mu_week"]), str(w["mu_ros"]), f"+{w['delta_over_starter']} {w['slot']}", f"${w['bid']}", "; ".join(w["why"][:3]))
@@ -183,14 +183,18 @@ def waivers(league: str | None = LeagueOpt):
 
 @app.command()
 def trades(league: str | None = LeagueOpt,
-           explain: bool = typer.Option(False, "--explain", help="Print the acceptance scorecard behind each row (p(accept), its factors, what he is left with, the fallback)")):
-    for lg in _section(league, "trades"):
-        for c in lg["trades"]:
+           explain: bool = typer.Option(False, "--explain", help="Print the acceptance scorecard behind each row (p(accept), its factors, what he is left with, the fallback)"),
+           top: int = typer.Option(0, "--top", help="Print only the first N packages per league (0 = all)"),
+           sims: int = 1500, demo: bool = DemoOpt):
+    for lg in _section(league, "trades", sims, demo):
+        for c in lg["trades"][: top or None]:
             word = f" · {c['accept_word']}" if c.get("accept_word") else ""
-            rprint(f"- give {c['give']} → get {c['get']} ({c['rival']}): me {c['my_delta_ppw']:+.1f}, them {c['their_delta_ppw']:+.1f}{word}  {c['why']}")
+            why = f"  [dim]{'; '.join(c['why'])}[/]" if c.get("why") else ""
+            rprint(f"- give [bold]{', '.join(c['give'])}[/] → get [bold]{', '.join(c['get'])}[/] ({c['rival']}): "
+                   f"me {c['my_delta_ppw']:+.1f}, them {c['their_delta_ppw']:+.1f}{word}{why}")
             if explain:
                 rprint(f"    p(accept) {c.get('p_accept')}: {'; '.join(c.get('accept_why') or []) or 'no factor moved it'}")
-                rprint(f"    chart from his side {c.get('fair_his')}, best player {c.get('best_side') or 'unpriced'}, sendable {c.get('sendable')}, must_try {c.get('must_try')}")
+                rprint(f"    chart from his side {c.get('fair_his') or 'unpriced'}, best player {c.get('best_side') or 'unpriced'}, sendable {c.get('sendable')}, must_try {c.get('must_try')}")
                 if c.get("after_line"):
                     rprint(f"    {c['after_line']}")
                 if c.get("fallback"):
@@ -246,8 +250,8 @@ def incoming(league: str | None = LeagueOpt, sims: int = 1500,
 
 
 @app.command()
-def odds(league: str | None = LeagueOpt):
-    for lg in _section(league, "odds"):
+def odds(league: str | None = LeagueOpt, sims: int = 1500, demo: bool = DemoOpt):
+    for lg in _section(league, "odds", sims, demo):
         t = Table("team", "record", "playoff %", "title %", "exp W")
         for _tid, o in sorted(lg["odds"].items(), key=lambda kv: -kv[1]["title_pct"]):
             t.add_row(("★ " if o["is_me"] else "") + o["name"], o["record"], str(o["playoff_pct"]), str(o["title_pct"]), str(o["exp_wins"]))

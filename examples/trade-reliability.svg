@@ -1,0 +1,56 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='460' height='360' viewBox='0 0 460 360' font-family='-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif'>
+<rect width='460' height='360' rx='6' fill='#fcfcfb'/>
+<text x='16.0' y='24.0' font-size='14' fill='#0b0b0b' text-anchor='start' font-weight='600' >Does a trade row deliver what it promises?</text>
+<text x='16.0' y='42.0' font-size='11' fill='#8a8985' text-anchor='start' font-weight='normal' >points a week, promised vs realized, every package · 2026 weeks 1-5</text>
+<line x1='56' y1='274.1' x2='440' y2='274.1' stroke='#8a8985' stroke-width='1'/>
+<text x='48.0' y='278.1' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >0</text>
+<line x1='56' y1='214.2' x2='440' y2='214.2' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='218.2' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >+2</text>
+<line x1='56' y1='154.4' x2='440' y2='154.4' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='158.4' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >+4</text>
+<line x1='56' y1='94.5' x2='440' y2='94.5' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='98.5' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >+6</text>
+<text x='14.0' y='187.0' font-size='11' fill='#52514e' text-anchor='middle' font-weight='normal' transform='rotate(-90 14 187.0)'>realized, pts/wk</text>
+<text x='248.0' y='348.0' font-size='11' fill='#52514e' text-anchor='middle' font-weight='normal' >what the row promised, pts/wk</text>
+<text x='104.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >0-1</text>
+<line x1='67.0' y1='259.1' x2='141.0' y2='259.1' stroke='#0b0b0b' stroke-width='1.5' stroke-dasharray='3 3'/>
+<path d='M72.0,274.1 V279.7 Q72.0,283.7 76.0,283.7 H88.0 Q92.0,283.7 92.0,279.7 V274.1 Z' fill='#2a78d6'/>
+<text x='82.0' y='295.7' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >-0.3</text>
+<path d='M94.0,274.1 V217.3 Q94.0,213.3 98.0,213.3 H110.0 Q114.0,213.3 114.0,217.3 V274.1 Z' fill='#eb6834'/>
+<text x='104.0' y='208.3' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+2.0</text>
+<path d='M116.0,274.1 V270.8 Q116.0,267.5 119.3,267.5 H132.7 Q136.0,267.5 136.0,270.8 V274.1 Z' fill='#1baf7a'/>
+<text x='126.0' y='262.5' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+0.2</text>
+<text x='200.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >1-2</text>
+<line x1='163.0' y1='229.2' x2='237.0' y2='229.2' stroke='#0b0b0b' stroke-width='1.5' stroke-dasharray='3 3'/>
+<path d='M168.0,274.1 V236.8 Q168.0,232.8 172.0,232.8 H184.0 Q188.0,232.8 188.0,236.8 V274.1 Z' fill='#2a78d6'/>
+<text x='178.0' y='227.8' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+1.4</text>
+<path d='M190.0,274.1 V254.7 Q190.0,250.7 194.0,250.7 H206.0 Q210.0,250.7 210.0,254.7 V274.1 Z' fill='#eb6834'/>
+<text x='200.0' y='245.7' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+0.8</text>
+<path d='M212.0,274.1 V242.8 Q212.0,238.8 216.0,238.8 H228.0 Q232.0,238.8 232.0,242.8 V274.1 Z' fill='#1baf7a'/>
+<text x='222.0' y='233.8' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+1.2</text>
+<text x='296.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >2-4</text>
+<line x1='259.0' y1='184.3' x2='333.0' y2='184.3' stroke='#0b0b0b' stroke-width='1.5' stroke-dasharray='3 3'/>
+<path d='M264.0,274.1 V171.0 Q264.0,167.0 268.0,167.0 H280.0 Q284.0,167.0 284.0,171.0 V274.1 Z' fill='#2a78d6'/>
+<text x='274.0' y='162.0' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+3.6</text>
+<path d='M286.0,274.1 V191.9 Q286.0,187.9 290.0,187.9 H302.0 Q306.0,187.9 306.0,191.9 V274.1 Z' fill='#eb6834'/>
+<text x='296.0' y='182.9' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+2.9</text>
+<path d='M308.0,274.1 V206.3 Q308.0,202.3 312.0,202.3 H324.0 Q328.0,202.3 328.0,206.3 V274.1 Z' fill='#1baf7a'/>
+<text x='318.0' y='197.3' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+2.4</text>
+<text x='392.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >4+</text>
+<line x1='355.0' y1='124.5' x2='429.0' y2='124.5' stroke='#0b0b0b' stroke-width='1.5' stroke-dasharray='3 3'/>
+<path d='M360.0,274.1 V89.0 Q360.0,85.0 364.0,85.0 H376.0 Q380.0,85.0 380.0,89.0 V274.1 Z' fill='#2a78d6'/>
+<text x='370.0' y='80.0' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+6.3</text>
+<text x='392.0' y='268.1' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >—</text>
+<path d='M404.0,274.1 V250.5 Q404.0,246.5 408.0,246.5 H420.0 Q424.0,246.5 424.0,250.5 V274.1 Z' fill='#1baf7a'/>
+<text x='414.0' y='241.5' font-size='9' fill='#52514e' text-anchor='middle' font-weight='normal' >+0.9</text>
+<rect x='68' y='70' width='10' height='10' rx='2' fill='#2a78d6'/>
+<text x='82.0' y='79.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >L1</text>
+<rect x='114' y='70' width='10' height='10' rx='2' fill='#eb6834'/>
+<text x='128.0' y='79.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >L2</text>
+<rect x='160' y='70' width='10' height='10' rx='2' fill='#1baf7a'/>
+<text x='174.0' y='79.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >L3</text>
+<line x1='210' y1='75' x2='230' y2='75' stroke='#0b0b0b' stroke-width='1.5' stroke-dasharray='3 3'/>
+<text x='234.0' y='79.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >promised (bin midpoint)</text>
+<text x='68.0' y='102.0' font-size='10' fill='#52514e' text-anchor='start' font-weight='normal' >L1, every package (n 2141): promised +1.73, realized +1.73</text>
+<text x='68.0' y='116.0' font-size='10' fill='#52514e' text-anchor='start' font-weight='normal' >L1, the card's top 3 (n 178): promised +2.68, realized +4.94, hit 0.69</text>
+</svg>

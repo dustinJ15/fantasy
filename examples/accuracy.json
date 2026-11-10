@@ -1,0 +1,47 @@
+{
+  "source": "docs/accuracy.md, 2026-10-21",
+  "note": "Hand-transcribed from the tables in docs/accuracy.md so scripts/accuracy_charts.py can draw them with no replay on disk. tests/test_accuracy_charts.py checks the Brier values against the doc. Leagues are anonymized L1/L2/L3 as in the doc.",
+  "calibration": {
+    "season": 2026,
+    "weeks": "1-6",
+    "summary": {
+      "L1": {"n": 36, "brier": 0.2245, "log_loss": 0.6382, "ece": 0.152},
+      "L2": {"n": 30, "brier": 0.2009, "log_loss": 0.5778, "ece": 0.064},
+      "L3": {"n": 30, "brier": 0.2168, "log_loss": 0.6234, "ece": 0.109}
+    },
+    "coin_flip_brier": 0.25,
+    "bins": [
+      {"bin": "0.1-0.2", "L1": [1, 0.12, 0.00], "L2": [2, 0.13, 0.00], "L3": null, "pooled": [3, 0.13, 0.00]},
+      {"bin": "0.2-0.3", "L1": [3, 0.23, 0.33], "L2": [1, 0.28, 0.00], "L3": [2, 0.28, 0.00], "pooled": [6, 0.26, 0.17]},
+      {"bin": "0.3-0.4", "L1": [6, 0.37, 0.17], "L2": [3, 0.36, 0.33], "L3": null, "pooled": [9, 0.37, 0.22]},
+      {"bin": "0.4-0.5", "L1": [6, 0.45, 0.50], "L2": [8, 0.45, 0.38], "L3": [10, 0.44, 0.30], "pooled": [24, 0.45, 0.38]},
+      {"bin": "0.5-0.6", "L1": [13, 0.54, 0.69], "L2": [10, 0.54, 0.50], "L3": [11, 0.54, 0.55], "pooled": [34, 0.54, 0.59]},
+      {"bin": "0.6-0.7", "L1": [3, 0.63, 0.67], "L2": [3, 0.65, 0.67], "L3": [6, 0.67, 0.83], "pooled": [12, 0.65, 0.75]},
+      {"bin": "0.7-0.8", "L1": [3, 0.74, 0.33], "L2": [1, 0.77, 1.00], "L3": [1, 0.76, 1.00], "pooled": [5, 0.75, 0.60]},
+      {"bin": "0.8-0.9", "L1": [1, 0.80, 1.00], "L2": null, "L3": null, "pooled": [1, 0.80, 1.00]},
+      {"bin": "0.9-1.0", "L1": null, "L2": [2, 0.95, 1.00], "L3": null, "pooled": [2, 0.95, 1.00]}
+    ],
+    "bin_fields": ["n", "predicted", "won"]
+  },
+  "optimizer": {
+    "bench_pts_per_week": {"L1": 1.8, "L2": -0.0, "L3": 2.8},
+    "differs": {"league": "L2", "n": 15, "of": 60, "highest_win": 0.600, "pwin_win": 0.667, "promised": 0.047, "realized": 0.067}
+  },
+  "trade_scan": {
+    "season": 2026,
+    "weeks": "1-5 graded through 6",
+    "packages": {"L1": 2141, "L2": 845, "L3": 1534},
+    "totals": {
+      "every package": {"L1": [2141, 0.56, 1.73, 1.73], "L2": [845, 0.53, 1.24, 1.38], "L3": [1534, 0.51, 1.51, 1.17]},
+      "the card's top 3": {"L1": [178, 0.69, 2.68, 4.94], "L2": [145, 0.57, 1.54, 1.87], "L3": [150, 0.54, 2.20, 1.06]}
+    },
+    "totals_fields": ["n", "hit", "promised", "realized_lineup"],
+    "bins": [
+      {"bin": "0-1", "mid": 0.5, "every package": {"L1": [458, 0.47, -0.32], "L2": [310, 0.57, 2.03], "L3": [401, 0.49, 0.22]}, "the card's top 3": {"L1": [3, 0.67, 2.11], "L2": [21, 0.71, 2.06], "L3": [7, 0.57, -1.61]}},
+      {"bin": "1-2", "mid": 1.5, "every package": {"L1": [1077, 0.54, 1.38], "L2": [480, 0.50, 0.78], "L3": [813, 0.51, 1.18]}, "the card's top 3": {"L1": [55, 0.56, 0.58], "L2": [95, 0.55, 1.99], "L3": [54, 0.44, -1.31]}},
+      {"bin": "2-4", "mid": 3.0, "every package": {"L1": [534, 0.65, 3.58], "L2": [55, 0.56, 2.88], "L3": [307, 0.56, 2.40]}, "the card's top 3": {"L1": [94, 0.76, 6.16], "L2": [29, 0.52, 1.36], "L3": [82, 0.63, 3.20]}},
+      {"bin": "4+", "mid": 5.0, "every package": {"L1": [72, 0.67, 6.32], "L2": null, "L3": [13, 0.39, 0.92]}, "the card's top 3": {"L1": [26, 0.73, 10.10], "L2": null, "L3": [7, 0.14, -2.99]}}
+    ],
+    "bin_fields": ["n", "hit", "realized"]
+  }
+}

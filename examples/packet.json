@@ -1,6 +1,6 @@
 {
  "version": 6,
- "generated": "2026-10-13T20:11:55",
+ "generated": "2026-11-10T08:27:38",
  "season": 2026,
  "demo": true,
  "shared": {
@@ -163,9 +163,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 16.0,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 16.0,
+      "prior_pg": 16.0,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 2,
       "ecr": 10,
@@ -225,9 +231,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 11.41,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 11.4,
+      "prior_pg": 11.41,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 1,
       "ecr": 10,
@@ -286,9 +298,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 11.12,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 11.1,
+      "prior_pg": 11.14,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 1,
       "ecr": 10,
@@ -348,9 +366,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 14.69,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 14.7,
+      "prior_pg": 14.68,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 1,
       "ecr": 10,
@@ -410,9 +434,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 19.38,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 19.4,
+      "prior_pg": 19.38,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 1,
       "ecr": 10,
@@ -474,9 +504,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 13.49,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 13.5,
+      "prior_pg": 13.47,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 2,
       "ecr": 10,
@@ -537,9 +573,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 8.61,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 8.6,
+      "prior_pg": 8.63,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 3,
       "ecr": 10,
@@ -601,9 +643,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 6.49,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 6.5,
+      "prior_pg": 6.47,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 2,
       "ecr": 10,
@@ -663,9 +711,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 4.62,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 4.6,
+      "prior_pg": 4.64,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 1,
       "ecr": 10,
@@ -725,9 +779,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 6.0,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 6.0,
+      "prior_pg": 6.0,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 1,
       "ecr": 10,
@@ -788,9 +848,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 4.52,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 4.5,
+      "prior_pg": 4.55,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 4,
       "ecr": 10,
@@ -851,9 +917,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 1.0,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 1.0,
+      "prior_pg": 1.0,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 2,
       "ecr": 10,
@@ -913,9 +985,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 2.44,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 2.4,
+      "prior_pg": 2.44,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 3,
       "ecr": 10,
@@ -976,9 +1054,15 @@
       "implied_total": null,
       "wind_mph": null,
       "weather_mult": 1.0,
+      "def_factor": null,
+      "def_mult": 1.0,
       "espn_pg": 5.14,
       "ytd_pg": null,
       "games_played": 0,
+      "mu_neutral": 0.0,
+      "prior_pg": 5.14,
+      "prior_src": "season",
+      "opp_mult": 1.0,
       "actual_prev": null,
       "pos_rank": 4,
       "ecr": 10,
@@ -1055,7 +1139,8 @@
      "Cole Ruiz-Hollis",
      "Grady Sorensen",
      "Rico Achebe"
-    ]
+    ],
+    "held": []
    },
    "lineup_win": {
     "slots": {
@@ -1093,9 +1178,11 @@
      "Cole Ruiz-Hollis",
      "Grady Sorensen",
      "Rico Achebe"
-    ]
+    ],
+    "held": []
    },
    "lineup_diff": [],
+   "lineup_after": null,
    "replacement": {
     "QB": 15.6,
     "RB": 7.42,
@@ -1252,8 +1339,17 @@
       "fp:B"
      ],
      "percent_owned": 20.0,
-     "on_waivers": false,
-     "kickoff_day": null
+     "on_waivers": true,
+     "kickoff_day": null,
+     "lands": "Wed 1:00 AM",
+     "lands_ts": 1794384000000,
+     "claimed": {
+      "id": "claim-1",
+      "bid": 9,
+      "drop": "Malik Okafor",
+      "drop_id": 104,
+      "status": "PENDING"
+     }
     },
     {
      "espn_id": 224,
@@ -1572,8 +1668,17 @@
       "Tobias Ruiz-Hollis",
       "Tyrek Grantham"
      ],
+     "give_ids": [
+      107
+     ],
+     "get_ids": [
+      191,
+      192
+     ],
      "my_delta_ppw": 0.93,
      "their_delta_ppw": -0.69,
+     "my_gain": 0.93,
+     "variance_mult": 1.0,
      "drops": [],
      "their_drops": [],
      "get_pos": [
@@ -1613,6 +1718,7 @@
      ],
      "after_line": null,
      "sendable": false,
+     "why_not": "costs him 0.7/wk; under +1.0/wk for me",
      "must_try": false,
      "why": [
       "they start Tobias Ruiz-Hollis today"
@@ -1630,8 +1736,16 @@
      "get": [
       "Dontae Rutherford"
      ],
+     "give_ids": [
+      108
+     ],
+     "get_ids": [
+      144
+     ],
      "my_delta_ppw": 1.08,
      "their_delta_ppw": 0.26,
+     "my_gain": 1.08,
+     "variance_mult": 1.0,
      "drops": [],
      "their_drops": [],
      "get_pos": [
@@ -1671,6 +1785,7 @@
      ],
      "after_line": "he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after",
      "sendable": true,
+     "why_not": null,
      "must_try": false,
      "why": [
       "they start Dontae Rutherford today",
@@ -1690,8 +1805,16 @@
      "get": [
       "Darius Solano"
      ],
+     "give_ids": [
+      108
+     ],
+     "get_ids": [
+      152
+     ],
      "my_delta_ppw": 2.08,
      "their_delta_ppw": -0.53,
+     "my_gain": 2.08,
+     "variance_mult": 1.0,
      "drops": [],
      "their_drops": [],
      "get_pos": [
@@ -1726,6 +1849,7 @@
      ],
      "after_line": "he'd start Jermaine Vell (the wire) at TE after",
      "sendable": false,
+     "why_not": "costs him 0.5/wk; coin flip at best; he'd have to stream TE this week",
      "must_try": false,
      "why": [
       "they start Darius Solano today",
@@ -1755,8 +1879,17 @@
       "Dontae Rutherford",
       "Xavier Vell"
      ],
+     "give_ids": [
+      108
+     ],
+     "get_ids": [
+      144,
+      145
+     ],
      "my_delta_ppw": 1.36,
      "their_delta_ppw": -0.41,
+     "my_gain": 1.36,
+     "variance_mult": 1.0,
      "drops": [],
      "their_drops": [],
      "get_pos": [
@@ -1797,6 +1930,7 @@
      ],
      "after_line": "he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after",
      "sendable": false,
+     "why_not": "costs him 0.4/wk; coin flip at best",
      "must_try": false,
      "why": [
       "they start Dontae Rutherford today",
@@ -1815,8 +1949,16 @@
      "get": [
       "Tyrek Grantham"
      ],
+     "give_ids": [
+      108
+     ],
+     "get_ids": [
+      192
+     ],
      "my_delta_ppw": 0.95,
      "their_delta_ppw": -0.64,
+     "my_gain": 0.95,
+     "variance_mult": 1.0,
      "drops": [],
      "their_drops": [],
      "get_pos": [
@@ -1855,6 +1997,7 @@
      ],
      "after_line": null,
      "sendable": false,
+     "why_not": "costs him 0.6/wk; coin flip at best; under +1.0/wk for me",
      "must_try": false,
      "why": [],
      "score": 0.281
@@ -1870,8 +2013,18 @@
       "Elias Delacroix",
       "Quincy Brandt"
      ],
+     "give_ids": [
+      102,
+      108
+     ],
+     "get_ids": [
+      190,
+      194
+     ],
      "my_delta_ppw": 0.77,
      "their_delta_ppw": -0.38,
+     "my_gain": 0.77,
+     "variance_mult": 1.0,
      "drops": [],
      "their_drops": [],
      "get_pos": [
@@ -1924,6 +2077,7 @@
      ],
      "after_line": "he'd start Jermaine Vell (the wire) at TE after",
      "sendable": false,
+     "why_not": "costs him 0.4/wk; coin flip at best; under +1.0/wk for me; he'd have to stream TE this week",
      "must_try": false,
      "why": [
       "they start Elias Delacroix today",
@@ -1965,13 +2119,7 @@
       "IR slot open, the stash is free"
      ],
      "espn_status": "INJURY_RESERVE",
-     "verdict": "ir",
-     "add": {
-      "name": "Kwame Brandt",
-      "pos": "WR",
-      "kind": "upgrade",
-      "why": "+0.9/wk"
-     }
+     "verdict": "ir"
     },
     {
      "espn_id": 104,
@@ -2003,8 +2151,7 @@
       "no better than the wire when he is back, dead roster spot, but Rico Achebe is the cheaper drop"
      ],
      "espn_status": "OUT",
-     "verdict": "hold",
-     "add": null
+     "verdict": "hold"
     }
    ],
    "open_spots": 1,
@@ -2020,10 +2167,24 @@
    "pending_moves": [],
    "trade_spots_after": 0,
    "trade_adds_after": [],
+   "pending_claims": [
+    {
+     "id": "claim-1",
+     "add": "Tyrek Stroud",
+     "add_id": 221,
+     "add_pos": "RB",
+     "drop": "Malik Okafor",
+     "drop_id": 104,
+     "bid": 9,
+     "lands": "Wed 1:00 AM",
+     "lands_ts": 1794384000000,
+     "status": "PENDING"
+    }
+   ],
    "deadlines": {
-    "waiver_run": "2026-10-14T01:00-06:00",
+    "waiver_run": "2026-11-11T01:00-07:00",
     "waiver_run_word": "Wed 1:00 AM",
-    "waiver_run_ts": 1791961200000,
+    "waiver_run_ts": 1794384000000,
     "waiver_run_source": "default",
     "waiver_process_days": [
      "Mon",
@@ -2050,11 +2211,11 @@
      "id": "in-1",
      "rival_team_id": 2,
      "rival": "The Tuesday Regrets",
-     "proposed_iso": "2026-10-13T17:11",
-     "expires_iso": "2026-10-14T17:11",
+     "proposed_iso": "2026-11-10T05:27",
+     "expires_iso": "2026-11-11T05:27",
      "hours_left": 21.0,
-     "proposed_ts": 1791911512559,
-     "expires_ts": 1791997912559,
+     "proposed_ts": 1794313656767,
+     "expires_ts": 1794400056767,
      "unmatched_ids": [],
      "accepted": false,
      "process_ts": null,
@@ -2133,11 +2294,11 @@
      "id": "out-1",
      "rival_team_id": 3,
      "rival": "Waiver Wire Widows",
-     "proposed_iso": "2026-10-13T17:11",
-     "expires_iso": "2026-10-14T17:11",
+     "proposed_iso": "2026-11-10T05:27",
+     "expires_iso": "2026-11-11T05:27",
      "hours_left": 21.0,
-     "proposed_ts": 1791911512559,
-     "expires_ts": 1791997912559,
+     "proposed_ts": 1794313656767,
+     "expires_ts": 1794400056767,
      "unmatched_ids": [],
      "accepted": false,
      "process_ts": null,
@@ -2149,7 +2310,9 @@
      ],
      "get": [
       "Rico Saldana"
-     ]
+     ],
+     "my_delta_ppw": 0.38,
+     "p_accept": null
     }
    ],
    "pending_trades_error": null,

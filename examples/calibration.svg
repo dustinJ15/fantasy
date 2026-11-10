@@ -1,0 +1,65 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='460' height='360' viewBox='0 0 460 360' font-family='-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif'>
+<rect width='460' height='360' rx='6' fill='#fcfcfb'/>
+<text x='16.0' y='24.0' font-size='14' fill='#0b0b0b' text-anchor='start' font-weight='600' >Does “win 62%” mean 62%?</text>
+<text x='16.0' y='42.0' font-size='11' fill='#8a8985' text-anchor='start' font-weight='normal' >P(win) of the set lineups against who won · 2026 weeks 1-6 · three leagues</text>
+<line x1='56' y1='304.0' x2='440' y2='304.0' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='308.0' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >0.00</text>
+<text x='56.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >0.00</text>
+<line x1='56' y1='245.5' x2='440' y2='245.5' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='249.5' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >0.25</text>
+<text x='152.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >0.25</text>
+<line x1='56' y1='187.0' x2='440' y2='187.0' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='191.0' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >0.50</text>
+<text x='248.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >0.50</text>
+<line x1='56' y1='128.5' x2='440' y2='128.5' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='132.5' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >0.75</text>
+<text x='344.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >0.75</text>
+<line x1='56' y1='70.0' x2='440' y2='70.0' stroke='#e6e5e1' stroke-width='1'/>
+<text x='48.0' y='74.0' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >1.00</text>
+<text x='440.0' y='320.0' font-size='10' fill='#8a8985' text-anchor='middle' font-weight='normal' >1.00</text>
+<text x='248.0' y='348.0' font-size='11' fill='#52514e' text-anchor='middle' font-weight='normal' >predicted P(win), bin mean</text>
+<text x='14.0' y='187.0' font-size='11' fill='#52514e' text-anchor='middle' font-weight='normal' transform='rotate(-90 14 187.0)'>share won</text>
+<line x1='56' y1='304' x2='440' y2='70' stroke='#8a8985' stroke-width='1'/>
+<text x='401.6' y='107.4' font-size='10' fill='#8a8985' text-anchor='end' font-weight='normal' >calibrated</text>
+<circle cx='102.1' cy='304.0' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='144.3' cy='226.8' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='198.1' cy='264.2' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='228.8' cy='187.0' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='263.4' cy='142.5' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='297.9' cy='147.2' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='340.2' cy='226.8' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='363.2' cy='70.0' r='4' fill='#2a78d6' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='105.9' cy='304.0' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='163.5' cy='304.0' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='194.2' cy='226.8' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='228.8' cy='215.1' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='263.4' cy='187.0' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='305.6' cy='147.2' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='351.7' cy='70.0' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='420.8' cy='70.0' r='4' fill='#eb6834' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='163.5' cy='304.0' r='4' fill='#1baf7a' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='225.0' cy='233.8' r='4' fill='#1baf7a' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='263.4' cy='175.3' r='4' fill='#1baf7a' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='313.3' cy='109.8' r='4' fill='#1baf7a' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='347.8' cy='70.0' r='4' fill='#1baf7a' fill-opacity='0.55' stroke='#fcfcfb' stroke-width='2'/>
+<path d='M105.9,304.0 L155.8,264.2 L198.1,252.5 L228.8,215.1 L263.4,165.9 L305.6,128.5 L344.0,163.6 L363.2,70.0 L420.8,70.0' fill='none' stroke='#0b0b0b' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>
+<circle cx='105.9' cy='304.0' r='6.8' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='155.8' cy='264.2' r='7.9' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='198.1' cy='252.5' r='8.8' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='228.8' cy='215.1' r='11.8' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='263.4' cy='165.9' r='13.3' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='305.6' cy='128.5' r='9.5' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='344.0' cy='163.6' r='7.6' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='363.2' cy='70.0' r='5.6' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<circle cx='420.8' cy='70.0' r='6.3' fill='#0b0b0b' stroke='#fcfcfb' stroke-width='2'/>
+<text x='279.4' y='169.9' font-size='10' fill='#52514e' text-anchor='start' font-weight='normal' >n=34</text>
+<circle cx='73' cy='80' r='5' fill='#0b0b0b'/>
+<text x='84.0' y='84.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >pooled, sized by n</text>
+<circle cx='73' cy='98' r='4' fill='#2a78d6' fill-opacity='0.55'/>
+<text x='84.0' y='102.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >L1 · n 36 · Brier 0.225</text>
+<circle cx='73' cy='116' r='4' fill='#eb6834' fill-opacity='0.55'/>
+<text x='84.0' y='120.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >L2 · n 30 · Brier 0.201</text>
+<circle cx='73' cy='134' r='4' fill='#1baf7a' fill-opacity='0.55'/>
+<text x='84.0' y='138.0' font-size='11' fill='#52514e' text-anchor='start' font-weight='normal' >L3 · n 30 · Brier 0.217</text>
+<text x='84.0' y='156.0' font-size='11' fill='#8a8985' text-anchor='start' font-weight='normal' >coin flip Brier 0.25</text>
+</svg>

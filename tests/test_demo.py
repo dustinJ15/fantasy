@@ -33,6 +33,17 @@ def test_packet_and_incoming_demo(tmp_path):
     assert offers[0]["row_id"].startswith("offer:")  # the reads.json key the trade-offer skill rules on
 
 
+def test_section_commands_demo():
+    """`ff trades --demo --explain` and `ff odds --demo` are what `scripts/screenshots.sh` draws; every section
+    command takes the flag so the README's Try-it block holds."""
+    r = runner.invoke(app, ["trades", "--demo", "--explain", "--top", "2", "--sims", "100"])
+    assert r.exit_code == 0, r.output
+    assert "p(accept)" in r.output and "→ get" in r.output
+    for cmd in ("odds", "lineup", "waivers", "roster"):
+        r = runner.invoke(app, [cmd, "--demo", "--sims", "100"])
+        assert r.exit_code == 0, (cmd, r.output)
+
+
 def test_demo_overrides(tmp_path):
     ov = tmp_path / "o.json"
     ov.write_text(json.dumps({"100": {"p_zero": 1.0, "note": "ruled out (demo)"}}))

@@ -1,15 +1,16 @@
-# FF briefing — 2026-10-13
+# FF briefing — 2026-11-10
 
 ## Demo League
 _4-0 · vs Bye Week Blues · win 59% · playoffs 97.6% · title 21.4%_  
 
 - **Incoming offer (DECLINE):** The Tuesday Regrets offers Dontae Kowalczyk for your Jalen Haggerty, Silas Pennington: -4.5 pts/wk for you, +4.5 for them _(title odds -11.6 · expires in 21h)_
 - **IR:** move Grady Sorensen (WR) to IR, then add Kwame Brandt (WR) _(out ~4 wks, back wk 9 · Kwame Brandt: +0.9/wk)_ — **note:** Brandt is cover for the Sorensen weeks only; he is the first cut when a spot is needed
+- **Waiver (claim in):** claim in: Tyrek Stroud (RB) ($9, drop Malik Okafor), lands Wed 1:00 AM _(placed in the app; nothing to click, cancel it there if the research says so · +4 pts this week at RB · +2.0/wk over your RB · Malik Okafor had an HOLDING verdict (out ~1 wk, back wk 6): the claim cuts him instead, your call)_
 - **Waiver:** add Jermaine Vell (TE) and start him at TE _(+7 pts this week · there is an open bench spot · if he is gone, Jaxon Bassett (RB, +7 this week))_ — **note:** the full bid is right; Beau Bassett is the fallback if you're outbid
-- **Stream:** swap in Texans D/ST at D/ST _(+2.6 this week)_
+- **Stream:** swap in Texans D/ST for Packers D/ST at D/ST _(+2.5 this week)_
 - **Lineup (in order):** Cole Ibarra: QB → bench · Beau Whitlock: bench → QB · Nico Vell: bench → RB/WR/TE · Jermaine Vell: free agent → TE over Reggie Lindqvist once the add above is through
-- **Already sent:** your Rico Achebe for Rico Saldana is still waiting on Waiver Wire Widows _(21h left)_
-- **Trade (worth sending):** offer Bye Week Blues your Nico Vell for Dontae Rutherford: +1.1/wk for you, +0.3 for them, coin flip (46%) _(he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after)_ — they start Dontae Rutherford today — **note:** send it today: Rutherford practiced in full, and Bye Week Blues has been streaming RB all month anyway, so the wire bodies the row names are what he runs out now
+- **Already sent:** your Rico Achebe for Rico Saldana is still waiting on Waiver Wire Widows _(21h left · 50% to land (the scan did not price this package; the prior) for +0.4/wk)_
+- **Trade (worth sending):** offer Bye Week Blues your Nico Vell for Dontae Rutherford: +1.1/wk for you, +0.3 for them, coin flip (46%) _(he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after)_ — they start Dontae Rutherford today; he is your opponent this week; accepted today it executes before kickoff — **note:** send it today: Rutherford practiced in full, and Bye Week Blues has been streaming RB all month anyway, so the wire bodies the row names are what he runs out now
 
 **Claude's read:** Rutherford's boot was precautionary and he practiced in full Thursday, so the ask is live. Ibarra is still a game-time call, so Whitlock starts Sunday. Brandt is a bye-week body until Sorensen is back in week 9, not a starter.  
 **Paste to Bye Week Blues:** "hey, would you do Nico Vell for Rutherford? you've been thin at WR and he'd start for you every week, and I need an RB body back for byes. no worries if not"  
@@ -21,7 +22,7 @@ _4-0 · vs Bye Week Blues · win 59% · playoffs 97.6% · title 21.4%_
 
 _Full detail below._
 
-# Detail — 2026-10-13
+# Detail — 2026-11-10
 
 
 ---
@@ -29,7 +30,7 @@ _Full detail below._
 Record 4-0 · FAAB left $79 · weeks remaining 12 · waivers run Wed 1:00 AM  
 Playoff odds **97.6%** · title odds **21.4%** · expected wins 10.01 · playoff weeks 15-16 weighted ×1.5
 
-## Matchup vs Bye Week Blues (their proj 72.3 ± 16.0)
+## Matchup vs Bye Week Blues (their projected lineup 72.3 ± 16.0)
 Recommended lineup (max P(win) = 0.588), proj 77.65 ± 17.85; current ESPN lineup proj 64.7
 
 - K: Brody Vanterpool
@@ -42,22 +43,22 @@ Recommended lineup (max P(win) = 0.588), proj 77.65 ± 17.85; current ESPN lineu
 
 Bench: Cole Ibarra, Malik Okafor, Cole Ruiz-Hollis, Grady Sorensen, Rico Achebe
 
-## My roster (this week μ · ROS/g · game · usage · flags)
-| player | pos | wk μ | ROS/g | game | usage | flags |
+## My roster (this week expected pts · ROS/g · game · usage · flags)
+| player | pos | wk | ROS/g | game | usage | flags |
 |---|---|---|---|---|---|---|
-| Beau Whitlock | QB | 16.0 | 16.0 |  |  | B |
-| Omar Lindqvist | WR | 11.4 | 11.41 |  |  | B |
-| Brody Vanterpool | K | 11.1 | 11.12 |  |  | B |
-| Deon Castellano | RB | 14.7 | 14.32 |  |  | espn:QUESTIONABLE, B |
-| Cole Ibarra | QB | 19.4 | 18.57 |  |  | espn:QUESTIONABLE, llm:p_zero, B |
-| Silas Pennington | WR | 13.5 | 13.15 |  |  | espn:QUESTIONABLE, B |
-| Nico Vell | WR | 9.89 | 8.4 |  |  | espn:QUESTIONABLE, llm:mu, B |
-| Jalen Haggerty | RB | 6.5 | 6.32 |  |  | espn:QUESTIONABLE, B |
-| Packers D/ST | D/ST | 4.6 | 4.62 |  |  | B |
-| Reggie Lindqvist | TE | 6.0 | 5.85 |  |  | espn:QUESTIONABLE, B |
-| Cole Ruiz-Hollis | RB | 4.5 | 4.41 |  |  | espn:QUESTIONABLE, B |
+| Beau Whitlock | QB | 15.7 | 16.0 |  |  | B |
+| Omar Lindqvist | WR | 11.2 | 11.41 |  |  | B |
+| Brody Vanterpool | K | 10.9 | 11.12 |  |  | B |
+| Deon Castellano | RB | 10.3 | 14.32 |  |  | espn:QUESTIONABLE, B |
+| Cole Ibarra | QB | 9.7 | 18.57 |  |  | espn:QUESTIONABLE, llm:p_zero, B, μ 19.4 if he plays |
+| Silas Pennington | WR | 9.4 | 13.15 |  |  | espn:QUESTIONABLE, B |
+| Nico Vell | WR | 6.9 | 8.4 |  |  | espn:QUESTIONABLE, llm:mu, B |
+| Jalen Haggerty | RB | 4.5 | 6.32 |  |  | espn:QUESTIONABLE, B |
+| Packers D/ST | D/ST | 4.5 | 4.62 |  |  | B |
+| Reggie Lindqvist | TE | 4.2 | 5.85 |  |  | espn:QUESTIONABLE, B |
+| Cole Ruiz-Hollis | RB | 3.1 | 4.41 |  |  | espn:QUESTIONABLE, B |
 | Rico Achebe | TE | 1.0 | 1.0 |  |  | B |
-| Malik Okafor | RB | 2.4 | 2.23 |  |  | espn:OUT, B, out ~1w, back wk 6 |
+| Malik Okafor | RB | 0.0 | 2.23 |  |  | espn:OUT, B, μ 2.4 if he plays, out ~1w, back wk 6 |
 | Grady Sorensen | WR | 0.0 | 3.43 |  |  | espn:INJURY_RESERVE, sleeper:IR (Knee), B, out ~4w, back wk 9 |
 
 ## Waivers
@@ -77,9 +78,9 @@ Handcuffs: Rico Pennington for Deon Castellano (owned); Deshawn Haggerty for Jal
 Your open offers: Rico Achebe for Rico Saldana to Waiver Wire Widows
 
 ## Trade candidates
-- **Give Silas Pennington → get Tobias Ruiz-Hollis, Tyrek Grantham** from Sunday Scaries: me +0.9 ppw, them -0.7 ppw · title odds me +8.2 / them -8.1 · p(accept) 0.54 (coin flip: it starts for him; I ask for a player he starts today). they start Tobias Ruiz-Hollis today
-- **Give Nico Vell → get Dontae Rutherford** from Bye Week Blues: me +1.1 ppw, them +0.3 ppw · title odds me +6.1 / them -0.1 · p(accept) 0.46 (coin flip: it starts for him; I ask for a player he starts today; he is out of it and sellers go quiet) · he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after. they start Dontae Rutherford today; fills my RB hole; fills their WR hole
-- **Give Nico Vell → get Darius Solano** from Bye Week Blues: me +2.1 ppw, them -0.5 ppw · title odds me +7.3 / them -0.1 · p(accept) 0.23 (not a row: it starts for him; I ask for a player he starts today; he'd have to stream TE this week; he is out of it and sellers go quiet) · he'd start Jermaine Vell (the wire) at TE after. they start Darius Solano today; fills my TE hole; fills their WR hole; they'd have to stream TE this week
+- **row** — **Give Nico Vell → get Dontae Rutherford** from Bye Week Blues: me +1.1 ppw, them +0.3 ppw · title odds me +6.1 / them -0.1 · p(accept) 0.46 (coin flip: it starts for him; I ask for a player he starts today; he is out of it and sellers go quiet) · he'd start Jaxon Bassett (the wire), Landon Marchetti (the wire) at RB after. they start Dontae Rutherford today; fills my RB hole; fills their WR hole; he is your opponent this week; accepted today it executes before kickoff
+- **not a row: costs him 0.7/wk; under +1.0/wk for me** — **Give Silas Pennington → get Tobias Ruiz-Hollis, Tyrek Grantham** from Sunday Scaries: me +0.9 ppw, them -0.7 ppw · title odds me +8.2 / them -8.1 · p(accept) 0.54 (coin flip: it starts for him; I ask for a player he starts today). they start Tobias Ruiz-Hollis today
+- **not a row: costs him 0.5/wk; coin flip at best; he'd have to stream TE this week** — **Give Nico Vell → get Darius Solano** from Bye Week Blues: me +2.1 ppw, them -0.5 ppw · title odds me +7.3 / them -0.1 · p(accept) 0.23 (he would decline: it starts for him; I ask for a player he starts today; he'd have to stream TE this week; he is out of it and sellers go quiet) · he'd start Jermaine Vell (the wire) at TE after. they start Darius Solano today; fills my TE hole; fills their WR hole; they'd have to stream TE this week; he is your opponent this week; accepted today it executes before kickoff
 
 ## League odds
 | team | record | playoff % | title % | exp wins |

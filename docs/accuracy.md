@@ -2,6 +2,8 @@
 
 Status: measurement, re-run with `uv run ff accuracy` (the projlog branch restored first: `scripts/projlog_push.sh --restore`)
 and `uv run ff backtest` / `ff backtest --trades` / `--scan` / `--claims` (the replays pulled first: `ff replay-pull --season 2026`).
+When the Brier table or the scan totals below change, update `examples/accuracy.json` to match (the README's charts are
+drawn from it by `scripts/accuracy_charts.py`; `tests/test_accuracy_charts.py` fails on a mismatch) and run `scripts/screenshots.sh`.
 Written: 2026-10-08 against the week 1-4 logs; moved here from ROADMAP.md on 2026-10-20 (Docs-1); the backtest tables added
 2026-10-20 (D11); the scanner replay tables 2026-10-21 (D12 step 5).
 TODO ids: D2 (adopt the fitted variance once a position has 150 scored forecasts); D13 (the wire body with no preseason total,

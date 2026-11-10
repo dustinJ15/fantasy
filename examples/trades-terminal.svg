@@ -1,0 +1,137 @@
+<svg class="rich-terminal" viewBox="0 0 1238 538.0" xmlns="http://www.w3.org/2000/svg">
+    <!-- Generated with Rich https://www.textualize.io -->
+    <style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-888806193-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-888806193-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-888806193-r1 { fill: #98a84b;font-weight: bold }
+.terminal-888806193-r2 { fill: #c5c8c6 }
+.terminal-888806193-r3 { fill: #c5c8c6;font-weight: bold }
+.terminal-888806193-r4 { fill: #868887 }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-888806193-clip-terminal">
+      <rect x="0" y="0" width="1219.0" height="487.0" />
+    </clipPath>
+    <clipPath id="terminal-888806193-line-0">
+    <rect x="0" y="1.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-1">
+    <rect x="0" y="25.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-2">
+    <rect x="0" y="50.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-3">
+    <rect x="0" y="74.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-4">
+    <rect x="0" y="99.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-5">
+    <rect x="0" y="123.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-6">
+    <rect x="0" y="147.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-7">
+    <rect x="0" y="172.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-8">
+    <rect x="0" y="196.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-9">
+    <rect x="0" y="221.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-10">
+    <rect x="0" y="245.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-11">
+    <rect x="0" y="269.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-12">
+    <rect x="0" y="294.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-13">
+    <rect x="0" y="318.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-14">
+    <rect x="0" y="343.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-15">
+    <rect x="0" y="367.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-16">
+    <rect x="0" y="391.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-17">
+    <rect x="0" y="416.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-888806193-line-18">
+    <rect x="0" y="440.7" width="1220" height="24.65"/>
+            </clipPath>
+    </defs>
+
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1236" height="536" rx="8"/><text class="terminal-888806193-title" fill="#c5c8c6" text-anchor="middle" x="618" y="27">ff&#160;trades&#160;--demo&#160;--explain</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
+            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
+            <circle cx="44" cy="0" r="7" fill="#28c840"/>
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-888806193-clip-terminal)">
+    
+    <g class="terminal-888806193-matrix">
+    <text class="terminal-888806193-r1" x="0" y="20" textLength="12.2" clip-path="url(#terminal-888806193-line-0)">$</text><text class="terminal-888806193-r2" x="12.2" y="20" textLength="427" clip-path="url(#terminal-888806193-line-0)">&#160;ff&#160;trades&#160;--demo&#160;--explain&#160;--top&#160;3</text><text class="terminal-888806193-r2" x="1220" y="20" textLength="12.2" clip-path="url(#terminal-888806193-line-0)">
+</text><text class="terminal-888806193-r2" x="1220" y="44.4" textLength="12.2" clip-path="url(#terminal-888806193-line-1)">
+</text><text class="terminal-888806193-r3" x="0" y="68.8" textLength="244" clip-path="url(#terminal-888806193-line-2)">Demo&#160;League&#160;—&#160;week&#160;5</text><text class="terminal-888806193-r2" x="1220" y="68.8" textLength="12.2" clip-path="url(#terminal-888806193-line-2)">
+</text><text class="terminal-888806193-r2" x="0" y="93.2" textLength="85.4" clip-path="url(#terminal-888806193-line-3)">-&#160;give&#160;</text><text class="terminal-888806193-r3" x="85.4" y="93.2" textLength="195.2" clip-path="url(#terminal-888806193-line-3)">Silas&#160;Pennington</text><text class="terminal-888806193-r2" x="280.6" y="93.2" textLength="85.4" clip-path="url(#terminal-888806193-line-3)">&#160;→&#160;get&#160;</text><text class="terminal-888806193-r3" x="366" y="93.2" textLength="414.8" clip-path="url(#terminal-888806193-line-3)">Tobias&#160;Ruiz-Hollis,&#160;Tyrek&#160;Grantham</text><text class="terminal-888806193-r2" x="780.8" y="93.2" textLength="402.6" clip-path="url(#terminal-888806193-line-3)">&#160;(Sunday&#160;Scaries):&#160;me&#160;+0.9,&#160;them&#160;</text><text class="terminal-888806193-r2" x="1220" y="93.2" textLength="12.2" clip-path="url(#terminal-888806193-line-3)">
+</text><text class="terminal-888806193-r2" x="0" y="117.6" textLength="219.6" clip-path="url(#terminal-888806193-line-4)">-0.7&#160;·&#160;coin&#160;flip&#160;&#160;</text><text class="terminal-888806193-r4" x="219.6" y="117.6" textLength="427" clip-path="url(#terminal-888806193-line-4)">they&#160;start&#160;Tobias&#160;Ruiz-Hollis&#160;today</text><text class="terminal-888806193-r2" x="1220" y="117.6" textLength="12.2" clip-path="url(#terminal-888806193-line-4)">
+</text><text class="terminal-888806193-r2" x="0" y="142" textLength="902.8" clip-path="url(#terminal-888806193-line-5)">&#160;&#160;&#160;&#160;p(accept)&#160;0.539:&#160;it&#160;starts&#160;for&#160;him;&#160;I&#160;ask&#160;for&#160;a&#160;player&#160;he&#160;starts&#160;today</text><text class="terminal-888806193-r2" x="1220" y="142" textLength="12.2" clip-path="url(#terminal-888806193-line-5)">
+</text><text class="terminal-888806193-r2" x="0" y="166.4" textLength="1049.2" clip-path="url(#terminal-888806193-line-6)">&#160;&#160;&#160;&#160;chart&#160;from&#160;his&#160;side&#160;unpriced,&#160;best&#160;player&#160;unpriced,&#160;sendable&#160;False,&#160;must_try&#160;False</text><text class="terminal-888806193-r2" x="1220" y="166.4" textLength="12.2" clip-path="url(#terminal-888806193-line-6)">
+</text><text class="terminal-888806193-r2" x="0" y="190.8" textLength="85.4" clip-path="url(#terminal-888806193-line-7)">-&#160;give&#160;</text><text class="terminal-888806193-r3" x="85.4" y="190.8" textLength="109.8" clip-path="url(#terminal-888806193-line-7)">Nico&#160;Vell</text><text class="terminal-888806193-r2" x="195.2" y="190.8" textLength="85.4" clip-path="url(#terminal-888806193-line-7)">&#160;→&#160;get&#160;</text><text class="terminal-888806193-r3" x="280.6" y="190.8" textLength="207.4" clip-path="url(#terminal-888806193-line-7)">Dontae&#160;Rutherford</text><text class="terminal-888806193-r2" x="488" y="190.8" textLength="622.2" clip-path="url(#terminal-888806193-line-7)">&#160;(Bye&#160;Week&#160;Blues):&#160;me&#160;+1.1,&#160;them&#160;+0.3&#160;·&#160;coin&#160;flip&#160;&#160;</text><text class="terminal-888806193-r4" x="1110.2" y="190.8" textLength="61" clip-path="url(#terminal-888806193-line-7)">they&#160;</text><text class="terminal-888806193-r2" x="1220" y="190.8" textLength="12.2" clip-path="url(#terminal-888806193-line-7)">
+</text><text class="terminal-888806193-r4" x="0" y="215.2" textLength="829.6" clip-path="url(#terminal-888806193-line-8)">start&#160;Dontae&#160;Rutherford&#160;today;&#160;fills&#160;my&#160;RB&#160;hole;&#160;fills&#160;their&#160;WR&#160;hole</text><text class="terminal-888806193-r2" x="1220" y="215.2" textLength="12.2" clip-path="url(#terminal-888806193-line-8)">
+</text><text class="terminal-888806193-r2" x="0" y="239.6" textLength="1171.2" clip-path="url(#terminal-888806193-line-9)">&#160;&#160;&#160;&#160;p(accept)&#160;0.458:&#160;it&#160;starts&#160;for&#160;him;&#160;I&#160;ask&#160;for&#160;a&#160;player&#160;he&#160;starts&#160;today;&#160;he&#160;is&#160;out&#160;of&#160;it&#160;and&#160;</text><text class="terminal-888806193-r2" x="1220" y="239.6" textLength="12.2" clip-path="url(#terminal-888806193-line-9)">
+</text><text class="terminal-888806193-r2" x="0" y="264" textLength="195.2" clip-path="url(#terminal-888806193-line-10)">sellers&#160;go&#160;quiet</text><text class="terminal-888806193-r2" x="1220" y="264" textLength="12.2" clip-path="url(#terminal-888806193-line-10)">
+</text><text class="terminal-888806193-r2" x="0" y="288.4" textLength="1037" clip-path="url(#terminal-888806193-line-11)">&#160;&#160;&#160;&#160;chart&#160;from&#160;his&#160;side&#160;unpriced,&#160;best&#160;player&#160;unpriced,&#160;sendable&#160;True,&#160;must_try&#160;False</text><text class="terminal-888806193-r2" x="1220" y="288.4" textLength="12.2" clip-path="url(#terminal-888806193-line-11)">
+</text><text class="terminal-888806193-r2" x="0" y="312.8" textLength="976" clip-path="url(#terminal-888806193-line-12)">&#160;&#160;&#160;&#160;he&#x27;d&#160;start&#160;Jaxon&#160;Bassett&#160;(the&#160;wire),&#160;Landon&#160;Marchetti&#160;(the&#160;wire)&#160;at&#160;RB&#160;after</text><text class="terminal-888806193-r2" x="1220" y="312.8" textLength="12.2" clip-path="url(#terminal-888806193-line-12)">
+</text><text class="terminal-888806193-r2" x="0" y="337.2" textLength="85.4" clip-path="url(#terminal-888806193-line-13)">-&#160;give&#160;</text><text class="terminal-888806193-r3" x="85.4" y="337.2" textLength="109.8" clip-path="url(#terminal-888806193-line-13)">Nico&#160;Vell</text><text class="terminal-888806193-r2" x="195.2" y="337.2" textLength="85.4" clip-path="url(#terminal-888806193-line-13)">&#160;→&#160;get&#160;</text><text class="terminal-888806193-r3" x="280.6" y="337.2" textLength="158.6" clip-path="url(#terminal-888806193-line-13)">Darius&#160;Solano</text><text class="terminal-888806193-r2" x="439.2" y="337.2" textLength="475.8" clip-path="url(#terminal-888806193-line-13)">&#160;(Bye&#160;Week&#160;Blues):&#160;me&#160;+2.1,&#160;them&#160;-0.5&#160;&#160;</text><text class="terminal-888806193-r4" x="915" y="337.2" textLength="305" clip-path="url(#terminal-888806193-line-13)">they&#160;start&#160;Darius&#160;Solano&#160;</text><text class="terminal-888806193-r2" x="1220" y="337.2" textLength="12.2" clip-path="url(#terminal-888806193-line-13)">
+</text><text class="terminal-888806193-r4" x="0" y="361.6" textLength="976" clip-path="url(#terminal-888806193-line-14)">today;&#160;fills&#160;my&#160;TE&#160;hole;&#160;fills&#160;their&#160;WR&#160;hole;&#160;they&#x27;d&#160;have&#160;to&#160;stream&#160;TE&#160;this&#160;week</text><text class="terminal-888806193-r2" x="1220" y="361.6" textLength="12.2" clip-path="url(#terminal-888806193-line-14)">
+</text><text class="terminal-888806193-r2" x="0" y="386" textLength="1207.8" clip-path="url(#terminal-888806193-line-15)">&#160;&#160;&#160;&#160;p(accept)&#160;0.229:&#160;it&#160;starts&#160;for&#160;him;&#160;I&#160;ask&#160;for&#160;a&#160;player&#160;he&#160;starts&#160;today;&#160;he&#x27;d&#160;have&#160;to&#160;stream&#160;TE&#160;</text><text class="terminal-888806193-r2" x="1220" y="386" textLength="12.2" clip-path="url(#terminal-888806193-line-15)">
+</text><text class="terminal-888806193-r2" x="0" y="410.4" textLength="573.4" clip-path="url(#terminal-888806193-line-16)">this&#160;week;&#160;he&#160;is&#160;out&#160;of&#160;it&#160;and&#160;sellers&#160;go&#160;quiet</text><text class="terminal-888806193-r2" x="1220" y="410.4" textLength="12.2" clip-path="url(#terminal-888806193-line-16)">
+</text><text class="terminal-888806193-r2" x="0" y="434.8" textLength="1049.2" clip-path="url(#terminal-888806193-line-17)">&#160;&#160;&#160;&#160;chart&#160;from&#160;his&#160;side&#160;unpriced,&#160;best&#160;player&#160;unpriced,&#160;sendable&#160;False,&#160;must_try&#160;False</text><text class="terminal-888806193-r2" x="1220" y="434.8" textLength="12.2" clip-path="url(#terminal-888806193-line-17)">
+</text><text class="terminal-888806193-r2" x="0" y="459.2" textLength="622.2" clip-path="url(#terminal-888806193-line-18)">&#160;&#160;&#160;&#160;he&#x27;d&#160;start&#160;Jermaine&#160;Vell&#160;(the&#160;wire)&#160;at&#160;TE&#160;after</text><text class="terminal-888806193-r2" x="1220" y="459.2" textLength="12.2" clip-path="url(#terminal-888806193-line-18)">
+</text><text class="terminal-888806193-r2" x="0" y="483.6" textLength="695.4" clip-path="url(#terminal-888806193-line-19)">&#160;&#160;&#160;&#160;if&#160;he&#160;says&#160;no,&#160;offer&#160;Beau&#160;Whitlock&#160;instead&#160;(likelier)</text><text class="terminal-888806193-r2" x="1220" y="483.6" textLength="12.2" clip-path="url(#terminal-888806193-line-19)">
+</text>
+    </g>
+    </g>
+</svg>

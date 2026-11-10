@@ -11,6 +11,10 @@ PACKET="$(uv run ff packet --demo --sims 3000 --overrides examples/overrides.jso
 cp "$PACKET" examples/packet.json
 uv run ff render-email --packet examples/packet.json --reads examples/reads.json --out examples/briefing.html --md examples/briefing.md
 
+echo "charts"
+# The results charts: docs/accuracy.md's numbers (transcribed in examples/accuracy.json) drawn as plain SVG, no Chrome.
+uv run python scripts/accuracy_charts.py
+
 echo "email screenshot"
 # First pass: ask the page how tall it is, so the capture is cropped to content instead of a fixed viewport.
 sed 's#</body>#<script>document.title=document.documentElement.scrollHeight</script></body>#' examples/briefing.html > "$TMP/measure.html"
@@ -34,4 +38,14 @@ with patch.object(cli, "rprint", con.print):
         pass
 con.save_svg("examples/incoming-terminal.svg", title="ff incoming --demo")
 print("  examples/incoming-terminal.svg")
+
+con = Console(record=True, width=100, force_terminal=True, color_system="truecolor", highlight=False)
+con.print("[bold green]$[/] ff trades --demo --explain --top 3")
+with patch.object(cli, "rprint", con.print):
+    try:
+        cli.app(["trades", "--demo", "--explain", "--top", "3", "--sims", "1500"], standalone_mode=False)
+    except SystemExit:
+        pass
+con.save_svg("examples/trades-terminal.svg", title="ff trades --demo --explain")
+print("  examples/trades-terminal.svg")
 PY
