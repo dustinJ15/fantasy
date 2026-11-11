@@ -172,7 +172,7 @@
  "L3|Brock Purdy+Jaylen Warren": {
   "status": "open",
   "since": "2026-11-09",
-  "last": "2026-11-09",
+  "last": "2026-11-11",
   "league": "L3",
   "rival": "BUTT MUNCH",
   "give": [
@@ -182,6 +182,22 @@
   "get": [
    "Brock Purdy",
    "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L1|Denzel Boston+Puka Nacua": {
+  "status": "open",
+  "since": "2026-11-11",
+  "last": "2026-11-11",
+  "league": "L1",
+  "rival": "Tina\u2019s Tight Ends",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Puka Nacua",
+   "Denzel Boston"
   ],
   "source": "math",
   "note": null
