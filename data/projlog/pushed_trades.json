@@ -170,7 +170,7 @@
   "note": null
  },
  "L3|Brock Purdy+Jaylen Warren": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-11-09",
   "last": "2026-11-11",
   "league": "L3",
@@ -184,7 +184,9 @@
    "Jaylen Warren"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-11-12",
+  "skip_note": "Warren splits that Pittsburgh backfield with Rico Dowdle and Dowdle has the goal line work, so he isn't replacing Taylor's volume. Purdy would just sit behind Caleb Williams and Rodgers."
  },
  "L1|Denzel Boston+Puka Nacua": {
   "status": "open",
