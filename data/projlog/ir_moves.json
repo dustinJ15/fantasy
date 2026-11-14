@@ -1,7 +1,7 @@
 {
  "rosters": {
   "L1": {
-   "date": "2026-11-13",
+   "date": "2026-11-14",
    "names": {
     "4374302": "Amon-Ra St. Brown",
     "4890973": "Ashton Jeanty",
@@ -26,7 +26,7 @@
    ]
   },
   "L2": {
-   "date": "2026-11-13",
+   "date": "2026-11-14",
    "names": {
     "4242335": "Jonathan Taylor",
     "4685382": "Omarion Hampton",
@@ -49,7 +49,7 @@
    "ir": []
   },
   "L3": {
-   "date": "2026-11-13",
+   "date": "2026-11-14",
    "names": {
     "4431611": "Caleb Williams",
     "4242335": "Jonathan Taylor",
@@ -60,14 +60,14 @@
     "4361370": "Chris Olave",
     "4685278": "Luther Burden III",
     "4426388": "Jameson Williams",
-    "3917315": "Kyler Murray",
     "3929645": "Juwan Johnson",
     "4599739": "Kendre Miller",
     "4428718": "Tre Tucker",
     "4689936": "Jake Bates",
     "3912547": "Sam Darnold",
     "8439": "Aaron Rodgers",
-    "-16033": "Ravens D/ST"
+    "-16033": "Ravens D/ST",
+    "3139477": "Patrick Mahomes"
    },
    "ir": [
     "3912547"
