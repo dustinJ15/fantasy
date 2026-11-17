@@ -203,5 +203,21 @@
   ],
   "source": "math",
   "note": null
+ },
+ "L1|Jaylen Warren+Tetairoa McMillan": {
+  "status": "open",
+  "since": "2026-11-17",
+  "last": "2026-11-17",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Jaylen Warren",
+   "Tetairoa McMillan"
+  ],
+  "source": "math",
+  "note": null
  }
 }

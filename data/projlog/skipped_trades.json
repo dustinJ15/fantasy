@@ -628,5 +628,45 @@
    "Tony Pollard"
   ],
   "note": "you have no open roster spot, so a two for one means cutting a body, and splitting your RB1 into two committee backs is the wrong direction at 98% to make the playoffs."
+ },
+ "L1|Kyren Williams+Tetairoa McMillan": {
+  "date": "2026-11-17",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Kyren Williams",
+   "Tetairoa McMillan"
+  ],
+  "note": "Same St. Brown goes out in both, so send the Warren version first and keep this one as the fallback if he says no. Kyren's on bye this week anyway."
+ },
+ "L2|Jonah Coleman+Puka Nacua": {
+  "date": "2026-11-17",
+  "league": "L2",
+  "rival": "Punts and Pints",
+  "give": [
+   "Trey McBride",
+   "Parker Washington"
+  ],
+  "get": [
+   "Jonah Coleman",
+   "Puka Nacua"
+  ],
+  "note": "Same McBride out the door and this one costs you Parker Washington too. Take the Stafford version."
+ },
+ "L3|Cam Skattebo+Jonah Coleman": {
+  "date": "2026-11-17",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Jonathan Taylor"
+  ],
+  "get": [
+   "Jonah Coleman",
+   "Cam Skattebo"
+  ],
+  "note": "Taylor's your best back here and two platoon guys don't replace him. The Hubbard deal fixes the same hole without breaking him up."
  }
 }
