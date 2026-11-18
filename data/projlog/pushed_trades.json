@@ -207,7 +207,7 @@
  "L1|Jaylen Warren+Tetairoa McMillan": {
   "status": "open",
   "since": "2026-11-17",
-  "last": "2026-11-17",
+  "last": "2026-11-18",
   "league": "L1",
   "rival": "Bring Out The Whole Ocean!",
   "give": [
@@ -216,6 +216,40 @@
   "get": [
    "Jaylen Warren",
    "Tetairoa McMillan"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L2|Bucky Irving+Tony Pollard": {
+  "status": "open",
+  "since": "2026-11-18",
+  "last": "2026-11-18",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Jonathan Taylor",
+   "Trey McBride"
+  ],
+  "get": [
+   "Bucky Irving",
+   "Tony Pollard"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L3|David Montgomery+Matthew Golden": {
+  "status": "open",
+  "since": "2026-11-18",
+  "last": "2026-11-18",
+  "league": "L3",
+  "rival": "Pink Zone Princess",
+  "give": [
+   "Caleb Williams",
+   "Chris Olave"
+  ],
+  "get": [
+   "Matthew Golden",
+   "David Montgomery"
   ],
   "source": "math",
   "note": null

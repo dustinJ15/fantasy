@@ -668,5 +668,31 @@
    "Cam Skattebo"
   ],
   "note": "Taylor's your best back here and two platoon guys don't replace him. The Hubbard deal fixes the same hole without breaking him up."
+ },
+ "L1|Javonte Williams+Mike Evans": {
+  "date": "2026-11-18",
+  "league": "L1",
+  "rival": "Chucks Spine",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Javonte Williams",
+   "Mike Evans"
+  ],
+  "note": "same Amon-Ra as the deal above for a worse return, and Evans has missed three straight with the Achilles"
+ },
+ "L2|Kyren Williams+Tony Pollard": {
+  "date": "2026-11-18",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Chuba Hubbard"
+  ],
+  "get": [
+   "Tony Pollard",
+   "Kyren Williams"
+  ],
+  "note": "it asks the same team for the same Pollard, so send the bigger one first and only come back here if he says no"
  }
 }
