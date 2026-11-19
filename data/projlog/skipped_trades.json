@@ -694,5 +694,30 @@
    "Kyren Williams"
   ],
   "note": "it asks the same team for the same Pollard, so send the bigger one first and only come back here if he says no"
+ },
+ "L1|Jaylen Warren+Tetairoa McMillan": {
+  "date": "2026-11-19",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Amon-Ra St. Brown"
+  ],
+  "get": [
+   "Jaylen Warren",
+   "Tetairoa McMillan"
+  ],
+  "note": "Warren is down to 38% of the snaps with Dowdle taking the backfield over, and this hands St. Brown to the guy you play this week. Use St. Brown on the Tina's deal instead."
+ },
+ "L3|Jonah Coleman": {
+  "date": "2026-11-19",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Luther Burden III"
+  ],
+  "get": [
+   "Jonah Coleman"
+  ],
+  "note": "Same Burden as the Warren ask and a lesser back. Send the Warren one."
  }
 }

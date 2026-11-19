@@ -205,7 +205,7 @@
   "note": null
  },
  "L1|Jaylen Warren+Tetairoa McMillan": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-11-17",
   "last": "2026-11-18",
   "league": "L1",
@@ -218,7 +218,9 @@
    "Tetairoa McMillan"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-11-19",
+  "skip_note": "Warren is down to 38% of the snaps with Dowdle taking the backfield over, and this hands St. Brown to the guy you play this week. Use St. Brown on the Tina's deal instead."
  },
  "L2|Bucky Irving+Tony Pollard": {
   "status": "open",
@@ -250,6 +252,21 @@
   "get": [
    "Matthew Golden",
    "David Montgomery"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L3|Jaylen Warren": {
+  "status": "open",
+  "since": "2026-11-19",
+  "last": "2026-11-19",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Luther Burden III"
+  ],
+  "get": [
+   "Jaylen Warren"
   ],
   "source": "math",
   "note": null
