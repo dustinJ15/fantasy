@@ -719,5 +719,33 @@
    "Jonah Coleman"
   ],
   "note": "Same Burden as the Warren ask and a lesser back. Send the Warren one."
+ },
+ "L2|Chris Olave+Tony Pollard": {
+  "date": "2026-11-20",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Trey McBride",
+   "Parker Washington"
+  ],
+  "get": [
+   "Tony Pollard",
+   "Chris Olave"
+  ],
+  "note": "gives TBD +7.6 title odds for your +0.9, and he's already the favorite at 24%"
+ },
+ "L2|Chris Olave+Kyren Williams": {
+  "date": "2026-11-20",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Trey McBride",
+   "Parker Washington"
+  ],
+  "get": [
+   "Kyren Williams",
+   "Chris Olave"
+  ],
+  "note": "same McBride out the door and the worse half of the pair, +0.3 for you against +8.0 for the favorite"
  }
 }
