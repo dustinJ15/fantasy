@@ -239,3 +239,19 @@ def test_an_opened_offer_remembers_the_scans_delta_for_the_backtest(tmp_path):
     record_outcomes(p, path, date(2026, 10, 7))
     outs = load_outcomes(path)
     assert outs["L1|a"]["predicted_ppw"] == 2.4 and outs["L1|b"]["predicted_ppw"] is None
+
+
+def test_an_offer_records_the_acceptance_odds_the_card_printed(tmp_path):
+    """Eight offers went out in Oct-Nov 2026 with 0.43 to 0.95 on them and one was accepted; nothing kept the number,
+    so the scorecard had no calibration row. The scan candidate's p_accept wins, the open-offer pricing is the fallback."""
+    path = tmp_path / "o.json"
+    pk = _packet([offer("a", ["Coker"], ["Rice"]), offer("b", ["Evans"], ["London"], rid=5), offer("c", ["Maye"], ["Pollard"], rid=6)])
+    lg = pk["leagues"][0]
+    lg["trades"] = [{"give": ["Rice"], "get": ["Coker"], "p_accept": 0.8},     # the other direction: not this offer
+                    {"give": ["Coker"], "get": ["Rice"], "p_accept": 0.62, "my_delta_ppw": 1.4}]
+    lg["outgoing_trades"][1]["p_accept"] = 0.41                                # `packet._price_open_offer`
+    record_outcomes(pk, path, date(2026, 11, 22))
+    outs = load_outcomes(path)
+    assert outs["L1|a"]["p_accept"] == 0.62 and outs["L1|a"]["predicted_ppw"] == 1.4
+    assert outs["L1|b"]["p_accept"] == 0.41
+    assert outs["L1|c"]["p_accept"] is None

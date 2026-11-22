@@ -142,6 +142,25 @@ per replayed week after the close, bench or not (the plan's definition; a 3-for-
 Read: one trade, one week (Hubbard 19.1 against Tuten 24.7, Coker 15.7 and Rodriguez 5.5 on the bench), no prediction recorded
 on it (the outcome predates `rulings.predicted_ppw`). Not a number to act on; the row is here so the next one has a neighbour.
 
+### The acceptance scorecard against the answers (added 2026-11-22)
+
+`ff backtest --trades` also prints `backtest.acceptance_table`: every offer of mine closed by the rival's answer or the clock
+(`rulings.CLOSED`: accepted, declined, expired; a counter is his package and a withdrawal is my hand, so neither is graded),
+how many were accepted, and, on the offers that carry the `p_accept` the card printed, the mean prediction, the Brier score
+and the three bins the card's words come from (`acceptance.BUCKETS`: under 0.35 is never a row, 0.35-0.6 "coin flip", 0.6
+and up "he'd likely take it").
+
+As of 2026-11-22 the log holds 8 offers: 1 accepted (the Hubbard 3-for-1, 2026-10-14), 6 expired unanswered, 1 withdrawn.
+None carries `p_accept`: the field is recorded from 2026-11-22 (`rulings.predicted_accept`), so the Brier reads blank until
+the next offers close. The emails printed 0.95 (Lawrence + Jeanty for Purdy + Higgins, 2026-10-13), 0.43 (Lawrence + St. Brown
+for McMillan + London, 2026-10-23) and 0.46 (Hubbard + Rodgers for McMillan + Jones, 2026-10-27) on three of the six that
+lapsed; the numbers are in the emails, not the log, and are not hand-copied into it.
+
+Read: one yes in seven answers against printed odds of 0.43 to 0.95 says the scorecard runs hot, but seven offers is
+not a fit. The plan (`docs/plans/trade-acceptance.md` 3.7) leaves the factors alone until twenty closed offers; TODO D22
+is that re-read, on this table. Until then the per-rival `prior` (`rulings.history`) is the only correction the scan
+applies, and only after two answers from the same rival.
+
 ## The scanner replay: 2026 weeks 1-5, graded through week 6, pulled and scored 2026-10-21
 
 `ff replay-pull --season 2026` for the three leagues (the version-2 file: the player universe, 1054 players in each), then

@@ -66,7 +66,12 @@ MUST_TRY_PPW = 2.0
 # A package is a row (`sendable`) when it clears every floor here; `why_not_sendable` names the ones it misses so the
 # detail can say why a candidate it lists is not on the card.
 SEND_MIN_PPW = 1.0        # my gain per week, a lost backup charged against it
-THEIR_FLOOR_PPW = -0.25   # what it may cost him per week before it reads as a loss on his side
+# What it may cost him per week before the package is not a row. His side of the delta is my projections on his lineup,
+# a number he never sees and one the blend cannot resolve to a quarter point; `p_accept` is the gate on whether he says
+# yes. At -0.25 (2026-10-07 to 2026-11-22) the L2 card carried no trade row for weeks 7-9 while the detail listed
+# packages at +2.3, +2.8 and +4.1 a week for me as "not a row: costs him 0.6/wk", in the one league whose roster was
+# sinking (points-for rank 5th to 8th of 10). The floor now catches only a package my own math says plainly robs him.
+THEIR_FLOOR_PPW = -1.0    # was -0.25 (2026-10-07); loosened 2026-11-22
 # The variance sign on a consolidation (fewer, bigger starters back): an underdog buys variance, a favorite buys floor
 # (Skinner, JQAS 2011; docs/research/trade-acceptance.md §2). Under UNDERDOG_PCT playoff odds my gain on one is scaled
 # up by VARIANCE_SIGN, over FAVORITE_PCT down by it; points per week stay the measure in between and with no sim. The

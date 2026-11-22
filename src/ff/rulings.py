@@ -223,7 +223,10 @@ def record_outcomes(packet: dict, path: Path = OUTCOMES_PATH, today: date | None
                              "expires_ts": t.get("expires_ts"), "proposed_ts": t.get("proposed_ts"),
                              # the scan's delta for the same package the morning it was seen: the predicted side of
                              # `backtest.trade_hits` (None when the scan did not produce the package that morning)
-                             "predicted_ppw": predicted_ppw(lg, t)}
+                             "predicted_ppw": predicted_ppw(lg, t),
+                             # the acceptance odds the card printed on it: the predicted side of
+                             # `backtest.acceptance_table` (None when neither the scan nor the open-offer pricing had one)
+                             "p_accept": predicted_accept(lg, t)}
                 events.append(f"{key}: opened")
         if lg.get("pending_trades_error"):
             continue
@@ -265,6 +268,17 @@ def predicted_ppw(lg: dict, offer: dict) -> float | None:
         if set(c.get("give") or []) == give and set(c.get("get") or []) == get and c.get("my_delta_ppw") is not None:
             return float(c["my_delta_ppw"])
     return float(offer["my_delta_ppw"]) if offer.get("my_delta_ppw") is not None else None
+
+
+def predicted_accept(lg: dict, offer: dict) -> float | None:
+    """`p_accept` of the scan candidate with this offer's players (both sides, as sets), else the number the packet
+    put on the open offer (`packet._price_open_offer`), else None. Before 2026-11-22 nothing kept it: eight offers went
+    out with 0.43 to 0.95 printed on them and one was accepted, and the scorecard had no calibration row to show it."""
+    give, get = set(offer.get("give") or []), set(offer.get("get") or [])
+    for c in lg.get("trades") or []:
+        if set(c.get("give") or []) == give and set(c.get("get") or []) == get and c.get("p_accept") is not None:
+            return float(c["p_accept"])
+    return float(offer["p_accept"]) if offer.get("p_accept") is not None else None
 
 
 def history(outs: dict[str, dict], league: str, today: date | None = None) -> dict[int, dict]:

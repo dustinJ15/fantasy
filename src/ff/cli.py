@@ -460,17 +460,30 @@ def backtest(replay: list[str] = typer.Option(None, "--replay", help="Replay fil
         return
     if trades:
         from .rulings import load_outcomes
-        rows = bt.trade_hits(load_outcomes(), {r["league"]: r for r in paths})
+        outcomes = load_outcomes()
+        rows = bt.trade_hits(outcomes, {r["league"]: r for r in paths})
+        acc = bt.acceptance_table(outcomes)
         if as_json:
-            print(json.dumps(rows, indent=1)); return
+            print(json.dumps({"trades": rows, "acceptance": acc}, indent=1)); return
         if not rows:
-            rprint("no accepted offers in the outcome log"); return
-        t = Table("league", "gave", "got", "closed", "from wk", "weeks", "missing", "realized /wk", "predicted /wk", "hit")
-        for r in rows:
-            fmt = lambda x: "—" if x is None else f"{x:+.1f}"
-            t.add_row(r["league"], ", ".join(r["give"]), ", ".join(r["get"]), r["closed"] or "—", str(r["from_week"] or "—"),
-                      str(r["weeks"]), str(r["missing"]), fmt(r["realized_ppw"]), fmt(r["predicted_ppw"]),
-                      "—" if r["hit"] is None else ("yes" if r["hit"] else "no"))
+            rprint("no accepted offers in the outcome log")
+        else:
+            t = Table("league", "gave", "got", "closed", "from wk", "weeks", "missing", "realized /wk", "predicted /wk", "hit")
+            for r in rows:
+                fmt = lambda x: "—" if x is None else f"{x:+.1f}"
+                t.add_row(r["league"], ", ".join(r["give"]), ", ".join(r["get"]), r["closed"] or "—", str(r["from_week"] or "—"),
+                          str(r["weeks"]), str(r["missing"]), fmt(r["realized_ppw"]), fmt(r["predicted_ppw"]),
+                          "—" if r["hit"] is None else ("yes" if r["hit"] else "no"))
+            rprint(t)
+        # The acceptance scorecard against the answers: every closed offer, and the printed odds where they were kept.
+        rprint(f"\n[bold]Acceptance[/]: {acc['n']} offers closed by his answer or the clock, {acc['accepted']} accepted"
+               + (f"; {acc['scored']} carried the card's odds: predicted {acc['predicted']:.2f}, Brier {acc['brier']}"
+                  if acc["scored"] else "; none carried the card's odds yet (recorded from 2026-11-22)")
+               + "; by status: " + ", ".join(f"{k} {v}" for k, v in sorted(acc["status"].items())))
+        t = Table("p(accept) bin", "n", "predicted", "accepted")
+        for b in acc["bins"]:
+            t.add_row(f"{b['lo']:.2f}-{b['hi']:.2f}", str(b["n"]), "—" if b["predicted"] is None else f"{b['predicted']:.2f}",
+                      "—" if b["accepted"] is None else f"{b['accepted']:.2f}")
         rprint(t); return
     results = [bt.lineup_calibration(r) for r in paths]
     if as_json:

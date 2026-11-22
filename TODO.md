@@ -87,6 +87,15 @@ Rules that hold for every item: read-only against ESPN; code owns numbers, Claud
   in every league (hit 0.47-0.57, realized -0.3 to +2.0) and the 1-2 bin realized +0.78 in L2 at a coin flip; 1.5 is the
   case if the 1-2 bin realizes under a point in two leagues over the season, and a ruling on it is one line here, not a
   constant change without the table.
+- [ ] **D22 (S, at twenty closed offers). Re-read the acceptance scorecard** (`model/acceptance.py` factors, `BASE`,
+  `SENDABLE`, `PUSH`) on `ff backtest --trades`' acceptance table (`backtest.acceptance_table`, `docs/accuracy.md` "The
+  acceptance scorecard against the answers"). As of 2026-11-22: 8 offers out since 2026-10-07, 1 accepted, 6 lapsed
+  unanswered, 1 withdrawn, printed odds 0.43-0.95 on the ones the emails show; `p_accept` is recorded on each new outcome
+  from 2026-11-22 (`rulings.predicted_accept`), so the Brier fills from the next offers on. The plan's bar
+  (`docs/plans/trade-acceptance.md` 3.7) is twenty closed offers before a factor moves. Done when: the table's 0.6+ bin
+  holds ten offers; if it accepts under half of them, shrink toward `BASE` (multiply the product's distance from BASE by
+  the bin's accepted/predicted) with the sample size and date in the comment and the old values kept; `SENDABLE` and
+  `PUSH` move only with the words (`BUCKETS`), and a pass is "stays" with the table pasted into docs/accuracy.md.
 
 ## Tier E — tests that would catch model errors
 

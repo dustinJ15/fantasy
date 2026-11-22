@@ -838,3 +838,31 @@ def test_a_week_w_prior_row_never_reads_a_week_w_or_later_actual():
     _box_scores_from_universe(week3)
     truth = lambda rows: [(r["espn_id"], r["weeks"], r["after_pg"]) for r in rows]
     assert truth(bt.score_prior(rep, bt.prior_week(rep, 3, 8), 8)) == truth(bt.score_prior(week3, bt.prior_week(week3, 3, 8), 8))
+
+
+# ---------- the acceptance scorecard against the answers (2026-11-22) ----------
+
+def test_acceptance_table_grades_closed_offers_and_skips_the_ones_without_odds():
+    """One of seven closed offers accepted while the card printed 0.43-0.95: the table that shows it. A withdrawal and a
+    counter are not his answer; an offer from before the field was kept counts in n and not in the Brier."""
+    outs = {
+        "L1|a": {"status": "accepted", "p_accept": 0.9},
+        "L1|b": {"status": "expired", "p_accept": 0.95},
+        "L1|c": {"status": "expired", "p_accept": 0.43},
+        "L1|d": {"status": "declined", "p_accept": 0.46},
+        "L1|e": {"status": "expired"},                      # predates the field
+        "L1|f": {"status": "withdrawn", "p_accept": 0.6},   # my hand
+        "L1|g": {"status": "countered", "p_accept": 0.5},   # his package, not a yes
+        "L1|h": {"status": "open", "p_accept": 0.7},
+    }
+    t = bt.acceptance_table(outs)
+    assert (t["n"], t["accepted"], t["scored"]) == (5, 1, 4)
+    assert t["predicted"] == round((0.9 + 0.95 + 0.43 + 0.46) / 4, 3)
+    assert t["brier"] == round(((0.9 - 1) ** 2 + 0.95 ** 2 + 0.43 ** 2 + 0.46 ** 2) / 4, 4)
+    by_bin = {(b["lo"], b["hi"]): b for b in t["bins"]}
+    assert by_bin[(0.0, 0.35)]["n"] == 0 and by_bin[(0.0, 0.35)]["predicted"] is None
+    assert by_bin[(0.35, 0.6)] == {"lo": 0.35, "hi": 0.6, "n": 2, "predicted": 0.445, "accepted": 0.0}
+    assert by_bin[(0.6, 1.0)] == {"lo": 0.6, "hi": 1.0, "n": 2, "predicted": 0.925, "accepted": 0.5}
+    assert t["status"] == {"accepted": 1, "expired": 3, "declined": 1, "withdrawn": 1, "countered": 1, "open": 1}
+    empty = bt.acceptance_table({})
+    assert (empty["n"], empty["scored"], empty["predicted"], empty["brier"]) == (0, 0, None, None)

@@ -506,9 +506,16 @@ def test_evaluate_taxes_an_uneven_offer_from_my_side(slots):
 def test_why_not_names_every_floor_the_package_misses():
     """The detail prints "not a row: <why_not>"; one line per floor, in the scan's first person."""
     assert why_not_sendable(0.5, 1.5, 0.3, [], 1.0) == []
-    assert why_not_sendable(0.5, 1.5, -0.6, [], 1.0) == ["costs him 0.6/wk"]
-    assert why_not_sendable(0.25, 0.4, -0.3, ["QB"], 0.7) == [
-        "costs him 0.3/wk", "coin flip at best", "under +1.0/wk for me", "he'd have to stream QB this week", "I give more at market"]
+    assert why_not_sendable(0.5, 1.5, -1.6, [], 1.0) == ["costs him 1.6/wk"]
+    assert why_not_sendable(0.25, 0.4, -1.3, ["QB"], 0.7) == [
+        "costs him 1.3/wk", "coin flip at best", "under +1.0/wk for me", "he'd have to stream QB this week", "I give more at market"]
+
+
+def test_a_package_that_costs_him_a_little_is_a_row_when_he_would_say_yes():
+    """Weeks 7-9 of 2026: the L2 card had no trade row while +2.3 to +4.1 a week for me sat in the detail as "costs him
+    0.6/wk". His side of the delta is my model on his lineup; `p_accept` decides whether he says yes."""
+    assert why_not_sendable(0.6, 4.1, -0.6, [], 1.0) == []
+    assert why_not_sendable(0.6, 2.3, -0.99, [], 1.0) == []
 
 
 def test_scan_says_why_an_overpay_is_not_a_row(slots):

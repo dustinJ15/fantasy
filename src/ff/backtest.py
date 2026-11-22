@@ -368,6 +368,40 @@ def trade_hits(outcomes: dict[str, dict], replays: dict[str, dict]) -> list[dict
     return out
 
 
+# ---------- the acceptance scorecard against the answers (2026-11-22) ----------
+# Eight offers went out between 2026-10-07 and 2026-11-22 with 0.43 to 0.95 printed on them; one was accepted, six
+# lapsed unanswered, one I withdrew. `acceptance.score` is a product of researched factors, "meant to be tuned against
+# the outcome log, not believed to two decimals", and until now nothing laid the two side by side. The bins are the
+# card's own words (`acceptance.BUCKETS`): under SENDABLE is never a row, SENDABLE to 0.6 reads "coin flip", 0.6 and up
+# "he'd likely take it". An offer counts once it is closed by his answer or the clock (`rulings.CLOSED`); a counter is
+# his package, not a yes to mine, and a withdrawal is my hand, so neither is graded. `predicted` averages the recorded
+# `p_accept`; offers that predate the field are counted in `n` and `accepted` and not in the Brier.
+ACCEPT_BINS = ((0.0, 0.35), (0.35, 0.6), (0.6, 1.01))
+
+
+def acceptance_table(outcomes: dict[str, dict]) -> dict[str, Any]:
+    """The printed acceptance odds against what the rivals did: `n` closed offers, how many were accepted, the mean
+    `p_accept` on the ones that carried it, the Brier score of those, the bins, and every status's count. The
+    `prior` factor the scan already blends in (`rulings.history`) is per rival; this is the scorecard as a whole."""
+    from .rulings import CLOSED
+    closed = [o for o in outcomes.values() if o.get("status") in CLOSED]
+    status = {}
+    for o in outcomes.values():
+        status[o.get("status") or "?"] = status.get(o.get("status") or "?", 0) + 1
+    scored = [(float(o["p_accept"]), float(o["status"] == "accepted")) for o in closed if o.get("p_accept") is not None]
+    bins = []
+    for lo, hi in ACCEPT_BINS:
+        xs = [(p, y) for p, y in scored if lo <= p < hi]
+        bins.append({"lo": lo, "hi": min(hi, 1.0), "n": len(xs),
+                     "predicted": round(sum(p for p, _ in xs) / len(xs), 3) if xs else None,
+                     "accepted": round(sum(y for _, y in xs) / len(xs), 3) if xs else None})
+    return {"n": len(closed), "accepted": sum(1 for o in closed if o["status"] == "accepted"),
+            "scored": len(scored),
+            "predicted": round(sum(p for p, _ in scored) / len(scored), 3) if scored else None,
+            "brier": round(sum((p - y) ** 2 for p, y in scored) / len(scored), 4) if scored else None,
+            "bins": bins, "status": status}
+
+
 # ---------- the scanner replay: every package the scan would have proposed, graded (TODO D12) ----------
 # `docs/plans/scanner-replay.md`. Each replayed regular-season week w, each team as `my_id`: the rosters from the
 # week-w box scores and the wire from the universe (minus everyone rostered that week), priced as the live scan prices

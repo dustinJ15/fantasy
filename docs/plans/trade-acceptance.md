@@ -225,6 +225,10 @@ Generate from need, not from brute force:
 5. Row rules: `sendable` requires `p_accept >= 0.35` and `my_gain >= 1.0`; `must_try` requires `p_accept >= 0.5` and
    `my_gain >= 2.0`. The card shows at most two trade rows per league and no "reach" row (today `todos()` prints one
    even when nothing is sendable; that line goes).
+   As built (2026-10-07), `sendable` also refused a package that cost the rival more than `THEIR_FLOOR_PPW` (-0.25) a
+   week by my projections. Loosened to -1.0 on 2026-11-22: his side of the delta is my model on his lineup, which he
+   never sees and which cannot resolve a quarter point; in weeks 7-9 of 2026 the floor hid +2.3 to +4.1 a week for me
+   behind "costs him 0.6/wk" in the one league whose roster was sinking. `p_accept` is the gate on whether he says yes.
 
 Every row carries `rival_after`: the position asked for, who starts there for him after the trade (a name, or
 "the wire: Mac Jones, 13.9"), and whether the best player in the deal is his or mine. `report.todos()` prints it in the
@@ -240,6 +244,10 @@ points back at the proposal: `espn.trade_resolutions`, B10, 2026-10-08) and the 
 fallback (accepted / countered / expired / withdrawn / declined). The scan reads it for the recency
 factor and for a per-rival prior (a rival who declined three offers has a lower base). This is the first real
 acceptance data the repo will have; it rides the projlog branch like the rest.
+From 2026-11-22 each entry also keeps the `p_accept` the card printed the morning the offer was first seen
+(`rulings.predicted_accept`), and `ff backtest --trades` prints `backtest.acceptance_table`: closed offers, accepted,
+the mean prediction, the Brier and the three word-bins (`docs/accuracy.md`, "The acceptance scorecard against the
+answers"). The first eight offers (one accepted, six lapsed) predate the field.
 
 Skip memory stays keyed by `<league>|<get>` but the generator fix is what stops the sibling packages; a skipped `get`
 set still blocks for 14 days.

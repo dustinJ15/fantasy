@@ -47,7 +47,7 @@ or an unruled trade, `card_lint` the card contradicting itself (two rows adding 
 exempt); `detail` is the reasons, clocks and numbers behind it (the email's grey line, `report.detail_line`). New wording goes in `detail` unless it
 changes the click. Game context on a row is a packet field put into words by one `report` helper both renderers call (`game_note` reads `odds_line`;
 `usage_note`, `due_note`, `accept_note`, `processes_note` likewise). `email_html.py` renders the HTML email from the packet. `rulings.py` is the
-memory on the `projlog` branch (skipped and pushed trades, offer outcomes, IR moves); `projlog.py` the projection log (`ff accuracy`). `demo.py` is
+memory on the `projlog` branch (skipped and pushed trades, offer outcomes with the card's `p_accept`, graded by `ff backtest --trades`, IR moves); `projlog.py` the projection log (`ff accuracy`). `demo.py` is
 the synthetic league. `backtest.py` replays a season's box scores (`ff replay-pull` → `data/replay/`) through the same code: P(win) calibration, the optimizer vs the set lineups, `--trades`, `--scan` and `--claims` (every trade package and claim row of every team-week, graded; `docs/plans/scanner-replay.md`), `--prior` (every body's rest-of-season price against what he scored after), `--fit` (the fitted weekly number against ESPN's, the mixing weight; reads nflverse). Tests: `uv run pytest`; the Apps Script doorbell: `node scripts/gmail_trade_doorbell.test.js` (run it after editing the `.gs`).
 
 ## Data gotchas and rules
