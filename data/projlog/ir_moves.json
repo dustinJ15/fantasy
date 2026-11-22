@@ -33,7 +33,6 @@
     "4361307": "Trey McBride",
     "4685472": "Tetairoa McMillan",
     "4426348": "Jayden Daniels",
-    "4431452": "Drake Maye",
     "4430027": "Sam LaPorta",
     "4432620": "Parker Washington",
     "16737": "Mike Evans",
@@ -47,9 +46,7 @@
     "4696044": "Kaelon Black",
     "3042519": "Aaron Jones Sr."
    },
-   "ir": [
-    "16737"
-   ]
+   "ir": []
   },
   "L3": {
    "date": "2026-11-22",
@@ -64,13 +61,13 @@
     "4685278": "Luther Burden III",
     "4426388": "Jameson Williams",
     "3929645": "Juwan Johnson",
-    "4599739": "Kendre Miller",
     "4428718": "Tre Tucker",
     "4689936": "Jake Bates",
     "3912547": "Sam Darnold",
     "-16033": "Ravens D/ST",
     "3139477": "Patrick Mahomes",
-    "4362478": "Emari Demercado"
+    "4362478": "Emari Demercado",
+    "3116164": "Mike Gesicki"
    },
    "ir": [
     "3912547"
@@ -125,7 +122,7 @@
    "added": [
     "Jonathon Brooks"
    ],
-   "left": "2026-11-13"
+   "left": "2026-11-22"
   },
   "L3|3912547": {
    "name": "Sam Darnold",

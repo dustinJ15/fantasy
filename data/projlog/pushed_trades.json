@@ -225,7 +225,7 @@
  "L2|Bucky Irving+Tony Pollard": {
   "status": "open",
   "since": "2026-11-18",
-  "last": "2026-11-18",
+  "last": "2026-11-22",
   "league": "L2",
   "rival": "TBD",
   "give": [
@@ -257,7 +257,7 @@
   "note": null
  },
  "L3|Jaylen Warren": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-11-19",
   "last": "2026-11-19",
   "league": "L3",
@@ -269,6 +269,8 @@
    "Jaylen Warren"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-11-22",
+  "skip_note": "Warren is down to 38% of the Steelers' snaps and Dowdle out-snapped him last week, so his per game number is stale. Not sending Burden for a back losing his job."
  }
 }

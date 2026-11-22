@@ -761,5 +761,31 @@
    "Jaylen Warren"
   ],
   "note": "Same McBride as the Irving offer and I'd rather have Irving and Olave. Only fall back to this if TBD turns that one down."
+ },
+ "L2|Bucky Irving+Chris Olave": {
+  "date": "2026-11-22",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Trey McBride",
+   "Parker Washington"
+  ],
+  "get": [
+   "Bucky Irving",
+   "Chris Olave"
+  ],
+  "note": "same McBride and Washington going out as the Pollard version, and Pollard is the one with the bellcow snap share. One ask to TBD, not two."
+ },
+ "L3|Jaylen Warren": {
+  "date": "2026-11-22",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Luther Burden III"
+  ],
+  "get": [
+   "Jaylen Warren"
+  ],
+  "note": "Warren is down to 38% of the Steelers' snaps and Dowdle out-snapped him last week, so his per game number is stale. Not sending Burden for a back losing his job."
  }
 }
