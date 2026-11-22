@@ -44,9 +44,12 @@
     "4567104": "Will Reichard",
     "3916433": "Jakobi Meyers",
     "4696044": "Kaelon Black",
-    "3042519": "Aaron Jones Sr."
+    "3042519": "Aaron Jones Sr.",
+    "4685350": "Trevor Etienne"
    },
-   "ir": []
+   "ir": [
+    "4429205"
+   ]
   },
   "L3": {
    "date": "2026-11-22",
@@ -130,6 +133,14 @@
    "stashed": "2026-11-11",
    "added": [
     "Aaron Rodgers"
+   ]
+  },
+  "L2|4429205": {
+   "name": "Jordan Addison",
+   "league": "L2",
+   "stashed": "2026-11-22",
+   "added": [
+    "Trevor Etienne"
    ]
   }
  }
