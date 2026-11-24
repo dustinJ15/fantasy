@@ -394,18 +394,18 @@
   "note": "SpangeBob would be starting the wire at QB and at RB after this. nobody takes that mid-week, whatever the chart says"
  },
  "L3|Jaylen Warren+Joe Burrow": {
-  "date": "2026-11-07",
+  "date": "2026-11-24",
   "league": "L3",
   "rival": "BUTT MUNCH",
   "give": [
-   "Jonathan Taylor",
+   "Amon-Ra St. Brown",
    "Caleb Williams"
   ],
   "get": [
    "Joe Burrow",
    "Jaylen Warren"
   ],
-  "note": "not giving up Taylor for this. Pittsburgh is on bye so Warren does nothing for you this week, and I couldn't find anything recent on his workload. the Mahomes deal buys the same QB upgrade for a bench receiver."
+  "note": "this is the guy you play this week and it executes before kickoff. you'd be handing him a QB upgrade he'd start against you, and you're already the underdog."
  },
  "L3|Jordan Love+Trey McBride": {
   "date": "2026-10-13",
@@ -787,5 +787,18 @@
    "Jaylen Warren"
   ],
   "note": "Warren is down to 38% of the Steelers' snaps and Dowdle out-snapped him last week, so his per game number is stale. Not sending Burden for a back losing his job."
+ },
+ "L2|Bhayshul Tuten+Kyren Williams": {
+  "date": "2026-11-24",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Chuba Hubbard"
+  ],
+  "get": [
+   "Kyren Williams",
+   "Bhayshul Tuten"
+  ],
+  "note": "Kyren was a near 50/50 split with Blake Corum before the bye and has toe soreness, Tuten played 43% of snaps on a bad ankle. That's two part time backs for your 19 carry guy."
  }
 }
