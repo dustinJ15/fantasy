@@ -272,5 +272,22 @@
   "note": null,
   "closed": "2026-11-22",
   "skip_note": "Warren is down to 38% of the Steelers' snaps and Dowdle out-snapped him last week, so his per game number is stale. Not sending Burden for a back losing his job."
+ },
+ "L3|Kenneth Walker III+Tyler Shough": {
+  "status": "open",
+  "since": "2026-11-25",
+  "last": "2026-11-25",
+  "league": "L3",
+  "rival": "Bodacious",
+  "give": [
+   "Amon-Ra St. Brown",
+   "Patrick Mahomes"
+  ],
+  "get": [
+   "Kenneth Walker III",
+   "Tyler Shough"
+  ],
+  "source": "math",
+  "note": null
  }
 }
