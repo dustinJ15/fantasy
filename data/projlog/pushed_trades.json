@@ -289,5 +289,21 @@
   ],
   "source": "math",
   "note": null
+ },
+ "L1|Jaylen Warren+Kyren Williams": {
+  "status": "open",
+  "since": "2026-11-26",
+  "last": "2026-11-26",
+  "league": "L1",
+  "rival": "Bring Out The Whole Ocean!",
+  "give": [
+   "Chuba Hubbard"
+  ],
+  "get": [
+   "Kyren Williams",
+   "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
  }
 }
