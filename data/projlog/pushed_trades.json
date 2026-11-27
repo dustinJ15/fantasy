@@ -32,9 +32,9 @@
   "closed": "2026-10-07"
  },
  "L1|Jaylen Warren": {
-  "status": "open",
+  "status": "skipped",
   "since": "2026-10-02",
-  "last": "2026-10-02",
+  "last": "2026-11-27",
   "league": "L1",
   "rival": "Bring Out The Whole Ocean!",
   "give": [
@@ -45,7 +45,9 @@
    "Jaylen Warren"
   ],
   "source": "math",
-  "note": null
+  "note": null,
+  "closed": "2026-11-27",
+  "skip_note": "Dowdle owns that backfield now and Warren's per-game is stale. You already have Kittle out to this same guy for McMillan, who is the better get. Stop asking."
  },
  "L2|Ja'Marr Chase": {
   "status": "skipped",
@@ -302,6 +304,21 @@
   "get": [
    "Kyren Williams",
    "Jaylen Warren"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L2|Puka Nacua": {
+  "status": "open",
+  "since": "2026-11-27",
+  "last": "2026-11-27",
+  "league": "L2",
+  "rival": "Punts and Pints",
+  "give": [
+   "Sam LaPorta"
+  ],
+  "get": [
+   "Puka Nacua"
   ],
   "source": "math",
   "note": null
