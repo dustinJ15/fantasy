@@ -146,7 +146,7 @@
   "closed": "2026-11-01"
  },
  "L1|fc94d6f1-5588-4534-8f87-22f7f1c6a9c2": {
-  "status": "open",
+  "status": "expired",
   "league": "L1",
   "rival": "Bring Out The Whole Ocean!",
   "rival_team_id": 9,
@@ -161,10 +161,11 @@
   "expires_ts": 1795798711930,
   "proposed_ts": 1795625911890,
   "predicted_ppw": 1.54,
-  "p_accept": null
+  "p_accept": null,
+  "closed": "2026-11-28"
  },
  "L2|8045da76-c761-44ed-a0c8-a043cdc5a1ba": {
-  "status": "open",
+  "status": "expired",
   "league": "L2",
   "rival": "TBD",
   "rival_team_id": 9,
@@ -180,6 +181,7 @@
   "expires_ts": 1795798867354,
   "proposed_ts": 1795626067320,
   "predicted_ppw": 4.03,
-  "p_accept": null
+  "p_accept": null,
+  "closed": "2026-11-28"
  }
 }

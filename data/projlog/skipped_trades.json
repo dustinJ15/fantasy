@@ -839,5 +839,31 @@
    "Bhayshul Tuten"
   ],
   "note": "two part-time backs for your 19-carry guy, and Tuten has been playing through a bad ankle. Same answer as the Kyren version on Tuesday."
+ },
+ "L2|Kyren Williams": {
+  "date": "2026-11-28",
+  "league": "L2",
+  "rival": "TBD",
+  "give": [
+   "Jonathan Taylor"
+  ],
+  "get": [
+   "Kyren Williams"
+  ],
+  "note": "Kyren played Wednesday. You'd be shipping Taylor before his 1pm kickoff for a guy who can't score again this week, and Blake Corum has him near a 50/50 split anyway. A tenth of a title point isn't worth a 19 carry back."
+ },
+ "L3|CeeDee Lamb+Kyren Williams": {
+  "date": "2026-11-28",
+  "league": "L3",
+  "rival": "Nadderall",
+  "give": [
+   "Amon-Ra St. Brown",
+   "Chris Olave"
+  ],
+  "get": [
+   "CeeDee Lamb",
+   "Kyren Williams"
+  ],
+  "note": "Lamb played Thursday and Kyren played Wednesday, so this is Olave's Sunday traded for two players who can't score again. It costs St. Brown on top of that."
  }
 }

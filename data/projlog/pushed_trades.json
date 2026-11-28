@@ -295,7 +295,7 @@
  "L1|Jaylen Warren+Kyren Williams": {
   "status": "open",
   "since": "2026-11-26",
-  "last": "2026-11-26",
+  "last": "2026-11-28",
   "league": "L1",
   "rival": "Bring Out The Whole Ocean!",
   "give": [
@@ -319,6 +319,21 @@
   ],
   "get": [
    "Puka Nacua"
+  ],
+  "source": "math",
+  "note": null
+ },
+ "L3|Cam Skattebo": {
+  "status": "open",
+  "since": "2026-11-28",
+  "last": "2026-11-28",
+  "league": "L3",
+  "rival": "BUTT MUNCH",
+  "give": [
+   "Luther Burden III"
+  ],
+  "get": [
+   "Cam Skattebo"
   ],
   "source": "math",
   "note": null
